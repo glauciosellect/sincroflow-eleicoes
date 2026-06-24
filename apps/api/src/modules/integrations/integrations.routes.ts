@@ -1,0 +1,102 @@
+import type { FastifyInstance } from 'fastify'
+import { z } from 'zod'
+import { prisma } from '../../lib/prisma'
+import { getWorkspaceId } from '../../lib/workspace'
+import { encrypt, decrypt } from '../../lib/crypto'
+
+
+const INTEGRATION_TYPES = ['ELEVEN_LABS', 'GOOGLE_CALENDAR', 'PLUG_CHAT', 'E_VENDI', 'SHOPIFY', 'STRIPE', 'PAYPAL', 'INVIDEO'] as const
+
+export async function integrationRoutes(app: FastifyInstance) {
+  app.addHook('onRequest', app.authenticate)
+
+  // ── ElevenLabs (chave global do workspace) ────────────────────────────────
+  app.get('/integrations/elevenlabs', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    const ws = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { elevenLabsKey: true, elevenLabsVoiceId: true } as any,
+    }) as any
+    return reply.send({
+      connected: !!ws?.elevenLabsKey,
+      voiceId: ws?.elevenLabsVoiceId ?? null,
+    })
+  })
+
+  app.post('/integrations/elevenlabs', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    const { apiKey, voiceId } = z.object({ apiKey: z.string().min(1), voiceId: z.string().min(1) }).parse(req.body)
+    await (prisma.workspace as any).update({
+      where: { id: workspaceId },
+      data: { elevenLabsKey: encrypt(apiKey), elevenLabsVoiceId: voiceId },
+    })
+    return reply.send({ ok: true })
+  })
+
+  // Preview de voz — retorna áudio MP3 em base64 para ouvir no browser
+  app.post('/integrations/tts/preview', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    const { voice } = z.object({ voice: z.string().min(1) }).parse(req.body)
+    const { generateSpeech } = await import('../tts/tts.service')
+    // Texto fixo de demonstração
+    const sampleText = 'Olá! Eu sou seu assistente virtual. Como posso ajudar você hoje?'
+    const buffer = await generateSpeech(sampleText, workspaceId, voice)
+    if (!buffer) return reply.status(500).send({ error: 'Não foi possível gerar o áudio' })
+    return reply.send({ audio: buffer.toString('base64'), mimeType: 'audio/mpeg' })
+  })
+
+  app.delete('/integrations/elevenlabs', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    await (prisma.workspace as any).update({
+      where: { id: workspaceId },
+      data: { elevenLabsKey: null, elevenLabsVoiceId: null },
+    })
+    return reply.send({ ok: true })
+  })
+
+  app.get('/agents/:agentId/integrations', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    const { agentId } = req.params as { agentId: string }
+    const agent = await prisma.agent.findFirst({ where: { id: agentId, workspaceId } })
+    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
+    const integrations = await prisma.agentIntegration.findMany({ where: { agentId } })
+    return reply.send(integrations)
+  })
+
+  app.post('/agents/:agentId/integrations/:type', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const workspaceId = await getWorkspaceId(sub, wid)
+    const { agentId, type } = req.params as { agentId: string; type: string }
+    if (!INTEGRATION_TYPES.includes(type as any)) return reply.status(400).send({ error: 'Tipo inválido' })
+    const agent = await prisma.agent.findFirst({ where: { id: agentId, workspaceId } })
+    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
+    const { config } = z.object({ config: z.record(z.any()) }).parse(req.body)
+    const integration = await prisma.agentIntegration.upsert({
+      where: { agentId_type: { agentId, type: type as any } },
+      update: { config, isActive: true },
+      create: { agentId, type: type as any, config },
+    })
+    return reply.status(201).send(integration)
+  })
+
+  app.patch('/agents/:agentId/integrations/:type', async (req, reply) => {
+    const { agentId, type } = req.params as { agentId: string; type: string }
+    const data = z.object({ config: z.record(z.any()).optional(), isActive: z.boolean().optional() }).parse(req.body)
+    const integration = await prisma.agentIntegration.update({
+      where: { agentId_type: { agentId, type: type as any } },
+      data,
+    })
+    return reply.send(integration)
+  })
+
+  app.delete('/agents/:agentId/integrations/:type', async (req, reply) => {
+    const { agentId, type } = req.params as { agentId: string; type: string }
+    await prisma.agentIntegration.deleteMany({ where: { agentId, type: type as any } })
+    return reply.send({ ok: true })
+  })
+}

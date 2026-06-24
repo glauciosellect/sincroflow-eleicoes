@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise de Mercado — SyncroFlow.io</title>
+<style>
+  :root {
+    --brand: #6C3FF5;
+    --brand-light: #EDE9FF;
+    --brand-mid: #9B73FF;
+    --accent: #00D4AA;
+    --accent-light: #E0FBF5;
+    --warn: #FF6B35;
+    --warn-light: #FFF0EB;
+    --neutral: #0F0F1A;
+    --muted: #6B7280;
+    --border: #E5E7EB;
+    --bg: #F9FAFB;
+    --white: #FFFFFF;
+    --danger: #EF4444;
+    --success: #10B981;
+    --yellow: #F59E0B;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--neutral);
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #0F0F1A 0%, #1E1040 60%, #2D1B69 100%);
+    color: white;
+    padding: 56px 48px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(108,63,245,0.3) 0%, transparent 70%);
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: 30%;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,170,0.15) 0%, transparent 70%);
+  }
+  .header-content { position: relative; z-index: 1; max-width: 900px; }
+  .badge {
+    display: inline-block;
+    background: rgba(108,63,245,0.35);
+    border: 1px solid rgba(108,63,245,0.6);
+    color: #C4B0FF;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .header h1 {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff 40%, #C4B0FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header .subtitle {
+    font-size: 16px;
+    color: rgba(255,255,255,0.65);
+    max-width: 600px;
+  }
+  .header-meta {
+    display: flex;
+    gap: 24px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+  }
+  .meta-item strong { color: rgba(255,255,255,0.85); }
+
+  /* CONTAINER */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  /* SECTIONS */
+  .section { padding: 48px 0; }
+  .section-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--neutral);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .icon {
+    width: 32px; height: 32px;
+    background: var(--brand-light);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .section-desc { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .divider { height: 1px; background: var(--border); margin: 8px 0 32px; }
+
+  /* EXECUTIVE SUMMARY CARDS */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .summary-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .summary-card .value { font-size: 28px; font-weight: 800; color: var(--neutral); }
+  .summary-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .summary-card.highlight { border-color: var(--brand); background: var(--brand-light); }
+  .summary-card.highlight .value { color: var(--brand); }
+
+  /* POSITIONING MAP */
+  .position-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .position-title { font-size: 15px; font-weight: 700; color: var(--neutral); margin-bottom: 4px; }
+  .position-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  .matrix {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background:
+      linear-gradient(rgba(108,63,245,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(108,63,245,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    overflow: visible;
+  }
+  .axis-x {
+    position: absolute;
+    bottom: -28px;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .axis-y {
+    position: absolute;
+    left: -36px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .axis-label-low { position: absolute; font-size: 10px; color: var(--muted); }
+  .axis-label-high { position: absolute; font-size: 10px; color: var(--muted); }
+
+  .dot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: default;
+  }
+  .dot-circle {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 11px;
+    color: white;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+  }
+  .dot:hover .dot-circle { transform: scale(1.15); }
+  .dot-label {
+    margin-top: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--neutral);
+    white-space: nowrap;
+    background: white;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* COMPARISON TABLE */
+  .table-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--neutral); }
+  thead th {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  thead th.syncro { color: #C4B0FF; }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #FAFAFA; }
+  td {
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--neutral);
+    vertical-align: middle;
+  }
+  td.feature-name {
+    font-weight: 600;
+    color: var(--neutral);
+    font-size: 13px;
+  }
+  td.feature-cat {
+    font-size: 11px;
+    color: var(--muted);
+    padding-top: 6px;
+    padding-bottom: 2px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    background: #F3F4F6;
+    border-bottom: 1px solid var(--border);
+  }
+  .syncro-col { background: rgba(108,63,245,0.04); border-left: 3px solid var(--brand); }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .chip.yes { background: #D1FAE5; color: #065F46; }
+  .chip.no { background: #FEE2E2; color: #991B1B; }
+  .chip.partial { background: #FEF3C7; color: #92400E; }
+  .chip.star { background: var(--brand-light); color: var(--brand); }
+  .chip.na { background: #F3F4F6; color: var(--muted); }
+
+  /* GAPS SECTION */
+  .gaps-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .gap-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .gap-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .gap-logo {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+  }
+  .gap-header-info h3 { font-size: 15px; font-weight: 700; }
+  .gap-header-info p { font-size: 12px; color: var(--muted); }
+  .gap-body { padding: 20px; }
+
+  .gap-section { margin-bottom: 16px; }
+  .gap-section:last-child { margin-bottom: 0; }
+  .gap-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 8px;
+  }
+  .gap-section-title.adv { color: var(--success); }
+  .gap-section-title.disadv { color: var(--danger); }
+  .gap-section-title.opp { color: var(--brand); }
+
+  .gap-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .gap-item .bullet {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .bullet.g { background: #D1FAE5; color: #065F46; }
+  .bullet.r { background: #FEE2E2; color: #991B1B; }
+  .bullet.b { background: var(--brand-light); color: var(--brand); }
+
+  /* RADAR / SCORE */
+  .score-section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .score-col { text-align: center; }
+  .score-name { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 12px; }
+  .score-bars { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .score-bar-row { display: flex; align-items: center; gap: 6px; }
+  .score-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: #F3F4F6;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar-fill { height: 100%; border-radius: 3px; }
+  .score-label { font-size: 10px; color: var(--muted); width: 28px; text-align: right; }
+  .score-legend { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* STRATEGY */
+  .strategy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .strategy-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .strategy-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .strategy-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .priority-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+  .p-high { background: #FEE2E2; color: #991B1B; }
+  .p-med { background: #FEF3C7; color: #92400E; }
+  .p-low { background: #D1FAE5; color: #065F46; }
+
+  /* POSITIONING BOX */
+  .position-box {
+    background: linear-gradient(135deg, var(--brand) 0%, #9B73FF 100%);
+    border-radius: 16px;
+    padding: 36px;
+    color: white;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 20px;
+  }
+  .position-box h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    grid-column: 1 / -1;
+  }
+  .pos-stat { text-align: center; }
+  .pos-stat .num { font-size: 42px; font-weight: 900; line-height: 1; }
+  .pos-stat .unit { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+  .pos-stat .desc { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+
+  .verdict-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .verdict-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .verdict-card .icon-big { font-size: 32px; margin-bottom: 10px; }
+  .verdict-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .verdict-card p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .verdict-card.win { border-top: 3px solid var(--success); }
+  .verdict-card.risk { border-top: 3px solid var(--warn); }
+  .verdict-card.opp { border-top: 3px solid var(--brand); }
+
+  /* FOOTER */
+  .footer {
+    background: var(--neutral);
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    margin-top: 48px;
+  }
+
+  @media (max-width: 768px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .gaps-grid { grid-template-columns: 1fr; }
+    .score-grid { grid-template-columns: repeat(4, 1fr); }
+    .strategy-grid { grid-template-columns: 1fr; }
+    .verdict-grid { grid-template-columns: 1fr; }
+    .position-box { grid-template-columns: 1fr; }
+    .header { padding: 32px 24px; }
+    .container { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-content">
+    <div class="badge">📊 Análise Competitiva · Junho 2026</div>
+    <h1>SyncroFlow.io vs. Mercado Brasileiro<br>de Automação & Workflow</h1>
+    <p class="subtitle">Mapeamento detalhado de gaps, vantagens competitivas e posicionamento estratégico frente aos principais concorrentes no Brasil.</p>
+    <div class="header-meta">
+      <div class="meta-item">🏆 <strong>6 Concorrentes</strong> analisados</div>
+      <div class="meta-item">📍 <strong>Foco:</strong> Mercado Brasileiro</div>
+      <div class="meta-item">🤖 <strong>Dimensões:</strong> IA, Preço, Integrações, UX</div>
+      <div class="meta-item">🗓️ <strong>Base:</strong> Junho 2026</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- EXECUTIVE SUMMARY -->
+  <div class="section">
+    <div class="section-title"><div class="icon">🎯</div> Resumo Executivo</div>
+    <p class="section-desc">Visão macro do mercado e posicionamento atual do SyncroFlow.</p>
+    <div class="divider"></div>
+
+    <div class="summary-grid">
+      <div class="summary-card highlight">
+        <div class="label">Posição no Mercado BR</div>
+        <div class="value">#4</div>
+        <div class="sub">Entre plataformas com DNA brasileiro</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Mercado Global 2026</div>
+        <div class="value">$28B</div>
+        <div class="sub">Crescimento para $65B até 2034</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Principais Rivais BR</div>
+        <div class="value">3</div>
+        <div class="sub">Pipefy · Jestor · Pluga</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Rivais Globais no BR</div>
+        <div class="value">3</div>
+        <div class="sub">Zapier · Make · n8n</div>
+      </div>
+    </div>
+
+    <div class="verdict-grid">
+      <div class="verdict-card win">
+        <div class="icon-big">💚</div>
+        <h4>Vantagens Atuais</h4>
+        <p>DNA 100% brasileiro, preço em BRL, suporte em PT-BR nativo, integrações com ecossistema local (WhatsApp, PIX, NF-e, RD Station, Conta Azul) e foco em PMEs que os globais ignoram.</p>
+      </div>
+      <div class="verdict-card risk">
+        <div class="icon-big">⚠️</div>
+        <h4>Principais Riscos</h4>
+        <p>Menor quantidade de integrações vs. Zapier/Make, ausência de plano enterprise consolidado, menor reconhecimento de marca e comunidade ainda pequena frente a players globais.</p>
+      </div>
+      <div class="verdict-card opp">
+        <div class="icon-big">🚀</div>
+        <h4>Maior Oportunidade</h4>
+        <p>O vácuo entre ferramentas globais caras/complexas e ferramentas nacionais simples/limitadas. SyncroFlow pode ocupar o meio: poderoso e brasileiro, a preço acessível em BRL.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- POSITIONING MAP -->
+  <div class="section">
+    <div class="section-title"><div class="icon">🗺️</div> Mapa de Posicionamento</div>
+    <p class="section-desc">Eixo X = Nível de complexidade/técnico (low-code → dev-friendly). Eixo Y = Foco no mercado brasileiro (global → 100% BR).</p>
+    <div class="divider"></div>
+
+    <div class="position-wrap">
+      <div style="position: relative; margin: 20px 48px 48px 48px;">
+        <div class="matrix" id="matrix">
+
+          <!-- Axis lines -->
+          <div style="position:absolute; left:50%; top:0; bottom:0; width:1px; background: rgba(108,63,245,0.15);"></div>
+          <div style="position:absolute; top:50%; left:0; right:0; height:1px; background: rgba(108,63,245,0.15);"></div>
+
+          <!-- Quadrant labels -->
+          <div style="position:absolute; top:10px; left:10px; font-size:10px; color:#D1D5DB; font-weight:600;">Visual / Foco Global</div>
+          <div style="position:absolute; top:10px; right:10px; font-size:10px; color:#D1D5DB; font-weight:600; text-align:right;">Dev / Foco Global</div>
+          <div style="position:absolute; bottom:10px; left:10px; font-size:10px; color:#D1D5DB; font-weight:600;">Visual / Foco BR</div>
+          <div style="position:absolute; bottom:10px; right:10px; font-size:10px; color:#D1D5DB; font-weight:600; text-align:right;">Dev / Foco BR</div>
+
+          <!-- Zapier: high global, low-code -->
+          <div class="dot" style="left: 22%; top: 18%;">
+            <div class="dot-circle" style="width:44px;height:44px;background:#FF4A00;">ZP</div>
+            <div class="dot-label">Zapier</div>
+          </div>
+
+          <!-- Make: global, visual/mid-code -->
+          <div class="dot" style="left: 35%; top: 22%;">
+            <div class="dot-circle" style="width:40px;height:40px;background:#A438E4;">MK</div>
+            <div class="dot-label">Make</div>
+          </div>
+
+          <!-- n8n: global, dev-heavy -->
+          <div class="dot" style="left: 72%; top: 15%;">
+            <div class="dot-circle" style="width:42px;height:42px;background:#EA4B71;">n8n</div>
+            <div class="dot-label">n8n</div>
+          </div>
+
+          <!-- Pipefy: semi-BR, mid enterprise -->
+          <div class="dot" style="left: 30%; top: 55%;">
+            <div class="dot-circle" style="width:46px;height:46px;background:#1F9B6B;">PF</div>
+            <div class="dot-label">Pipefy</div>
+          </div>
+
+          <!-- Jestor: BR, low-code -->
+          <div class="dot" style="left: 18%; top: 72%;">
+            <div class="dot-circle" style="width:38px;height:38px;background:#0EA5E9;">JS</div>
+            <div class="dot-label">Jestor</div>
+          </div>
+
+          <!-- Pluga: BR, very simple -->
+          <div class="dot" style="left: 10%; top: 82%;">
+            <div class="dot-circle" style="width:34px;height:34px;background:#F97316;">PL</div>
+            <div class="dot-label">Pluga</div>
+          </div>
+
+          <!-- SyncroFlow: BR, mid-code, better than Jestor -->
+          <div class="dot" style="left: 52%; top: 68%;">
+            <div class="dot-circle" style="width:52px;height:52px;background: linear-gradient(135deg,#6C3FF5,#00D4AA); border: 3px solid white; box-shadow: 0 0 20px rgba(108,63,245,0.5);">SF</div>
+            <div class="dot-label" style="background: var(--brand); color: white; border-color: var(--brand); font-size:11px; padding: 2px 8px;">SyncroFlow ✦</div>
+          </div>
+
+        </div>
+        <div class="axis-x">← No-Code / Visual &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Técnico / Dev-First →</div>
+        <div class="axis-y">← Global &nbsp;&nbsp;&nbsp;&nbsp; 100% Brasil →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON TABLE -->
+  <div class="section">
+    <div class="section-title"><div class="icon">📋</div> Comparativo Detalhado</div>
+    <p class="section-desc">Análise feature-by-feature com a posição real do SyncroFlow em relação aos concorrentes.</p>
+    <div class="divider"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:200px;">Dimensão</th>
+            <th class="syncro">🟣 SyncroFlow</th>
+            <th>🟠 Zapier</th>
+            <th>🟣 Make</th>
+            <th>🔴 n8n</th>
+            <th>🟢 Pipefy</th>
+            <th>🔵 Jestor</th>
+            <th>🟡 Pluga</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- PREÇO -->
+          <tr><td colspan="8" class="feature-cat">💰 Modelo de Preço</td></tr>
+          <tr>
+            <td class="feature-name">Moeda de cobrança</td>
+            <td class="syncro-col"><span class="chip star">✦ BRL</span></td>
+            <td><span class="chip no">USD</span></td>
+            <td><span class="chip no">USD</span></td>
+            <td><span class="chip partial">USD*</span></td>
+            <td><span class="chip no">USD</span></td>
+            <td><span class="chip yes">BRL</span></td>
+            <td><span class="chip yes">BRL</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Plano gratuito</td>
+            <td class="syncro-col"><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Trial</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Plano entrada (mês)</td>
+            <td class="syncro-col"><span class="chip star">~R$79</span></td>
+            <td><span class="chip no">~R$139+</span></td>
+            <td><span class="chip partial">~R$55+</span></td>
+            <td><span class="chip yes">~R$125 cloud</span></td>
+            <td><span class="chip no">~R$125+/usuário</span></td>
+            <td><span class="chip yes">R$99 ilimitado</span></td>
+            <td><span class="chip yes">R$49+</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Precificação por usuário</td>
+            <td class="syncro-col"><span class="chip star">Não (por uso)</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Sim (caro)</span></td>
+            <td><span class="chip yes">Não (fixo)</span></td>
+            <td><span class="chip na">Limitado</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">LGPD / dados no BR</td>
+            <td class="syncro-col"><span class="chip star">✦ Nativo</span></td>
+            <td><span class="chip no">EUA</span></td>
+            <td><span class="chip no">Europa</span></td>
+            <td><span class="chip partial">Flex (self)</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+
+          <!-- INTEGRAÇÕES -->
+          <tr><td colspan="8" class="feature-cat">🔌 Integrações</td></tr>
+          <tr>
+            <td class="feature-name">Qtd. de integrações</td>
+            <td class="syncro-col"><span class="chip partial">~180 BR-foco</span></td>
+            <td><span class="chip yes">7.000+</span></td>
+            <td><span class="chip yes">1.800+</span></td>
+            <td><span class="chip yes">400+ nativo</span></td>
+            <td><span class="chip partial">~200</span></td>
+            <td><span class="chip partial">~400 BR</span></td>
+            <td><span class="chip partial">~200 BR</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">WhatsApp Business</td>
+            <td class="syncro-col"><span class="chip star">✦ Nativo</span></td>
+            <td><span class="chip partial">Via API</span></td>
+            <td><span class="chip partial">Via API</span></td>
+            <td><span class="chip partial">Via node</span></td>
+            <td><span class="chip partial">Limitado</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">PIX / Pagamentos BR</td>
+            <td class="syncro-col"><span class="chip star">✦ Nativo</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip partial">Custom</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">NF-e / Fiscal BR</td>
+            <td class="syncro-col"><span class="chip star">✦ Sim</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip partial">Custom</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">RD Station / MKT BR</td>
+            <td class="syncro-col"><span class="chip star">✦ Nativo</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Comunidade</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">ERPs nacionais (Conta Azul, Bling)</td>
+            <td class="syncro-col"><span class="chip star">✦ Nativo</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip no">Custom</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip yes">Foco principal</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+
+          <!-- IA -->
+          <tr><td colspan="8" class="feature-cat">🤖 Inteligência Artificial</td></tr>
+          <tr>
+            <td class="feature-name">Agentes de IA</td>
+            <td class="syncro-col"><span class="chip star">✦ Sim (PT-BR)</span></td>
+            <td><span class="chip partial">Beta</span></td>
+            <td><span class="chip partial">Beta</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Básico</span></td>
+            <td><span class="chip partial">Beta</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Builder IA (linguagem natural)</td>
+            <td class="syncro-col"><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Em dev</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Básico</span></td>
+            <td><span class="chip no">Não</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Sugestão de automação com IA</td>
+            <td class="syncro-col"><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Plugin</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">LLM integrado (GPT, Claude, Gemini)</td>
+            <td class="syncro-col"><span class="chip star">✦ Multi-LLM</span></td>
+            <td><span class="chip partial">OpenAI</span></td>
+            <td><span class="chip partial">OpenAI</span></td>
+            <td><span class="chip yes">Multi</span></td>
+            <td><span class="chip partial">Interno</span></td>
+            <td><span class="chip partial">Básico</span></td>
+            <td><span class="chip partial">Beta</span></td>
+          </tr>
+
+          <!-- UX -->
+          <tr><td colspan="8" class="feature-cat">🖥️ Experiência e Interface</td></tr>
+          <tr>
+            <td class="feature-name">Interface PT-BR nativa</td>
+            <td class="syncro-col"><span class="chip star">✦ 100%</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip partial">Parcial</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Suporte humano PT-BR</td>
+            <td class="syncro-col"><span class="chip star">✦ Sim</span></td>
+            <td><span class="chip no">Inglês</span></td>
+            <td><span class="chip no">Inglês</span></td>
+            <td><span class="chip no">Inglês/Comunidade</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Curva de aprendizado</td>
+            <td class="syncro-col"><span class="chip yes">Baixa</span></td>
+            <td><span class="chip yes">Muito baixa</span></td>
+            <td><span class="chip partial">Média</span></td>
+            <td><span class="chip no">Alta</span></td>
+            <td><span class="chip partial">Média</span></td>
+            <td><span class="chip yes">Baixa</span></td>
+            <td><span class="chip yes">Muito baixa</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Canvas visual de workflow</td>
+            <td class="syncro-col"><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Linear</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Sim (Kanban)</span></td>
+            <td><span class="chip partial">Básico</span></td>
+            <td><span class="chip no">Não</span></td>
+          </tr>
+
+          <!-- ENTERPRISE -->
+          <tr><td colspan="8" class="feature-cat">🏢 Recursos Enterprise</td></tr>
+          <tr>
+            <td class="feature-name">SSO / SAML</td>
+            <td class="syncro-col"><span class="chip partial">Em roadmap</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip no">Não</span></td>
+            <td><span class="chip no">Não</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Permissões granulares (RBAC)</td>
+            <td class="syncro-col"><span class="chip partial">Básico</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip yes">Avançado</span></td>
+            <td><span class="chip partial">Médio</span></td>
+            <td><span class="chip no">Simples</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">Audit log / histórico</td>
+            <td class="syncro-col"><span class="chip partial">Básico</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Médio</span></td>
+            <td><span class="chip no">Não</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">API pública / Webhooks</td>
+            <td class="syncro-col"><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Total</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip yes">Sim</span></td>
+            <td><span class="chip partial">Básico</span></td>
+          </tr>
+          <tr>
+            <td class="feature-name">SLA garantido</td>
+            <td class="syncro-col"><span class="chip partial">99.5%</span></td>
+            <td><span class="chip yes">99.9%</span></td>
+            <td><span class="chip yes">99.9%</span></td>
+            <td><span class="chip partial">Variável</span></td>
+            <td><span class="chip yes">99.9%</span></td>
+            <td><span class="chip partial">99.5%</span></td>
+            <td><span class="chip partial">Não publ.</span></td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- GAPS POR CONCORRENTE -->
+  <div class="section">
+    <div class="section-title"><div class="icon">🔍</div> Análise de Gaps por Concorrente</div>
+    <p class="section-desc">Para cada player, o que o SyncroFlow tem de vantagem, onde está atrás, e a oportunidade de atacar.</p>
+    <div class="divider"></div>
+
+    <div class="gaps-grid">
+
+      <!-- ZAPIER -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#FF4A00;">ZP</div>
+          <div class="gap-header-info">
+            <h3>Zapier</h3>
+            <p>Líder global · 7.000+ integrações · USD caro · 0 foco BR</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Preço 3-5x menor em BRL (sem câmbio + impostos)</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Integrações nativas com WhatsApp Business, PIX, NF-e e ERPs brasileiros</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Suporte humano em PT-BR com tempo de resposta rápido</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>LGPD nativo com dados armazenados no Brasil</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Volume de integrações: Zapier tem 7.000+ contra ~180 do SyncroFlow</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Brand awareness: Zapier é sinônimo de "automação" para muitos</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Ecosistema de parceiros e integradores certificados</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>Atacar diretamente a dor do preço em BRL + burocracia fiscal. "Pare de pagar em dólar" como mensagem central.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAKE -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#A438E4;">MK</div>
+          <div class="gap-header-info">
+            <h3>Make (Integromat)</h3>
+            <p>Visual poderoso · 1.800+ integrações · USD · Complexo</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Curva de aprendizado muito menor — Make tem reputação de ser difícil</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Preço em BRL sem surpresas de câmbio no cartão</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Suporte localizado e integrações com ferramentas BR-first</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Onboarding guiado em PT-BR com casos de uso do mercado local</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Canvas visual: Make é referência mundial em interface de automação visual</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Quantidade de conectores e módulos premium</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Capacidade de manipulação e transformação de dados complexos</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>Posicionar o SyncroFlow como "Make, mas simples e brasileiro". Migrar usuários frustrados com a complexidade do Make.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- N8N -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#EA4B71;">n8</div>
+          <div class="gap-header-info">
+            <h3>n8n</h3>
+            <p>Open source · Dev-first · Self-hosted · Técnico</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Sem necessidade de servidor, DevOps ou configuração técnica</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Acessível a não-técnicos e times de operação/marketing</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Suporte dedicado (n8n é comunidade/self-service)</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Onboarding e templates em PT-BR para contexto brasileiro</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Flexibilidade técnica: n8n é imbatível para devs que querem controle total</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Comunidade global massiva e repositório de templates</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Agentes de IA avançados: n8n lançou AI Agent com memória em 2026</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Custo em self-hosted pode ser quase zero para devs experientes</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>n8n é para devs. SyncroFlow é para o time de negócios. Públicos distintos — não competem diretamente no mesmo segmento.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIPEFY -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#1F9B6B;">PF</div>
+          <div class="gap-header-info">
+            <h3>Pipefy</h3>
+            <p>Unicórnio BR · Enterprise BPM · USD/usuário · IA nativa</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Preço: Pipefy cobra por usuário em USD — para PMEs, fica muito caro</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Foco em integrações de automação (Pipefy é mais BPM/formulários)</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Modelo por uso, não por usuário — escala sem custo crescente</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Integrações com ecossistema de automação externo nativo</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Brand: Pipefy é o player nacional mais reconhecido globalmente</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Maturidade enterprise: SLAs, compliance, governança avançada</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Ecossistema de parceiros e integradores certificados no Brasil</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Agentes de IA com interface no-code mais madura</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>Atacar a fatia de PMEs que foram do Pipefy por custo. "Pipefy para quem não pode pagar Pipefy" — posicionamento poderoso.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- JESTOR -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#0EA5E9;">JS</div>
+          <div class="gap-header-info">
+            <h3>Jestor</h3>
+            <p>BR No-Code · R$99 ilimitado · ERPs nacionais · Simples</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Profundidade de automação: SyncroFlow tem fluxos mais complexos</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Capacidade de integração com ferramentas globais (Slack, HubSpot, etc.)</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Canvas visual de fluxo mais rico</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Agentes de IA mais sofisticados com multi-LLM</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Jestor tem usuários ilimitados no plano fixo — vantagem clara para equipes grandes</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Integração nativa com ERPs nacionais (Totvs, SAP BR, Omie) mais profunda</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Templates prontos para processos de RH/DP brasileiro</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>Jestor é gestão de processos internos. SyncroFlow é integração e automação entre sistemas. Podem ser complementares — ou SyncroFlow pode absorver o caso de uso.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLUGA -->
+      <div class="gap-card">
+        <div class="gap-header">
+          <div class="gap-logo" style="background:#F97316;">PL</div>
+          <div class="gap-header-info">
+            <h3>Pluga</h3>
+            <p>Pioneira BR · Plug-and-play · Simples · Sem fluxos complexos</p>
+          </div>
+        </div>
+        <div class="gap-body">
+          <div class="gap-section">
+            <div class="gap-section-title adv">✅ SyncroFlow GANHA em:</div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Fluxos com lógica condicional, loops e ramificações — Pluga só faz 1-para-1</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Agentes de IA integrados — Pluga é estritamente reativa</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Canvas visual completo vs. interface linear da Pluga</span></div>
+            <div class="gap-item"><div class="bullet g">+</div><span>Escalabilidade para casos de uso mais complexos</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title disadv">❌ SyncroFlow PERDE em:</div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Simplicidade extrema: Pluga é a mais fácil do mercado para iniciantes absolutos</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Histórico de mercado: Pluga existe desde 2015 com reputação consolidada</span></div>
+            <div class="gap-item"><div class="bullet r">−</div><span>Reconhecimento em comunidades de pequenos empreendedores BR</span></div>
+          </div>
+          <div class="gap-section">
+            <div class="gap-section-title opp">🎯 Oportunidade:</div>
+            <div class="gap-item"><div class="bullet b">→</div><span>Pluga é o próximo passo natural: usuários que "cresceram" da Pluga precisam de mais poder. SyncroFlow como evolução natural da Pluga.</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SCORE RADAR -->
+  <div class="section">
+    <div class="section-title"><div class="icon">📊</div> Score Comparativo por Dimensão</div>
+    <p class="section-desc">Pontuação de 0–10 em cada dimensão estratégica. SyncroFlow destacado.</p>
+    <div class="divider"></div>
+
+    <div class="score-section">
+      <div class="score-grid">
+
+        <!-- Labels -->
+        <div></div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;color:#FF4A00;">🟠 ZAPIER</div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;color:#A438E4;">🟣 MAKE</div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;color:#EA4B71;">🔴 N8N</div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;color:#1F9B6B;">🟢 PIPEFY</div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;color:#0EA5E9;">🔵 JESTOR</div>
+        <div style="text-align:center;padding:8px 4px;font-size:11px;font-weight:800;background:linear-gradient(135deg,#6C3FF5,#00D4AA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">✦ SYNCRO</div>
+
+        <!-- Row: Preço/BRL -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">Preço/BRL</div>
+        <div style="padding:4px;">
+          <div style="background:#F3F4F6;border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            <div style="width:20%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">2/10</span>
+          </div>
+        </div>
+        <div style="padding:4px;">
+          <div style="background:#F3F4F6;border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            <div style="width:40%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">4/10</span>
+          </div>
+        </div>
+        <div style="padding:4px;">
+          <div style="background:#F3F4F6;border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            <div style="width:65%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">6/10</span>
+          </div>
+        </div>
+        <div style="padding:4px;">
+          <div style="background:#F3F4F6;border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            <div style="width:30%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">3/10</span>
+          </div>
+        </div>
+        <div style="padding:4px;">
+          <div style="background:#F3F4F6;border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            <div style="width:90%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">9/10</span>
+          </div>
+        </div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;">
+          <div style="background:rgba(108,63,245,0.1);border-radius:6px;overflow:hidden;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);">
+            <div style="width:85%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">8/10</span>
+          </div>
+        </div>
+
+        <!-- Row: Integrações BR -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">Integrações BR</div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:10%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">1/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:20%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">2/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:20%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">2/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:50%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">5/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:70%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">7/10</span></div></div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;"><div style="background:rgba(108,63,245,0.1);border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);"><div style="width:90%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">9/10</span></div></div>
+
+        <!-- Row: Volume de Integrações -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">Vol. Integrações</div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:100%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">10/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:80%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">8/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:70%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">7/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:50%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">5/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:40%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">4/10</span></div></div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;"><div style="background:rgba(108,63,245,0.1);border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);"><div style="width:30%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">3/10</span></div></div>
+
+        <!-- Row: IA -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">IA / Agentes</div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:50%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">5/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:50%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">5/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:90%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">9/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:80%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">8/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:30%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">3/10</span></div></div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;"><div style="background:rgba(108,63,245,0.1);border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);"><div style="width:65%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">6/10</span></div></div>
+
+        <!-- Row: UX/Facilidade -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">UX / Facilidade</div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:90%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">9/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:60%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">6/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:30%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">3/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:60%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">6/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:80%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">8/10</span></div></div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;"><div style="background:rgba(108,63,245,0.1);border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);"><div style="width:75%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">7/10</span></div></div>
+
+        <!-- Row: Maturidade Enterprise -->
+        <div style="font-size:12px;font-weight:600;padding:8px 4px;align-self:center;">Maturidade Entrp.</div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:90%;height:8px;background:#FF4A00;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">9/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:80%;height:8px;background:#A438E4;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">8/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:70%;height:8px;background:#EA4B71;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">7/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:90%;height:8px;background:#1F9B6B;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">9/10</span></div></div>
+        <div style="padding:4px;"><div style="background:#F3F4F6;border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;"><div style="width:50%;height:8px;background:#0EA5E9;border-radius:4px;"></div><span style="font-size:12px;font-weight:700;color:#666;">5/10</span></div></div>
+        <div style="padding:4px;background:rgba(108,63,245,0.06);border-radius:8px;"><div style="background:rgba(108,63,245,0.1);border-radius:6px;height:28px;display:flex;align-items:center;padding:0 8px;gap:8px;border:1px solid rgba(108,63,245,0.2);"><div style="width:35%;height:8px;background:linear-gradient(90deg,#6C3FF5,#00D4AA);border-radius:4px;"></div><span style="font-size:12px;font-weight:800;color:#6C3FF5;">3/10</span></div></div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- STRATEGY -->
+  <div class="section">
+    <div class="section-title"><div class="icon">🚀</div> Prioridades Estratégicas para o SyncroFlow</div>
+    <p class="section-desc">O que atacar agora com base nos gaps identificados.</p>
+    <div class="divider"></div>
+
+    <div class="strategy-grid">
+      <div class="strategy-card">
+        <h3>🔴 Alta Prioridade — Fechar Gaps Críticos</h3>
+        <div class="strategy-item">
+          <span class="priority-badge p-high">URGENTE</span>
+          <span><strong>Volume de integrações:</strong> Ampliar de ~180 para 300+ conectores. Foco em ferramentas globais usadas no BR: Notion, Trello, HubSpot, Shopify, Mercado Livre, Linx, TOTVS.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-high">URGENTE</span>
+          <span><strong>SLA e uptime:</strong> Publicar SLA de 99.9% com monitoramento público. Diferencial de confiança contra Pluga e Jestor.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-high">URGENTE</span>
+          <span><strong>RBAC completo:</strong> Permissões granulares por time e projeto. Necessário para vender para empresas com 10+ usuários.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-high">URGENTE</span>
+          <span><strong>Agentes de IA PT-BR:</strong> Lançar builder de agentes com interface em linguagem natural em português. n8n está dominando esse espaço.</span>
+        </div>
+      </div>
+
+      <div class="strategy-card">
+        <h3>🟡 Médio Prazo — Diferenciais Únicos</h3>
+        <div class="strategy-item">
+          <span class="priority-badge p-med">3-6 MES</span>
+          <span><strong>Programa de certificação BR:</strong> Criar ecossistema de parceiros e agências integradoras. Pipefy ganhou muito com isso.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-med">3-6 MES</span>
+          <span><strong>Templates por vertical BR:</strong> Pacotes prontos para e-commerce BR, clínicas, imobiliárias, agências. Cada vertical vira um canal de aquisição.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-med">3-6 MES</span>
+          <span><strong>Marketplace de fluxos:</strong> Usuários vendem e compram fluxos prontos. Cria rede, retenção e novo canal de receita.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-med">3-6 MES</span>
+          <span><strong>SSO / SAML para enterprise:</strong> Necessário para fechar contratos médias-grandes empresas e desbancar Pipefy no mid-market.</span>
+        </div>
+      </div>
+
+      <div class="strategy-card">
+        <h3>🟢 Curto Prazo — Ganhos Rápidos de Posicionamento</h3>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">JÁ</span>
+          <span><strong>Campanha "Pare de pagar em dólar":</strong> Atacar diretamente Zapier e Make com calculadora de custo real em BRL. ROI óbvio para o cliente.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">JÁ</span>
+          <span><strong>Caso de uso WhatsApp + PIX:</strong> Esse combo não tem nenhum concorrente global fazendo bem. SyncroFlow pode ser O produto nesse espaço.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">JÁ</span>
+          <span><strong>Migração assistida de Zapier/Make:</strong> Serviço de migração gratuita para os primeiros N clientes. Remove barreira de troca.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">JÁ</span>
+          <span><strong>Conteúdo SEO "automação para [vertical] no Brasil":</strong> Pluga tem isso mas é antigo. SyncroFlow pode rankear rápido com conteúdo focado.</span>
+        </div>
+      </div>
+
+      <div class="strategy-card">
+        <h3>📍 Posicionamento Recomendado</h3>
+        <div style="background: linear-gradient(135deg, var(--brand-light), var(--accent-light)); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <p style="font-size: 14px; font-weight: 700; color: var(--brand); margin-bottom: 8px;">Mensagem central:</p>
+          <p style="font-size: 13px; line-height: 1.6; color: var(--neutral);">"O poder do Zapier, o visual do Make — feito para o Brasil, cobrado em reais, com suporte que fala a sua língua."</p>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">ICP</span>
+          <span><strong>Cliente Ideal:</strong> PMEs brasileiras de 10–200 funcionários que usam WhatsApp no processo comercial, têm NF-e e precisam conectar 5+ ferramentas.</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-med">AVO</span>
+          <span><strong>Anti-target:</strong> Grandes enterprises com ERP SAP/Oracle (Pipefy's territory) ou devs que querem controle total (n8n's territory).</span>
+        </div>
+        <div class="strategy-item">
+          <span class="priority-badge p-low">WIN</span>
+          <span><strong>Win condition:</strong> Ser a ferramenta óbvia quando um brasileiro procura "automação" — assim como Pipefy virou sinônimo de "processo" no BR.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <strong style="color:rgba(255,255,255,0.6);">SyncroFlow.io — Análise Competitiva</strong> &nbsp;·&nbsp; Junho 2026 &nbsp;·&nbsp; Dados: Capterra, G2, Findstack, blogs especializados BR &nbsp;·&nbsp; Gerado por Claude AI
+</div>
+
+</body>
+</html>
