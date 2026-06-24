@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { getComplianceStatus } from '../compliance/compliance.service'
 
 // Relatórios implementados (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md):
 // 1. Visão Geral da Semana, 4. Volume por Canal, 8. Eleitores Mais Engajados,
@@ -122,7 +123,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const candidateId = await getWorkspaceId(sub, wid)
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-    const [openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests] = await prisma.$transaction([
+    const [openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests, compliance] = await Promise.all([
       prisma.conversation.count({ where: { candidateId, status: 'ACTIVE' } }),
       prisma.conversation.count({ where: { candidateId, status: 'URGENT' } }),
       prisma.channel.findMany({ where: { candidateId }, select: { id: true, name: true, type: true, isActive: true } }),
@@ -134,8 +135,9 @@ export async function analyticsRoutes(app: FastifyInstance) {
       }),
       prisma.contact.count({ where: { candidateId, createdAt: { gte: since24h } } }),
       prisma.request.count({ where: { candidateId, status: { in: ['RECEIVED', 'ANALYZING'] } } }),
+      getComplianceStatus(candidateId),
     ])
 
-    return reply.send({ openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests })
+    return reply.send({ openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests, compliance })
   })
 }

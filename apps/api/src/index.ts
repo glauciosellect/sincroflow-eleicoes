@@ -26,9 +26,11 @@ import { webhookRoutes } from './modules/webhooks/webhooks.routes'
 import { emailChannelRoutes } from './modules/channels/email/email.routes'
 import { rbacRoutes } from './modules/rbac/rbac.routes'
 import { statusRoutes } from './modules/status/status.routes'
+import { complianceRoutes } from './modules/compliance/compliance.routes'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
 import { startEmailPollingWorker } from './modules/channels/email/email-poll.worker'
+import { startComplianceWorker } from './modules/compliance/compliance.worker'
 import { initSocket } from './lib/socket'
 
 const app = Fastify({ logger: process.env.NODE_ENV === 'development' })
@@ -122,9 +124,13 @@ async function bootstrap() {
   // Status Page
   await app.register(statusRoutes)
 
+  // Compliance TSE (desativação automática 72h antes de cada turno)
+  await app.register(complianceRoutes)
+
   startMessageWorker()
   startReminderWorker()
   startEmailPollingWorker()
+  startComplianceWorker()
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })

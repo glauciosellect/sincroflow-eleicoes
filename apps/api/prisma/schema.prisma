@@ -307,6 +307,16 @@ model Invoice {
   candidate   Candidate @relation(fields: [candidateId], references: [id])
 }
 
+// Configuração global do sistema — linha única (id fixo "global"), editável
+// apenas por administradores do sistema (não por candidatos). Guarda as datas
+// de cada turno eleitoral para o cron de desativação TSE (seção 7 da spec).
+model SystemConfig {
+  id                 String    @id @default("global")
+  electionRound1Date DateTime?
+  electionRound2Date DateTime?
+  updatedAt          DateTime  @default(now()) @updatedAt
+}
+
 model EnvVariable {
   id          String     @id @default(cuid())
   candidateId String
