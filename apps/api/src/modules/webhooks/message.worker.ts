@@ -1,6 +1,6 @@
 import { createWorker } from '../../lib/queue'
 import { prisma } from '../../lib/prisma'
-import { processAgentResponse, processIncomingMedia, detectRequestIntent } from '../ai/ai.service'
+import { processAgentResponse, processIncomingMedia, detectRequestIntent, classifyMessageForAlerts } from '../ai/ai.service'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { redis } from '../../lib/redis'
@@ -205,6 +205,20 @@ export function startMessageWorker() {
         Promise.resolve().then(() => { try { emitNewMessage(candidate.id, conversation.id, userMsg) } catch {} }),
       ])
 
+      // ── Classificação para alertas automáticos (tema, gap de conteúdo, urgência) ──
+      const topicsForAlerts = await prisma.platformTopic.findMany({ where: { candidateId: candidate.id } })
+      const topicsWithContent = new Set(topicsForAlerts.filter(t => t.content && t.content.trim().length > 0).map(t => t.topicKey))
+      const classification = await classifyMessageForAlerts(text, topicsWithContent)
+      await prisma.message.update({
+        where: { id: userMsg.id },
+        data: { topicKey: classification.topicKey, isContentGap: classification.isContentGap },
+      })
+      if (classification.isUrgent) {
+        const urgentConv = await prisma.conversation.update({ where: { id: conversation.id }, data: { status: 'URGENT' } })
+        try { emitConversationUpdated(candidate.id, urgentConv) } catch {}
+        console.log(`[WORKER] Conversa ${conversation.id} marcada como urgente automaticamente`)
+      }
+
       // Relê o status no banco para evitar responder quando a equipe assumiu a conversa
       // entre a leitura inicial e este ponto (condição de corrida).
       const freshConversation = await prisma.conversation.findUnique({ where: { id: conversation.id }, select: { status: true, assignedToId: true } })
@@ -269,7 +283,7 @@ export function startMessageWorker() {
       }
 
       // ── Resposta via IA, restrita ao conteúdo cadastrado (Minha História + Plataforma Eleitoral) ──
-      const topics = await prisma.platformTopic.findMany({ where: { candidateId: candidate.id } })
+      const topics = topicsForAlerts
       const conversationHistory = history.map((m) => ({
         role: (m.senderType === 'VOTER' ? 'user' : 'assistant') as 'user' | 'assistant',
         content: m.content,

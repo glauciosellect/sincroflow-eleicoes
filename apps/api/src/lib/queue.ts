@@ -24,6 +24,7 @@ export const messageQueue = new Queue('messages', { connection })
 export const reminderQueue = new Queue('reminders', { connection })
 export const emailPollQueue = new Queue('email-poll', { connection })
 export const complianceQueue = new Queue('compliance-tse', { connection })
+export const alertsQueue = new Queue('alerts-email', { connection })
 
 export type MessageJobData = {
   channelId: string

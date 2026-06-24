@@ -225,6 +225,13 @@ model Message {
   audioTranscript String?           @db.Text
   isRead          Boolean           @default(false)
   isActiveMessage Boolean           @default(false)
+  // Tema da Plataforma Eleitoral identificado nesta mensagem do eleitor (null se não
+  // se encaixar em nenhum tema, ou se for mensagem do agente/humano) — usado pelos
+  // alertas de pico por tema e pelo relatório "Temas Mais Perguntados".
+  topicKey        String?
+  // true quando a mensagem é uma pergunta sobre um tema que o candidato não cadastrou
+  // conteúdo (gap de conteúdo, seção 4.13 da spec).
+  isContentGap    Boolean           @default(false)
   createdAt       DateTime          @default(now())
   conversation    Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }

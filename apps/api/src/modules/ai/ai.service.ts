@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import mammoth from 'mammoth'
+import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -107,6 +108,33 @@ Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do p
     return { isRequest: !!parsed.isRequest, subject: parsed.subject }
   } catch {
     return { isRequest: false }
+  }
+}
+
+// Classifica a mensagem do eleitor para os alertas automáticos (seção 4.13 da spec):
+// tema da Plataforma Eleitoral envolvido (para pico por tema), se é uma pergunta sobre
+// tema sem conteúdo cadastrado (gap), e se o tom é agressivo/sensível (urgência).
+export async function classifyMessageForAlerts(
+  message: string,
+  topicsWithContent: Set<string>,
+): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean }> {
+  try {
+    const topicList = PLATFORM_TOPICS.map(t => `${t.key}: ${t.name}`).join('\n')
+    const res = await callLLM({
+      model: DEFAULT_MODEL,
+      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false}.
+"topicKey": a chave do tema da lista se a mensagem for uma pergunta/comentário sobre esse tema, senão null.
+"isUrgent": true se a mensagem tiver tom agressivo, ameaça, xingamento, ou relatar situação sensível/grave que exige atenção humana imediata.
+Nenhum texto adicional.`,
+      messages: [{ role: 'user', content: message }],
+      maxTokens: 80,
+    })
+    const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
+    const topicKey = typeof parsed.topicKey === 'string' && PLATFORM_TOPICS.some(t => t.key === parsed.topicKey) ? parsed.topicKey : null
+    const isContentGap = !!topicKey && !topicsWithContent.has(topicKey)
+    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent }
+  } catch {
+    return { topicKey: null, isContentGap: false, isUrgent: false }
   }
 }
 
