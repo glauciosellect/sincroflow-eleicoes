@@ -5,13 +5,13 @@ import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket'
 
 // Conecta o socket ao montar e desconecta ao desmontar
 export function useSocketConnect() {
-  const { workspace, token } = useAuthStore()
+  const { candidate, token } = useAuthStore()
 
   useEffect(() => {
-    if (!workspace?.id || !token) return
-    connectSocket(workspace.id, token)
+    if (!candidate?.id || !token) return
+    connectSocket(candidate.id, token)
     return () => { disconnectSocket() }
-  }, [workspace?.id, token])
+  }, [candidate?.id, token])
 }
 
 // Escuta um evento específico do socket

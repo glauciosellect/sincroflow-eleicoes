@@ -1,195 +1,172 @@
 'use client'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
-import { useAuthStore } from '@/store/auth.store'
 import api from '@/lib/api'
-import { Loader2, ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { Loader2, ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const accountSchema = z.object({
   name: z.string().min(2, 'Nome muito curto'),
+  cpf: z.string().refine(c => /^\d{11}$/.test(c.replace(/\D/g, '')), 'CPF inválido — digite os 11 números'),
+  candidateNumber: z.string().optional(),
   email: z.string().email('Email inválido'),
+  whatsapp: z.string().refine(p => /^\d{10,11}$/.test(p.replace(/\s|-/g, '')), 'Número inválido — ex: 11 99999-9999'),
   password: z.string()
     .min(8, 'Mínimo 8 caracteres')
     .refine(p => /[A-Z]/.test(p), 'Deve conter ao menos uma letra maiúscula')
     .refine(p => /[0-9]/.test(p), 'Deve conter ao menos um número'),
-  phone: z.string().min(1, 'WhatsApp é obrigatório').refine(p => /^\d{10,11}$/.test(p.replace(/\s|-/g, '')), 'Número inválido — ex: 11 99999-9999'),
+  confirmPassword: z.string(),
+  acceptedTerms: z.boolean().refine(v => v === true, 'É necessário aceitar os Termos de Uso e a Política de Privacidade'),
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'As senhas não coincidem',
+  path: ['confirmPassword'],
 })
 
 type AccountData = z.infer<typeof accountSchema>
 
-const SEGMENTS = [
-  { value: 'health', label: 'Saúde & Clínicas' },
-  { value: 'education', label: 'Educação & Cursos' },
-  { value: 'ecommerce', label: 'E-commerce & Varejo' },
-  { value: 'legal', label: 'Jurídico & Advocacia' },
-  { value: 'beauty', label: 'Beleza & Estética' },
-  { value: 'realestate', label: 'Imobiliário' },
-  { value: 'food', label: 'Alimentação & Food' },
-  { value: 'tech', label: 'Tecnologia & SaaS' },
-  { value: 'services', label: 'Serviços em Geral' },
-  { value: 'other', label: 'Outro segmento' },
-]
-
-const ROLES = [
-  { value: 'owner', label: 'Dono(a) do negócio', desc: 'Vou usar para minha própria empresa' },
-  { value: 'manager', label: 'Gestor(a) de equipe', desc: 'Gerencio times de atendimento' },
-  { value: 'agency', label: 'Agência / Consultoria', desc: 'Vendo soluções para clientes' },
-  { value: 'dev', label: 'Desenvolvedor(a)', desc: 'Integrando IA em projetos' },
-]
-
-const TEAM_SIZES = [
-  { value: 'solo', label: 'Só eu', desc: 'Atendimento individual' },
-  { value: 'small', label: '2 a 5 pessoas', desc: 'Equipe pequena' },
-  { value: 'medium', label: '6 a 20 pessoas', desc: 'Time estruturado' },
-  { value: 'large', label: 'Mais de 20', desc: 'Operação de grande escala' },
+const PLANS = [
+  { value: 'CAMPAIGN' as const, label: 'Plano Campanha', desc: 'Para o período eleitoral' },
+  { value: 'MANDATE' as const, label: 'Plano Mandato', desc: 'Para após a eleição (ouvidoria)' },
 ]
 
 export default function RegisterPage() {
-  const router = useRouter()
   const { toast } = useToast()
-  const setAuth = useAuthStore((s) => s.setAuth)
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
-  const [segment, setSegment] = useState('')
-  const [role, setRole] = useState('')
-  const [teamSize, setTeamSize] = useState('')
+  const [plan, setPlan] = useState<'CAMPAIGN' | 'MANDATE'>('CAMPAIGN')
+  const [pendingId, setPendingId] = useState<string | null>(null)
 
-  const { register, handleSubmit, getValues, watch, setValue, formState: { errors, isValid } } = useForm<AccountData>({
+  const { register, handleSubmit, watch, control, formState: { errors, isValid } } = useForm<AccountData>({
     resolver: zodResolver(accountSchema),
     mode: 'onChange',
+    defaultValues: { acceptedTerms: false },
   })
   const passwordValue = watch('password', '')
 
-  const canAdvanceStep1 = isValid
-
-  const handleNext = () => {
-    if (step === 1 && canAdvanceStep1) setStep(2)
-    else if (step === 2 && segment) setStep(3)
-  }
-
-  const onSubmit = async () => {
-    if (!role || !teamSize) return
+  const onSubmitStep1 = async (data: AccountData) => {
     setLoading(true)
-    const values = getValues()
     try {
       const res = await api.post('/auth/register', {
-        name: values.name,
-        email: values.email,
-        password: values.password,
-        phone: values.phone ? '+55' + values.phone.replace(/\s|-/g, '') : undefined,
-        segment,
-        role,
-        teamSize,
+        name: data.name,
+        cpf: data.cpf.replace(/\D/g, ''),
+        candidateNumber: data.candidateNumber || undefined,
+        email: data.email,
+        whatsapp: '+55' + data.whatsapp.replace(/\s|-/g, ''),
+        password: data.password,
+        acceptedTerms: true,
       })
-      const { user, workspace, accessToken, refreshToken } = res.data
-      setAuth(user, workspace, accessToken, refreshToken)
-
-      // Dispara pixels de conversão ao concluir cadastro
-      if (typeof window !== 'undefined') {
-        if ((window as any).fbq) (window as any).fbq('track', 'CompleteRegistration')
-        if ((window as any).gtag) (window as any).gtag('event', 'sign_up', { method: 'email' })
-      }
-
-      router.push('/dashboard')
+      setPendingId(res.data.pendingId)
+      setStep(2)
     } catch (err: any) {
-      toast({ title: 'Erro ao criar conta', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
-      setStep(1)
+      toast({ title: 'Erro ao registrar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
     } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCheckout = async () => {
+    if (!pendingId) {
+      toast({ title: 'Sessão de cadastro expirada', description: 'Volte ao passo 1 e tente novamente', variant: 'destructive' })
+      setStep(1)
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await api.post('/auth/register/checkout', { pendingId, plan })
+      window.location.href = res.data.url
+    } catch (err: any) {
+      toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
       setLoading(false)
     }
   }
 
   return (
     <div className="w-full max-w-md">
-      {/* Progress */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          {[1, 2, 3].map((s) => (
+          {[1, 2].map((s) => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-all',
-                s < step ? 'bg-[#2E7D32] text-white' :
-                s === step ? 'bg-[#1565C0] text-white' :
+                s < step ? 'bg-[#009C3B] text-white' :
+                s === step ? 'bg-[#002776] text-white' :
                 'bg-gray-100 text-gray-400'
               )}>
                 {s < step ? <Check className="w-4 h-4" /> : s}
               </div>
-              {s < 3 && (
-                <div className={cn('flex-1 h-0.5 transition-all', s < step ? 'bg-[#2E7D32]' : 'bg-gray-100')} />
-              )}
+              {s < 2 && <div className={cn('flex-1 h-0.5 transition-all', s < step ? 'bg-[#009C3B]' : 'bg-gray-100')} />}
             </div>
           ))}
         </div>
         <div className="text-xs text-gray-400 text-right">
-          {step === 1 && 'Seus dados de acesso'}
-          {step === 2 && 'Seu segmento de atuação'}
-          {step === 3 && 'Seu perfil de uso'}
+          {step === 1 ? 'Dados do candidato' : 'Pagamento'}
         </div>
       </div>
 
-      {/* PASSO 1 — Dados da conta */}
       {step === 1 && (
         <div>
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Crie sua conta</h1>
-            <p className="text-gray-400 mt-1 text-sm">7 dias grátis · 1.000 créditos inclusos · sem cartão</p>
+            <h1 className="text-2xl font-bold text-gray-900">Cadastre sua campanha</h1>
+            <p className="text-gray-400 mt-1 text-sm">Sua conta é criada após a confirmação do pagamento.</p>
           </div>
 
-          <form onSubmit={handleSubmit(handleNext)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmitStep1)} className="space-y-4">
             <div>
-              <Label htmlFor="name">Como você se chama?</Label>
+              <Label htmlFor="name">Nome completo *</Label>
               <Input id="name" placeholder="Seu nome completo" className="mt-1" {...register('name')} />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
             <div>
-              <Label htmlFor="email">E-mail de acesso</Label>
-              <Input id="email" type="email" placeholder="voce@empresa.com" className="mt-1" {...register('email')} />
+              <Label htmlFor="cpf">CPF *</Label>
+              <Input id="cpf" placeholder="000.000.000-00" className="mt-1" {...register('cpf')} />
+              {errors.cpf && <p className="text-red-500 text-xs mt-1">{errors.cpf.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="candidateNumber">Número do candidato (opcional)</Label>
+              <Input id="candidateNumber" placeholder="Ex: 12345" className="mt-1" {...register('candidateNumber')} />
+            </div>
+            <div>
+              <Label htmlFor="email">E-mail *</Label>
+              <Input id="email" type="email" placeholder="voce@email.com" className="mt-1" {...register('email')} />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
             </div>
             <div>
-              <Label htmlFor="phone">WhatsApp</Label>
+              <Label htmlFor="whatsapp">WhatsApp *</Label>
               <div className="flex mt-1">
                 <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground select-none shrink-0">
                   +55
                 </span>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="11 99999-9999"
-                  className="rounded-l-none"
-                  {...register('phone')}
-                />
+                <Input id="whatsapp" type="tel" placeholder="11 99999-9999" className="rounded-l-none" {...register('whatsapp')} />
               </div>
-              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
+              {errors.whatsapp && <p className="text-red-500 text-xs mt-1">{errors.whatsapp.message}</p>}
             </div>
             <div>
-              <Label htmlFor="password">Crie uma senha</Label>
-              <Input id="password" type="password" placeholder="Ex: Syncro123" className="mt-1" {...register('password')} />
+              <Label htmlFor="password">Senha *</Label>
+              <Input id="password" type="password" placeholder="Mínimo 8 caracteres" className="mt-1" {...register('password')} />
               {passwordValue && (
                 <div className="mt-2 space-y-1">
-                  <div className={cn('flex items-center gap-1.5 text-xs', passwordValue.length >= 8 ? 'text-[#2E7D32]' : 'text-gray-400')}>
-                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', passwordValue.length >= 8 ? 'bg-[#2E7D32]' : 'bg-gray-200')}>
+                  <div className={cn('flex items-center gap-1.5 text-xs', passwordValue.length >= 8 ? 'text-[#009C3B]' : 'text-gray-400')}>
+                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', passwordValue.length >= 8 ? 'bg-[#009C3B]' : 'bg-gray-200')}>
                       {passwordValue.length >= 8 && <Check className="w-2.5 h-2.5 text-white" />}
                     </div>
                     Mínimo 8 caracteres
                   </div>
-                  <div className={cn('flex items-center gap-1.5 text-xs', /[A-Z]/.test(passwordValue) ? 'text-[#2E7D32]' : 'text-gray-400')}>
-                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', /[A-Z]/.test(passwordValue) ? 'bg-[#2E7D32]' : 'bg-gray-200')}>
+                  <div className={cn('flex items-center gap-1.5 text-xs', /[A-Z]/.test(passwordValue) ? 'text-[#009C3B]' : 'text-gray-400')}>
+                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', /[A-Z]/.test(passwordValue) ? 'bg-[#009C3B]' : 'bg-gray-200')}>
                       {/[A-Z]/.test(passwordValue) && <Check className="w-2.5 h-2.5 text-white" />}
                     </div>
                     Ao menos uma letra maiúscula
                   </div>
-                  <div className={cn('flex items-center gap-1.5 text-xs', /[0-9]/.test(passwordValue) ? 'text-[#2E7D32]' : 'text-gray-400')}>
-                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', /[0-9]/.test(passwordValue) ? 'bg-[#2E7D32]' : 'bg-gray-200')}>
+                  <div className={cn('flex items-center gap-1.5 text-xs', /[0-9]/.test(passwordValue) ? 'text-[#009C3B]' : 'text-gray-400')}>
+                    <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0', /[0-9]/.test(passwordValue) ? 'bg-[#009C3B]' : 'bg-gray-200')}>
                       {/[0-9]/.test(passwordValue) && <Check className="w-2.5 h-2.5 text-white" />}
                     </div>
                     Ao menos um número
@@ -197,122 +174,76 @@ export default function RegisterPage() {
                 </div>
               )}
             </div>
+            <div>
+              <Label htmlFor="confirmPassword">Confirmar senha *</Label>
+              <Input id="confirmPassword" type="password" placeholder="Repita a senha" className="mt-1" {...register('confirmPassword')} />
+              {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>}
+            </div>
+
+            <div className="flex items-start gap-2 pt-2">
+              <Controller
+                name="acceptedTerms"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox id="acceptedTerms" checked={field.value} onCheckedChange={field.onChange} />
+                )}
+              />
+              <Label htmlFor="acceptedTerms" className="text-sm font-normal leading-snug text-gray-600">
+                Li e aceito os <Link href="/termos" target="_blank" className="text-[#002776] underline">Termos de Uso</Link> e a{' '}
+                <Link href="/privacidade" target="_blank" className="text-[#002776] underline">Política de Privacidade</Link>
+              </Label>
+            </div>
+            {errors.acceptedTerms && <p className="text-red-500 text-xs">{errors.acceptedTerms.message}</p>}
 
             <Button
               type="submit"
               className="w-full text-white mt-2"
-              style={{ background: 'linear-gradient(135deg, #1565C0, #2E7D32)' }}
-              disabled={!canAdvanceStep1}
+              style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
+              disabled={!isValid || loading}
             >
-              Continuar <ArrowRight className="w-4 h-4 ml-2" />
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Avançar para pagamento <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </form>
 
           <p className="text-center text-sm text-gray-400 mt-5">
             Já tem conta?{' '}
-            <Link href="/login" className="text-[#1565C0] hover:underline font-medium">Entrar</Link>
+            <Link href="/login" className="text-[#002776] hover:underline font-medium">Entrar</Link>
           </p>
         </div>
       )}
 
-      {/* PASSO 2 — Segmento */}
       {step === 2 && (
         <div>
           <div className="mb-6">
-            <button onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 mb-4">
-              <ArrowLeft className="w-4 h-4" /> Voltar
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900">Qual é o seu mercado?</h1>
-            <p className="text-gray-400 mt-1 text-sm">Personalizamos sua experiência com base no seu setor</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {SEGMENTS.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setSegment(s.value)}
-                className={cn(
-                  'text-left px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all',
-                  segment === s.value
-                    ? 'border-[#1565C0] bg-blue-50 text-[#1565C0]'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          <Button
-            onClick={handleNext}
-            disabled={!segment}
-            className="w-full text-white"
-            style={{ background: 'linear-gradient(135deg, #1565C0, #2E7D32)' }}
-          >
-            Continuar <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
-      )}
-
-      {/* PASSO 3 — Perfil de uso */}
-      {step === 3 && (
-        <div>
-          <div className="mb-6">
-            <button onClick={() => setStep(2)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 mb-4">
-              <ArrowLeft className="w-4 h-4" /> Voltar
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900">Como você vai usar?</h1>
-            <p className="text-gray-400 mt-1 text-sm">Isso nos ajuda a sugerir as configurações certas</p>
-          </div>
-
-          <div className="space-y-2 mb-5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Seu papel</p>
-            {ROLES.map((r) => (
-              <button
-                key={r.value}
-                onClick={() => setRole(r.value)}
-                className={cn(
-                  'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
-                  role === r.value
-                    ? 'border-[#1565C0] bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                <div className={cn('text-sm font-semibold', role === r.value ? 'text-[#1565C0]' : 'text-gray-800')}>{r.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{r.desc}</div>
-              </button>
-            ))}
+            <h1 className="text-2xl font-bold text-gray-900">Escolha seu plano</h1>
+            <p className="text-gray-400 mt-1 text-sm">O pagamento confirma seu cadastro. Sua conta é criada automaticamente após a aprovação.</p>
           </div>
 
           <div className="space-y-2 mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tamanho do time de atendimento</p>
-            <div className="grid grid-cols-2 gap-2">
-              {TEAM_SIZES.map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => setTeamSize(t.value)}
-                  className={cn(
-                    'text-left px-3 py-2.5 rounded-xl border-2 transition-all',
-                    teamSize === t.value
-                      ? 'border-[#1565C0] bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  )}
-                >
-                  <div className={cn('text-sm font-semibold', teamSize === t.value ? 'text-[#1565C0]' : 'text-gray-800')}>{t.label}</div>
-                  <div className="text-xs text-gray-400">{t.desc}</div>
-                </button>
-              ))}
-            </div>
+            {PLANS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPlan(p.value)}
+                className={cn(
+                  'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
+                  plan === p.value ? 'border-[#002776] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <div className={cn('text-sm font-semibold', plan === p.value ? 'text-[#002776]' : 'text-gray-800')}>{p.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{p.desc}</div>
+              </button>
+            ))}
           </div>
 
           <Button
-            onClick={onSubmit}
-            disabled={!role || !teamSize || loading}
+            onClick={handleCheckout}
+            disabled={loading}
             className="w-full text-white"
-            style={{ background: 'linear-gradient(135deg, #1565C0, #2E7D32)' }}
+            style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Criar minha conta grátis
+            Ir para pagamento
           </Button>
         </div>
       )}

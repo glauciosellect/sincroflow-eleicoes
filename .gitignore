@@ -7,3 +7,4 @@ dist
 .turbo
 *.log
 supabase-init.sql
+tsconfig.tsbuildinfo

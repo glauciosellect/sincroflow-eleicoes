@@ -42,8 +42,8 @@ export async function stripeRoutes(app: FastifyInstance) {
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { type: 'registration', pendingId, plan },
       subscription_data: { metadata: { type: 'registration', pendingId, plan } },
-      success_url: `${process.env.FRONTEND_URL}/onboarding?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/registro?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
     })
 
     return reply.send({ url: session.url })

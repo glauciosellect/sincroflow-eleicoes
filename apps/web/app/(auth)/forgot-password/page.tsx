@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
         <p className="text-gray-500 mb-6">
           Se esse e-mail estiver cadastrado, você receberá um link para redefinir sua senha em instantes. Verifique também a caixa de spam.
         </p>
-        <Link href="/login" className="text-[#1565C0] hover:underline text-sm font-medium">
+        <Link href="/login" className="text-[#002776] hover:underline text-sm font-medium">
           Voltar para o login
         </Link>
       </div>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
         <Button
           type="submit"
           className="w-full text-white hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #1565C0, #2E7D32)' }}
+          style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}
           disabled={loading}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

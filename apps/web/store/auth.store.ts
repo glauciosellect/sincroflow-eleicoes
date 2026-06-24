@@ -12,23 +12,36 @@ interface User {
   theme: string
 }
 
-interface Workspace {
+interface Candidate {
   id: string
   name: string
-  slug: string
-  plan: string
-  credits: number
-  trialEndsAt: string | null
+  cpf: string
+  email: string
+  whatsapp: string
+  candidateNumber: string | null
+  party: string | null
+  position: string | null
+  state: string | null
+  city: string | null
+  photoUrl: string | null
+  status: 'ACTIVE' | 'SUSPENDED' | 'CANCELLED'
+  plan: 'CAMPAIGN' | 'MANDATE'
+  activeMsgsIncluded: number
+  activeMsgsUsed: number
+  activeMsgsExtra: number
 }
+
+type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS'
 
 interface AuthState {
   user: User | null
-  workspace: Workspace | null
+  candidate: Candidate | null
+  role: TeamRole | null
   token: string | null
   refreshToken: string | null
-  setAuth: (user: User, workspace: Workspace, token: string, refreshToken: string) => void
+  setAuth: (user: User, candidate: Candidate | null, token: string, refreshToken: string, role?: TeamRole) => void
   setUser: (user: Partial<User>) => void
-  setWorkspace: (workspace: Partial<Workspace>) => void
+  setCandidate: (candidate: Partial<Candidate>) => void
   logout: () => void
 }
 
@@ -36,22 +49,23 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      workspace: null,
+      candidate: null,
+      role: null,
       token: null,
       refreshToken: null,
-      setAuth: (user, workspace, token, refreshToken) => {
+      setAuth: (user, candidate, token, refreshToken, role) => {
         localStorage.setItem('sf_token', token)
         localStorage.setItem('sf_refresh', refreshToken)
-        set({ user, workspace, token, refreshToken })
+        set({ user, candidate, token, refreshToken, role: role ?? null })
       },
       setUser: (partial) => set((s) => ({ user: s.user ? { ...s.user, ...partial } : null })),
-      setWorkspace: (partial) => set((s) => ({ workspace: s.workspace ? { ...s.workspace, ...partial } : null })),
+      setCandidate: (partial) => set((s) => ({ candidate: s.candidate ? { ...s.candidate, ...partial } : null })),
       logout: () => {
         localStorage.removeItem('sf_token')
         localStorage.removeItem('sf_refresh')
-        set({ user: null, workspace: null, token: null, refreshToken: null })
+        set({ user: null, candidate: null, role: null, token: null, refreshToken: null })
       },
     }),
-    { name: 'sf-auth', partialize: (s) => ({ user: s.user, workspace: s.workspace, token: s.token, refreshToken: s.refreshToken }) }
+    { name: 'sf-auth', partialize: (s) => ({ user: s.user, candidate: s.candidate, role: s.role, token: s.token, refreshToken: s.refreshToken }) }
   )
 )

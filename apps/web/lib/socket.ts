@@ -15,16 +15,16 @@ export function getSocket(): Socket {
   return socket
 }
 
-export function connectSocket(workspaceId: string, token: string) {
+export function connectSocket(candidateId: string, token: string) {
   const s = getSocket()
   if (s.connected) {
-    s.emit('join:workspace', workspaceId)
+    s.emit('join:candidate', candidateId)
     return s
   }
   s.auth = { token }
   s.connect()
   s.once('connect', () => {
-    s.emit('join:workspace', workspaceId)
+    s.emit('join:candidate', candidateId)
   })
   return s
 }

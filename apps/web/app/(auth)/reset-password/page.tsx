@@ -57,7 +57,7 @@ function ResetPasswordContent() {
       <div className="w-full text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Link inválido</h1>
         <p className="text-gray-500 mb-6">Este link de redefinição é inválido ou já foi usado.</p>
-        <Link href="/forgot-password" className="text-[#1565C0] hover:underline text-sm font-medium">
+        <Link href="/forgot-password" className="text-[#002776] hover:underline text-sm font-medium">
           Solicitar novo link
         </Link>
       </div>
@@ -109,7 +109,7 @@ function ResetPasswordContent() {
         <Button
           type="submit"
           className="w-full text-white hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #1565C0, #2E7D32)' }}
+          style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}
           disabled={loading}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -118,7 +118,7 @@ function ResetPasswordContent() {
       </form>
 
       <p className="text-center text-sm text-gray-500 mt-6">
-        <Link href="/login" className="text-[#1565C0] hover:underline">Voltar para o login</Link>
+        <Link href="/login" className="text-[#002776] hover:underline">Voltar para o login</Link>
       </p>
     </div>
   )

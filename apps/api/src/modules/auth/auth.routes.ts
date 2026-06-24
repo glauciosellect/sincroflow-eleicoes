@@ -124,7 +124,8 @@ export async function authRoutes(app: FastifyInstance) {
     const tokens = signTokens(user.id, invite.candidateId)
     await saveRefreshToken(user.id, tokens.refreshToken)
 
-    return reply.send({ ok: true, candidateId: invite.candidateId, ...tokens })
+    const { passwordHash, twoFactorSecret, ...safeUser } = user
+    return reply.send({ ok: true, user: safeUser, candidateId: invite.candidateId, ...tokens })
   })
 
   app.patch('/auth/me', { onRequest: [app.authenticate] }, async (req, reply) => {
