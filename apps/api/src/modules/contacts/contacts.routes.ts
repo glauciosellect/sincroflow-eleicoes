@@ -9,13 +9,12 @@ export async function contactRoutes(app: FastifyInstance) {
 
   app.get('/contacts', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { search, channelId, tag, page = '1', limit = '20' } = req.query as Record<string, string>
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { search, channelType, page = '1', limit = '20' } = req.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
-    const where: any = { workspaceId }
-    if (channelId) where.channelId = channelId
-    if (tag) where.tags = { has: tag }
+    const where: any = { candidateId }
+    if (channelType) where.channelType = channelType
     if (search) where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
       { phone: { contains: search } },
@@ -31,49 +30,45 @@ export async function contactRoutes(app: FastifyInstance) {
 
   app.get('/contacts/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    const contact = await prisma.contact.findFirst({ where: { id, workspaceId } })
+    const contact = await prisma.contact.findFirst({ where: { id, candidateId } })
     if (!contact) return reply.status(404).send({ error: 'Contato não encontrado' })
     return reply.send(contact)
   })
 
   app.patch('/contacts/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
     const data = z.object({
       name: z.string().optional(),
       phone: z.string().optional().nullable(),
       email: z.string().email().optional().nullable(),
-      tags: z.array(z.string()).optional(),
       notes: z.string().optional().nullable(),
-      variables: z.any().optional(),
-      humanOnly: z.boolean().optional(),
     }).parse(req.body)
 
-    const updated = await prisma.contact.updateMany({ where: { id, workspaceId }, data })
+    const updated = await prisma.contact.updateMany({ where: { id, candidateId }, data })
     if (updated.count === 0) return reply.status(404).send({ error: 'Contato não encontrado' })
     return reply.send(await prisma.contact.findUnique({ where: { id } }))
   })
 
   app.delete('/contacts/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    await prisma.contact.deleteMany({ where: { id, workspaceId } })
+    await prisma.contact.deleteMany({ where: { id, candidateId } })
     return reply.send({ ok: true })
   })
 
   app.get('/contacts/:id/conversations', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    const contact = await prisma.contact.findFirst({ where: { id, workspaceId } })
+    const contact = await prisma.contact.findFirst({ where: { id, candidateId } })
     if (!contact) return reply.status(404).send({ error: 'Contato não encontrado' })
     const conversations = await prisma.conversation.findMany({
-      where: { contactId: id, workspaceId },
-      include: { agent: { select: { id: true, name: true } }, channel: { select: { id: true, type: true, name: true } } },
+      where: { contactId: id, candidateId },
       orderBy: { createdAt: 'desc' },
     })
     return reply.send(conversations)

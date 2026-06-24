@@ -3,30 +3,16 @@ import axios from 'axios'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { decrypt } from '../../lib/crypto'
-import { prisma } from '../../lib/prisma'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-// Busca chave ElevenLabs do workspace (salva pelo usuário em Configurações → Integrações)
-async function getElevenLabsConfig(workspaceId?: string): Promise<{ apiKey: string; voiceId: string } | null> {
-  if (!workspaceId) {
-    // Fallback: variáveis de ambiente globais
-    if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) {
-      return { apiKey: process.env.ELEVENLABS_API_KEY, voiceId: process.env.ELEVENLABS_VOICE_ID }
-    }
-    return null
+// ElevenLabs (opcional, qualidade superior) configurado globalmente via .env —
+// não é uma credencial por candidato no produto eleitoral.
+function getElevenLabsConfig(): { apiKey: string; voiceId: string } | null {
+  if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) {
+    return { apiKey: process.env.ELEVENLABS_API_KEY, voiceId: process.env.ELEVENLABS_VOICE_ID }
   }
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { elevenLabsKey: true, elevenLabsVoiceId: true } as any,
-  }) as any
-  if (!ws?.elevenLabsKey || !ws?.elevenLabsVoiceId) return null
-  try {
-    return { apiKey: decrypt(ws.elevenLabsKey), voiceId: ws.elevenLabsVoiceId }
-  } catch {
-    return null
-  }
+  return null
 }
 
 // Vozes OpenAI disponíveis para seleção pelo usuário
@@ -41,7 +27,7 @@ export const TTS_VOICES = {
 
 export type TtsVoice = keyof typeof TTS_VOICES
 
-export async function generateSpeech(text: string, workspaceId?: string, voice?: string): Promise<Buffer | null> {
+export async function generateSpeech(text: string, voice?: string): Promise<Buffer | null> {
   // Limpa markdown e emojis para soar melhor em áudio
   const cleanText = text
     .replace(/[*_~`#]/g, '')
@@ -55,8 +41,8 @@ export async function generateSpeech(text: string, workspaceId?: string, voice?:
 
   if (!cleanText) return null
 
-  // ElevenLabs — qualidade superior, voz JARVIS real
-  const elevenCfg = await getElevenLabsConfig(workspaceId)
+  // ElevenLabs — qualidade superior, se configurado globalmente
+  const elevenCfg = getElevenLabsConfig()
   if (elevenCfg) {
     try {
       const res = await axios.post(

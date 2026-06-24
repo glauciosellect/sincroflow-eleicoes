@@ -10,42 +10,25 @@ import { logger } from './lib/logger'
 
 import { authRoutes } from './modules/auth/auth.routes'
 import { googleRoutes } from './modules/auth/google.routes'
-import { workspaceRoutes } from './modules/workspaces/workspaces.routes'
+import { candidateRoutes } from './modules/candidates/candidates.routes'
 import { agentRoutes } from './modules/agents/agents.routes'
-import { trainingRoutes } from './modules/training/training.routes'
-import { intentionRoutes } from './modules/intentions/intentions.routes'
-import { flowRoutes } from './modules/flows/flows.routes'
 import { channelRoutes } from './modules/channels/channels.routes'
 import { conversationRoutes } from './modules/conversations/conversations.routes'
 import { contactRoutes } from './modules/contacts/contacts.routes'
-import { knowledgeRoutes } from './modules/knowledge/knowledge.routes'
 import { analyticsRoutes } from './modules/analytics/analytics.routes'
-import { attendanceRoutes } from './modules/attendances/attendances.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
 import { stripeRoutes } from './modules/billing/stripe.routes'
-import { mcpRoutes } from './modules/mcp/mcp.routes'
-import { integrationRoutes } from './modules/integrations/integrations.routes'
 import { metaIntegrationRoutes } from './modules/integrations/meta.routes'
 import { metaWhatsAppSignupRoutes } from './modules/integrations/meta-whatsapp-signup.routes'
 import { apiKeyRoutes } from './modules/auth/apikeys.routes'
 import { envVariableRoutes } from './modules/auth/env-variables.routes'
 import { webhookRoutes } from './modules/webhooks/webhooks.routes'
 import { emailChannelRoutes } from './modules/channels/email/email.routes'
-import { comercialRoutes } from './modules/comercial/comercial.routes'
-import { ecommerceWebhookRoutes, ecommerceIntegrationRoutes, ecommerceOAuthCallbackRoutes } from './modules/integrations/ecommerce.routes'
-import { crmWebhookRoutes, crmOAuthCallbackRoutes, crmRoutes } from './modules/crm/crm.routes'
-import { financeWebhookRoutes, financeRoutes } from './modules/finance/finance.routes'
-import { marketingWebhookRoutes, marketingOAuthCallbackRoutes, marketingRoutes } from './modules/marketing/marketing.routes'
-import { agentToolsRoutes } from './modules/ai/agent-tools.routes'
 import { rbacRoutes } from './modules/rbac/rbac.routes'
 import { statusRoutes } from './modules/status/status.routes'
-import { templateRoutes, seedTemplates } from './modules/templates/templates.routes'
-import { startTrainingWorker } from './modules/ai/training.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
-import { startWelcomeWorker } from './modules/welcome/welcome.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
 import { startEmailPollingWorker } from './modules/channels/email/email-poll.worker'
-import { integrationWorker } from './modules/integrations/integration.worker'
 import { initSocket } from './lib/socket'
 
 const app = Fastify({ logger: process.env.NODE_ENV === 'development' })
@@ -118,67 +101,30 @@ async function bootstrap() {
 
   await app.register(authRoutes)
   await app.register(googleRoutes)
-  await app.register(workspaceRoutes)
+  await app.register(candidateRoutes)
   await app.register(agentRoutes)
-  await app.register(trainingRoutes)
-  await app.register(intentionRoutes)
-  await app.register(flowRoutes)
   await app.register(channelRoutes)
   await app.register(emailChannelRoutes)
   await app.register(conversationRoutes)
   await app.register(contactRoutes)
-  await app.register(knowledgeRoutes)
   await app.register(analyticsRoutes)
-  await app.register(attendanceRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)
-  await app.register(mcpRoutes)
-  await app.register(integrationRoutes)
   await app.register(metaIntegrationRoutes)
   await app.register(metaWhatsAppSignupRoutes)
   await app.register(apiKeyRoutes)
   await app.register(envVariableRoutes)
   await app.register(webhookRoutes)
-  await app.register(comercialRoutes)
-  await app.register(ecommerceWebhookRoutes)
-  await app.register(ecommerceOAuthCallbackRoutes)
-  await app.register(ecommerceIntegrationRoutes)
 
-  // M4 — CRM
-  await app.register(crmWebhookRoutes)
-  await app.register(crmOAuthCallbackRoutes)
-  await app.register(crmRoutes)
-
-  // M5 — Financeiro
-  await app.register(financeWebhookRoutes)
-  await app.register(financeRoutes)
-
-  // M6 — Marketing
-  await app.register(marketingWebhookRoutes)
-  await app.register(marketingOAuthCallbackRoutes)
-  await app.register(marketingRoutes)
-
-  // M7 — IA Tools
-  await app.register(agentToolsRoutes)
-
-  // M8 — RBAC
+  // RBAC (equipe / níveis de acesso)
   await app.register(rbacRoutes)
 
-  // M9 — Status Page
+  // Status Page
   await app.register(statusRoutes)
 
-  // M10 — Templates
-  await app.register(templateRoutes)
-
-  startTrainingWorker()
   startMessageWorker()
-  startWelcomeWorker()
   startReminderWorker()
   startEmailPollingWorker()
-  integrationWorker
-
-  // Seed de templates iniciais (só roda se o banco estiver vazio)
-  await seedTemplates().catch(err => logger.error('Seed templates error', err))
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })

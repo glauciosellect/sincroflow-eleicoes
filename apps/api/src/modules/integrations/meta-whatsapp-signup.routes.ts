@@ -34,7 +34,7 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
 export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
   app.post('/channels/whatsapp-meta/signup', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
 
     const { code, wabaId, phoneNumberId } = z.object({
       code: z.string().min(1),
@@ -64,14 +64,14 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
       console.error('[META-WA-SIGNUP] Erro ao buscar número:', err?.response?.data || err?.message)
     }
 
-    const existing = await prisma.channel.findFirst({
-      where: { workspaceId, type: 'WHATSAPP', config: { path: ['phoneNumberId'], equals: phoneNumberId } },
-    })
-    if (existing) return reply.send(existing)
-
-    const channel = await prisma.channel.create({
-      data: {
-        workspaceId,
+    const channel = await prisma.channel.upsert({
+      where: { candidateId_type: { candidateId, type: 'WHATSAPP' } },
+      update: {
+        name: displayPhoneNumber || 'WhatsApp (Meta)',
+        config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },
+      },
+      create: {
+        candidateId,
         type: 'WHATSAPP',
         name: displayPhoneNumber || 'WhatsApp (Meta)',
         config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },

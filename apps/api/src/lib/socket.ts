@@ -10,9 +10,9 @@ export function initSocket(server: HttpServer, allowedOrigins: string[]) {
   })
 
   io.on('connection', (socket) => {
-    // Cliente entra na sala do workspace dele
-    socket.on('join:workspace', (workspaceId: string) => {
-      socket.join(`ws:${workspaceId}`)
+    // Cliente entra na sala do candidato dele
+    socket.on('join:candidate', (candidateId: string) => {
+      socket.join(`candidate:${candidateId}`)
     })
 
     socket.on('disconnect', () => {})
@@ -26,12 +26,12 @@ export function getIO(): SocketServer {
   return io
 }
 
-// Emite nova mensagem para todos no workspace
-export function emitNewMessage(workspaceId: string, conversationId: string, message: object) {
-  getIO().to(`ws:${workspaceId}`).emit('message:new', { conversationId, message })
+// Emite nova mensagem para todos no candidato
+export function emitNewMessage(candidateId: string, conversationId: string, message: object) {
+  getIO().to(`candidate:${candidateId}`).emit('message:new', { conversationId, message })
 }
 
 // Emite mudança de status de conversa (ex: IA → espera → humano)
-export function emitConversationUpdated(workspaceId: string, conversation: object) {
-  getIO().to(`ws:${workspaceId}`).emit('conversation:updated', conversation)
+export function emitConversationUpdated(candidateId: string, conversation: object) {
+  getIO().to(`candidate:${candidateId}`).emit('conversation:updated', conversation)
 }

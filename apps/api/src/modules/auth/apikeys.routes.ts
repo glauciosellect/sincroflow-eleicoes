@@ -10,9 +10,9 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   app.get('/api-keys', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const keys = await prisma.apiKey.findMany({
-      where: { workspaceId },
+      where: { candidateId },
       select: { id: true, name: true, lastUsedAt: true, createdAt: true },
     })
     return reply.send(keys)
@@ -20,19 +20,19 @@ export async function apiKeyRoutes(app: FastifyInstance) {
 
   app.post('/api-keys', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { name } = z.object({ name: z.string().min(1).max(100) }).parse(req.body)
     const fullKey = generateApiKey()
     const keyHash = hashApiKey(fullKey)
-    const key = await prisma.apiKey.create({ data: { name, keyHash, userId: sub, workspaceId } })
+    const key = await prisma.apiKey.create({ data: { name, keyHash, userId: sub, candidateId } })
     return reply.status(201).send({ ...key, key: fullKey })
   })
 
   app.delete('/api-keys/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    await prisma.apiKey.deleteMany({ where: { id, workspaceId } })
+    await prisma.apiKey.deleteMany({ where: { id, candidateId } })
     return reply.send({ ok: true })
   })
 }

@@ -104,27 +104,27 @@ export async function listCalendars(accessToken: string): Promise<{ id: string; 
   return data.items ?? []
 }
 
-export async function getValidToken(workspaceId: string): Promise<string | null> {
+export async function getValidToken(candidateId: string): Promise<string | null> {
   const { prisma } = await import('./prisma')
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
+  const config = await prisma.agentConfig.findUnique({
+    where: { candidateId },
     select: {
       googleAccessToken: true,
       googleRefreshToken: true,
       googleTokenExpiry: true,
-    } as any,
-  }) as any
-  if (!ws?.googleAccessToken) return null
+    },
+  })
+  if (!config?.googleAccessToken) return null
 
-  const expiry = ws.googleTokenExpiry ? new Date(ws.googleTokenExpiry).getTime() : 0
-  if (Date.now() < expiry - 60_000) return ws.googleAccessToken
+  const expiry = config.googleTokenExpiry ? new Date(config.googleTokenExpiry).getTime() : 0
+  if (Date.now() < expiry - 60_000) return config.googleAccessToken
 
   // Token expirado — renova
-  if (!ws.googleRefreshToken) return null
+  if (!config.googleRefreshToken) return null
   try {
-    const tokens = await refreshAccessToken(ws.googleRefreshToken)
-    await (prisma.workspace as any).update({
-      where: { id: workspaceId },
+    const tokens = await refreshAccessToken(config.googleRefreshToken)
+    await prisma.agentConfig.update({
+      where: { candidateId },
       data: {
         googleAccessToken: tokens.access_token,
         googleTokenExpiry: new Date(tokens.expiry_date),

@@ -3,168 +3,125 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 
-const agentSchema = z.object({
-  name: z.string().min(1).max(100),
-  funcao: z.string().max(100).optional().nullable(),
-  purpose: z.enum(['SUPPORT', 'SALES', 'PERSONAL']).optional(),
-  companyName: z.string().max(100).optional().nullable(),
-  companyWebsite: z.string().url().or(z.literal('')).optional().nullable(),
-  companyDesc: z.string().max(2000).optional().nullable(),
-  behavior: z.string().max(6000).optional().nullable(),
-  communicationStyle: z.enum(['FORMAL', 'NORMAL', 'CASUAL']).optional(),
-  llmModel: z.string().optional(),
-  avatarUrl: z.string().optional().nullable(),
-})
-
 const configSchema = z.object({
-  transferToHuman: z.boolean().optional(),
-  summarizeOnTransfer: z.boolean().optional(),
-  useEmojis: z.boolean().optional(),
-  signNameInResponses: z.boolean().optional(),
-  restrictTopics: z.boolean().optional(),
-  splitLongMessages: z.boolean().optional(),
-  allowReminders: z.boolean().optional(),
-  smartTrainingSearch: z.boolean().optional(),
-  timezone: z.string().optional(),
-  responseDelay: z.number().int().min(0).max(300).optional(),
-  maxInteractionsPerChat: z.number().int().nullable().optional(),
-  workingHours: z.any().optional(),
-  webhookEvents: z.any().optional(),
-  transferRules: z.any().optional(),
-  inactivityActions: z.any().optional(),
-  autoCreateLead: z.boolean().optional(),
-  autoLeadStageId: z.string().optional().nullable(),
-  firstContactEnabled: z.boolean().optional(),
-  firstContactText: z.string().max(4000).optional().nullable(),
-  firstContactVideoUrl: z.string().url().optional().nullable(),
-  firstContactFileUrl: z.string().optional().nullable(),
-  firstContactFileName: z.string().optional().nullable(),
+  agentName: z.string().min(1).max(100).optional(),
+  agentRole: z.string().max(200).optional(),
+  agentStyle: z.enum(['FORMAL', 'INFORMAL', 'ACOLHEDOR']).optional(),
+  story: z.string().max(20000).optional().nullable(),
+  disclaimer: z.string().min(1).max(2000).optional(),
+  candidateSite: z.string().url().or(z.literal('')).optional().nullable(),
+  voiceEnabled: z.boolean().optional(),
   ttsVoice: z.string().optional(),
+  responseDelay: z.number().int().min(0).max(300).optional(),
+  language: z.string().optional(),
+  timezone: z.string().optional(),
 })
 
+// 15 temas fixos da Plataforma Eleitoral (ver docs/spec-eleicoes/04-modulos/4.3-cadastro-agente.md)
+export const PLATFORM_TOPICS: { key: string; name: string }[] = [
+  { key: 'saude', name: 'Saúde' },
+  { key: 'seguranca_publica', name: 'Segurança Pública' },
+  { key: 'educacao', name: 'Educação' },
+  { key: 'economia_emprego', name: 'Economia e Emprego' },
+  { key: 'habitacao_urbanismo', name: 'Habitação e Urbanismo' },
+  { key: 'reforma_tributaria', name: 'Reforma Tributária' },
+  { key: 'infraestrutura_mobilidade', name: 'Infraestrutura e Mobilidade' },
+  { key: 'protecao_ambiental', name: 'Proteção Ambiental' },
+  { key: 'familia_valores', name: 'Família e Valores' },
+  { key: 'transparencia_corrupcao', name: 'Transparência e Combate à Corrupção' },
+  { key: 'direitos_humanos_inclusao', name: 'Direitos Humanos e Inclusão' },
+  { key: 'tecnologia_inovacao', name: 'Tecnologia e Inovação' },
+  { key: 'agricultura_agronegocio', name: 'Agricultura e Agronegócio' },
+  { key: 'cultura_esporte', name: 'Cultura e Esporte' },
+  { key: 'outras_propostas', name: 'Outras Propostas' },
+]
 
 export async function agentRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/agents', async (req, reply) => {
+  // ── Minha História / Disclaimer / Configuração ──────────────────────────
+
+  app.get('/agent/config', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { search } = req.query as { search?: string }
-    const agents = await prisma.agent.findMany({
-      where: {
-        workspaceId,
-        ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
-      },
-      include: { config: true, _count: { select: { trainings: true, conversations: true } } },
-      orderBy: { createdAt: 'desc' },
-    })
-    return reply.send(agents)
+    const candidateId = await getWorkspaceId(sub, wid)
+    const config = await prisma.agentConfig.findUnique({ where: { candidateId } })
+    return reply.send(config)
   })
 
-  app.post('/agents', async (req, reply) => {
+  app.patch('/agent/config', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const data = agentSchema.parse(req.body)
-    const agent = await prisma.agent.create({
-      data: { ...data, workspaceId, config: { create: {} } },
-      include: { config: true },
-    })
-    return reply.status(201).send(agent)
-  })
-
-  app.get('/agents/:id', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const agent = await prisma.agent.findFirst({
-      where: { id, workspaceId },
-      include: {
-        config: true,
-        trainings: { orderBy: { createdAt: 'desc' } },
-        intentions: { orderBy: { createdAt: 'desc' } },
-        integrations: true,
-        mcpServers: true,
-        agentChannels: { include: { channel: true } },
-        knowledgeBases: { include: { knowledgeBase: true } },
-      },
-    })
-    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
-    return reply.send(agent)
-  })
-
-  app.patch('/agents/:id', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const data = agentSchema.partial().parse(req.body)
-    const agent = await prisma.agent.updateMany({
-      where: { id, workspaceId },
-      data,
-    })
-    if (agent.count === 0) return reply.status(404).send({ error: 'Agente não encontrado' })
-    return reply.send(await prisma.agent.findUnique({ where: { id }, include: { config: true } }))
-  })
-
-  app.delete('/agents/:id', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    await prisma.agent.deleteMany({ where: { id, workspaceId } })
-    return reply.send({ ok: true })
-  })
-
-  app.patch('/agents/:id/toggle', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const agent = await prisma.agent.findFirst({ where: { id, workspaceId } })
-    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
-    const updated = await prisma.agent.update({
-      where: { id },
-      data: { isActive: !agent.isActive },
-    })
-    return reply.send(updated)
-  })
-
-  app.get('/agents/:id/config', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const agent = await prisma.agent.findFirst({ where: { id, workspaceId }, include: { config: true } })
-    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
-    return reply.send(agent.config)
-  })
-
-  app.patch('/agents/:id/config', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const agent = await prisma.agent.findFirst({ where: { id, workspaceId } })
-    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
+    const candidateId = await getWorkspaceId(sub, wid)
     const data = configSchema.parse(req.body)
     const config = await prisma.agentConfig.upsert({
-      where: { agentId: id },
+      where: { candidateId },
       update: data,
-      create: { agentId: id, ...data },
+      create: { candidateId, disclaimer: data.disclaimer || '', ...data },
     })
     return reply.send(config)
   })
 
-  app.post('/agents/:id/test', async (req, reply) => {
+  app.patch('/agent/toggle', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const config = await prisma.agentConfig.findUnique({ where: { candidateId } })
+    if (!config) return reply.status(404).send({ error: 'Agente não configurado' })
+    const updated = await prisma.agentConfig.update({
+      where: { candidateId },
+      data: { isActive: !config.isActive },
+    })
+    return reply.send(updated)
+  })
+
+  // ── Plataforma Eleitoral (15 temas fixos) ────────────────────────────────
+
+  app.get('/agent/platform-topics', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const saved = await prisma.platformTopic.findMany({ where: { candidateId } })
+    const savedByKey = new Map(saved.map(t => [t.topicKey, t]))
+    const topics = PLATFORM_TOPICS.map(t => ({
+      topicKey: t.key,
+      topicName: t.name,
+      content: savedByKey.get(t.key)?.content ?? null,
+      updatedAt: savedByKey.get(t.key)?.updatedAt ?? null,
+    }))
+    return reply.send(topics)
+  })
+
+  app.patch('/agent/platform-topics/:topicKey', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { topicKey } = req.params as { topicKey: string }
+    const topicDef = PLATFORM_TOPICS.find(t => t.key === topicKey)
+    if (!topicDef) return reply.status(404).send({ error: 'Tema não encontrado' })
+    const { content } = z.object({ content: z.string().max(8000) }).parse(req.body)
+    const topic = await prisma.platformTopic.upsert({
+      where: { candidateId_topicKey: { candidateId, topicKey } },
+      update: { content },
+      create: { candidateId, topicKey, topicName: topicDef.name, content },
+    })
+    return reply.send(topic)
+  })
+
+  // ── Testar agente ─────────────────────────────────────────────────────
+
+  app.post('/agent/test', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
     const { message, history } = z.object({
       message: z.string(),
       history: z.array(z.object({ role: z.string(), content: z.string() })).optional(),
     }).parse(req.body)
-    const agent = await prisma.agent.findFirst({
-      where: { id, workspaceId },
-      include: { config: true },
-    })
-    if (!agent) return reply.status(404).send({ error: 'Agente não encontrado' })
+
+    const [candidate, config, topics] = await Promise.all([
+      prisma.candidate.findUnique({ where: { id: candidateId } }),
+      prisma.agentConfig.findUnique({ where: { candidateId } }),
+      prisma.platformTopic.findMany({ where: { candidateId } }),
+    ])
+    if (!candidate || !config) return reply.status(404).send({ error: 'Agente não configurado' })
+
     const { testAgent } = await import('../ai/ai.service')
-    const result = await testAgent(agent, message, history)
+    const result = await testAgent(candidate, config, topics, message, history)
     return reply.send(result)
   })
 }

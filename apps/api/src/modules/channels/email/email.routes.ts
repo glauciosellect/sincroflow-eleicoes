@@ -28,22 +28,22 @@ export async function emailChannelRoutes(app: FastifyInstance) {
       }
     }
 
-    const member = await prisma.workspaceMember.findFirst({
-      where: wid ? { workspaceId: wid, userId } : { userId },
-      orderBy: { createdAt: 'asc' },
+    const member = await prisma.teamMember.findFirst({
+      where: wid ? { candidateId: wid, userId } : { userId },
+      orderBy: { acceptedAt: 'asc' },
     })
-    if (!member) return reply.status(404).send({ error: 'Workspace não encontrado' })
+    if (!member) return reply.status(404).send({ error: 'Candidato não encontrado' })
 
     const redirectUri = `${API_URL}/channels/email/callback`
-    const url = getGmailOAuthUrl(redirectUri, member.workspaceId)
+    const url = getGmailOAuthUrl(redirectUri, member.candidateId)
     return reply.redirect(url)
   })
 
   app.get('/channels/email/callback', async (req, reply) => {
-    const { code, state: workspaceId, error } = req.query as Record<string, string>
+    const { code, state: candidateId, error } = req.query as Record<string, string>
     const redirectBase = `${FRONTEND_URL}/settings?tab=channels`
 
-    if (error || !code || !workspaceId) {
+    if (error || !code || !candidateId) {
       return reply.redirect(`${redirectBase}&email=error`)
     }
 
@@ -52,27 +52,20 @@ export async function emailChannelRoutes(app: FastifyInstance) {
       const tokens = await exchangeCodeForTokens(code, redirectUri)
       const { email } = await getGoogleUserInfo(tokens.access_token)
 
-      const existing = await prisma.channel.findFirst({
-        where: { workspaceId, type: 'EMAIL', config: { path: ['email'], equals: email } },
-      })
-      if (existing) {
-        await prisma.channel.update({
-          where: { id: existing.id },
-          data: {
-            config: {
-              ...(existing.config as any),
-              accessToken: tokens.access_token,
-              refreshToken: tokens.refresh_token ?? (existing.config as any).refreshToken,
-              tokenExpiry: new Date(tokens.expiry_date).toISOString(),
-            },
+      await prisma.channel.upsert({
+        where: { candidateId_type: { candidateId, type: 'EMAIL' } },
+        update: {
+          name: email,
+          config: {
+            provider: 'gmail',
+            email,
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token ?? undefined,
+            tokenExpiry: new Date(tokens.expiry_date).toISOString(),
           },
-        })
-        return reply.redirect(`${redirectBase}&email=success`)
-      }
-
-      await prisma.channel.create({
-        data: {
-          workspaceId,
+        },
+        create: {
+          candidateId,
           type: 'EMAIL',
           name: email,
           config: {
@@ -95,10 +88,10 @@ export async function emailChannelRoutes(app: FastifyInstance) {
 
   app.patch('/channels/:id/email-settings', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
 
-    const channel = await prisma.channel.findFirst({ where: { id, workspaceId, type: 'EMAIL' } })
+    const channel = await prisma.channel.findFirst({ where: { id, candidateId, type: 'EMAIL' } })
     if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
 
     const { allowedSenders } = z.object({ allowedSenders: z.array(z.string()) }).parse(req.body)

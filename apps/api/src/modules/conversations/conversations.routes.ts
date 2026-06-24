@@ -11,16 +11,13 @@ export async function conversationRoutes(app: FastifyInstance) {
 
   app.get('/conversations', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { status, agentId, channelId, page = '1', limit = '20', search, assignedToMe } = req.query as Record<string, string>
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { status, channelId, page = '1', limit = '20', search, assignedToMe } = req.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
-    const where: any = { workspaceId }
+    const where: any = { candidateId }
     if (status) where.status = status
-    if (agentId) where.agentId = agentId
     if (channelId) where.channelId = channelId
-    // "Meus": conversas com atendimento humano atribuídas a quem está logado —
-    // sem isso, a aba "Meus" misturava conversas de todos os atendentes.
     if (assignedToMe === 'true') where.assignedToId = sub
     if (search) where.contact = { OR: [{ name: { contains: search, mode: 'insensitive' } }, { phone: { contains: search } }] }
 
@@ -29,11 +26,10 @@ export async function conversationRoutes(app: FastifyInstance) {
         where,
         include: {
           contact: true,
-          agent: { select: { id: true, name: true, avatarUrl: true } },
           channel: { select: { id: true, type: true, name: true } },
           messages: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { lastMessageAt: 'desc' },
         skip,
         take: Number(limit),
       }),
@@ -44,35 +40,31 @@ export async function conversationRoutes(app: FastifyInstance) {
 
   app.get('/conversations/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
     const conversation = await prisma.conversation.findFirst({
-      where: { id, workspaceId },
+      where: { id, candidateId },
       include: {
         contact: true,
-        agent: true,
         channel: true,
         messages: { orderBy: { createdAt: 'asc' } },
       },
     })
     if (!conversation) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
-    // Zera não lidas ao abrir a conversa
-    if (conversation.unreadCount > 0) {
-      await prisma.conversation.update({ where: { id }, data: { unreadCount: 0 } })
-    }
+    await prisma.message.updateMany({ where: { conversationId: id, isRead: false }, data: { isRead: true } })
 
-    return reply.send({ ...conversation, unreadCount: 0 })
+    return reply.send(conversation)
   })
 
   app.get('/conversations/:id/messages', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
     const { page = '1', limit = '50' } = req.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
-    const conv = await prisma.conversation.findFirst({ where: { id, workspaceId } })
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
     const [messages, total] = await prisma.$transaction([
@@ -89,20 +81,20 @@ export async function conversationRoutes(app: FastifyInstance) {
 
   app.post('/conversations/:id/messages', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
     const { content } = z.object({ content: z.string().min(1) }).parse(req.body)
 
     const conv = await prisma.conversation.findFirst({
-      where: { id, workspaceId },
+      where: { id, candidateId },
       include: { contact: true, channel: true },
     })
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
     const message = await prisma.message.create({
-      data: { conversationId: id, role: 'HUMAN', content },
+      data: { conversationId: id, senderType: 'HUMAN', content },
     })
-    try { emitNewMessage(workspaceId, id, message) } catch {}
+    try { emitNewMessage(candidateId, id, message) } catch {}
 
     // Envia a mensagem pelo canal de origem (WhatsApp, etc.)
     try {
@@ -110,7 +102,6 @@ export async function conversationRoutes(app: FastifyInstance) {
         const provider = getWhatsAppProvider()
         await provider.sendText(conv.channelId, conv.contact.externalId, content)
       }
-      // Telegram
       if (conv.channel.type === 'TELEGRAM' && conv.contact.externalId) {
         const cfg = conv.channel.config as any
         if (cfg?.botToken) {
@@ -121,38 +112,23 @@ export async function conversationRoutes(app: FastifyInstance) {
           })
         }
       }
-      // Meta (Instagram / Facebook)
       if ((conv.channel.type === 'FACEBOOK' || conv.channel.type === 'INSTAGRAM') && conv.contact.externalId) {
         const cfg = conv.channel.config as any
         if (cfg?.pageAccessToken) {
           const axios = (await import('axios')).default
-          await axios.post('https://graph.facebook.com/v19.0/me/messages', {
+          await axios.post(`https://graph.facebook.com/v21.0/${cfg.pageId}/messages`, {
             recipient: { id: conv.contact.externalId },
             message: { text: content },
-          }, { headers: { Authorization: `Bearer ${cfg.pageAccessToken}` } })
+          }, { params: { access_token: cfg.pageAccessToken } })
         }
       }
-      // LinkedIn — mesmo padrão (não-oficial) usado em message.worker.ts; ver
-      // PENDENCIAS.md sobre confiabilidade dessa integração
-      if (conv.channel.type === 'LINKEDIN' && conv.contact.externalId) {
-        const cfg = conv.channel.config as any
-        if (cfg?.accessToken) {
-          const axios = (await import('axios')).default
-          await axios.post('https://api.linkedin.com/v2/messages', {
-            recipients: [{ 'com.linkedin.voyager.messaging.MessagingMember': { 'com.linkedin.common.UrnId': conv.contact.externalId } }],
-            subject: '',
-            body: content,
-          }, { headers: { Authorization: `Bearer ${cfg.accessToken}`, 'Content-Type': 'application/json' } })
-        }
-      }
-      // Email — responde na mesma thread, usando o metadata (threadId/messageId/
-      // references/subject) salvo na última mensagem do cliente
+      // Email — responde na mesma thread, usando o metadata salvo na última mensagem recebida
       if (conv.channel.type === 'EMAIL' && conv.contact.externalId) {
         const lastInbound = await prisma.message.findFirst({
-          where: { conversationId: id, role: 'USER', metadata: { not: undefined } },
+          where: { conversationId: id, senderType: 'VOTER' },
           orderBy: { createdAt: 'desc' },
         })
-        const meta = lastInbound?.metadata as any
+        const meta = (lastInbound as any)?.metadata as any
         if (meta?.threadId && meta?.messageId) {
           const accessToken = await getValidGmailToken(conv.channelId)
           if (accessToken) {
@@ -175,83 +151,68 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.status(201).send(message)
   })
 
+  // Equipe assume o atendimento — o agente para de responder
   app.post('/conversations/:id/assume', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
 
-    const conv = await prisma.conversation.findFirst({ where: { id, workspaceId } })
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
     const updated = await prisma.conversation.update({
       where: { id },
-      data: { status: 'HUMAN_ACTIVE', assignedToId: sub },
+      data: { assignedToId: sub },
     })
     const sysMsg = await prisma.message.create({
-      data: { conversationId: id, role: 'SYSTEM', content: 'Atendimento assumido por humano.' },
+      data: { conversationId: id, senderType: 'HUMAN', content: 'Atendimento assumido pela equipe.' },
     })
-    try { emitConversationUpdated(workspaceId, updated) } catch {}
-    try { emitNewMessage(workspaceId, id, sysMsg) } catch {}
+    try { emitConversationUpdated(candidateId, updated) } catch {}
+    try { emitNewMessage(candidateId, id, sysMsg) } catch {}
     return reply.send(updated)
   })
 
-  app.post('/conversations/:id/transfer', async (req, reply) => {
+  // Devolve a conversa para o agente
+  app.post('/conversations/:id/release', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    const { to } = z.object({ to: z.enum(['human', 'ai']) }).parse(req.body)
 
-    const conv = await prisma.conversation.findFirst({ where: { id, workspaceId } })
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
-    const status = to === 'human' ? 'WAITING_HUMAN' : 'AI_ACTIVE'
-    const updated = await prisma.conversation.update({ where: { id }, data: { status } })
+    const updated = await prisma.conversation.update({ where: { id }, data: { assignedToId: null } })
     const sysMsg = await prisma.message.create({
-      data: { conversationId: id, role: 'SYSTEM', content: to === 'human' ? 'Atendimento transferido para equipe humana.' : 'Atendimento retornado para IA.' },
+      data: { conversationId: id, senderType: 'HUMAN', content: 'Atendimento devolvido para o agente.' },
     })
-    try { emitConversationUpdated(workspaceId, updated) } catch {}
-    try { emitNewMessage(workspaceId, id, sysMsg) } catch {}
+    try { emitConversationUpdated(candidateId, updated) } catch {}
+    try { emitNewMessage(candidateId, id, sysMsg) } catch {}
+    return reply.send(updated)
+  })
+
+  app.post('/conversations/:id/urgent', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { id } = req.params as { id: string }
+
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
+    if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
+
+    const updated = await prisma.conversation.update({ where: { id }, data: { status: 'URGENT' } })
+    try { emitConversationUpdated(candidateId, updated) } catch {}
     return reply.send(updated)
   })
 
   app.post('/conversations/:id/close', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
 
-    const conv = await prisma.conversation.findFirst({
-      where: { id, workspaceId },
-      include: { contact: true, agent: true, channel: true },
-    })
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
-    const updated = await prisma.conversation.update({
-      where: { id },
-      data: { status: 'CLOSED', endedAt: new Date(), closedBy: 'human' },
-    })
-
-    const duration = conv.startedAt ? Math.floor((Date.now() - conv.startedAt.getTime()) / 1000) : null
-    await prisma.attendance.upsert({
-      where: { conversationId: id },
-      update: { status: 'CLOSED', endedAt: new Date(), durationSeconds: duration || undefined },
-      create: {
-        workspaceId,
-        conversationId: id,
-        contactName: conv.contact?.name || undefined,
-        contactPhone: conv.contact?.phone || undefined,
-        channelType: conv.channel.type,
-        agentName: conv.agent.name,
-        status: 'CLOSED',
-        startedAt: conv.startedAt,
-        endedAt: new Date(),
-        durationSeconds: duration || undefined,
-        creditsUsed: conv.creditsUsed,
-        interactionCount: conv.interactionCount,
-        protocol: conv.protocol,
-      },
-    })
-
-    try { emitConversationUpdated(workspaceId, updated) } catch {}
+    const updated = await prisma.conversation.update({ where: { id }, data: { status: 'CLOSED' } })
+    try { emitConversationUpdated(candidateId, updated) } catch {}
     return reply.send(updated)
   })
 }

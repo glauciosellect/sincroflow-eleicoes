@@ -1,10 +1,18 @@
 import type { FastifyInstance } from 'fastify'
-import { ConversationStatus } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 
+// Relatórios implementados (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md):
+// 1. Visão Geral da Semana, 4. Volume por Canal, 8. Eleitores Mais Engajados,
+// 9. Evolução Semanal, 10. Status das Solicitações.
+//
+// TODO — ainda não implementados (exigem mais infra: NLP de temas, geolocalização,
+// análise de sentimento, detecção de perguntas sem resposta):
+// 2. Temas Mais Perguntados, 3. Mapa de Solicitações por Região, 5. Sentimento dos
+// Eleitores, 6. Perguntas Sem Resposta (Gaps de Conteúdo), 7. Horários de Pico.
+
 function dateRange(start?: string, end?: string) {
-  const s = start ? new Date(start) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const s = start ? new Date(start) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const e = end ? new Date(end) : new Date()
   return { gte: s, lte: e }
 }
@@ -12,156 +20,122 @@ function dateRange(start?: string, end?: string) {
 export async function analyticsRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
+  // Relatório 1: Visão Geral da Semana
   app.get('/analytics/overview', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
     const range = dateRange(start, end)
+    const previousRange = { gte: new Date(range.gte.getTime() - (range.lte.getTime() - range.gte.getTime())), lte: range.gte }
 
-    const [attendances, credits, contacts, workspace] = await prisma.$transaction([
-      prisma.attendance.count({ where: { workspaceId, status: 'CLOSED', createdAt: range } }),
-      prisma.message.aggregate({ _sum: { creditsUsed: true }, where: { conversation: { workspaceId }, createdAt: range } }),
-      prisma.contact.count({ where: { workspaceId, createdAt: range } }),
-      prisma.workspace.findUnique({ where: { id: workspaceId }, select: { credits: true, plan: true } }),
+    const [conversations, newContacts, requests, resolvedRequests, prevConversations] = await prisma.$transaction([
+      prisma.conversation.count({ where: { candidateId, createdAt: range } }),
+      prisma.contact.count({ where: { candidateId, createdAt: range } }),
+      prisma.request.count({ where: { candidateId, createdAt: range } }),
+      prisma.request.count({ where: { candidateId, createdAt: range, status: 'RESOLVED' } }),
+      prisma.conversation.count({ where: { candidateId, createdAt: previousRange } }),
     ])
 
-    return reply.send({
-      attendances,
-      creditsUsed: credits._sum.creditsUsed || 0,
-      newContacts: contacts,
-      creditsRemaining: workspace?.credits || 0,
-      plan: workspace?.plan,
-    })
+    const resolutionRate = requests > 0 ? Math.round((resolvedRequests / requests) * 100) : 0
+    const conversationsChangePercent = prevConversations > 0
+      ? Math.round(((conversations - prevConversations) / prevConversations) * 100)
+      : null
+
+    return reply.send({ conversations, newContacts, requests, resolutionRate, conversationsChangePercent })
   })
 
-  app.get('/analytics/timeline', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const messages = await prisma.message.findMany({
-      where: { conversation: { workspaceId }, createdAt: range, role: 'ASSISTANT' },
-      select: { createdAt: true, creditsUsed: true },
-    })
-
-    const grouped: Record<string, number> = {}
-    for (const m of messages) {
-      const day = m.createdAt.toISOString().split('T')[0]
-      grouped[day] = (grouped[day] || 0) + m.creditsUsed
-    }
-
-    return reply.send(Object.entries(grouped).map(([date, credits]) => ({ date, credits })).sort((a, b) => a.date.localeCompare(b.date)))
-  })
-
+  // Relatório 4: Volume por Canal
   app.get('/analytics/by-channel', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
     const range = dateRange(start, end)
 
     const conversations = await prisma.conversation.findMany({
-      where: { workspaceId, createdAt: range },
+      where: { candidateId, createdAt: range },
       include: { channel: { select: { type: true, name: true } } },
     })
 
-    const grouped: Record<string, { type: string; name: string; credits: number; count: number }> = {}
+    const grouped: Record<string, { type: string; name: string; count: number }> = {}
     for (const c of conversations) {
       const key = c.channelId
-      if (!grouped[key]) grouped[key] = { type: c.channel.type, name: c.channel.name, credits: 0, count: 0 }
-      grouped[key].credits += c.creditsUsed
+      if (!grouped[key]) grouped[key] = { type: c.channel.type, name: c.channel.name, count: 0 }
       grouped[key].count++
     }
 
-    return reply.send(Object.values(grouped).sort((a, b) => b.credits - a.credits))
+    return reply.send(Object.values(grouped).sort((a, b) => b.count - a.count))
   })
 
-  app.get('/analytics/top-agents', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const conversations = await prisma.conversation.findMany({
-      where: { workspaceId, createdAt: range },
-      include: { agent: { select: { id: true, name: true, avatarUrl: true } } },
-    })
-
-    const grouped: Record<string, { id: string; name: string; avatarUrl: string | null; credits: number; conversations: number }> = {}
-    for (const c of conversations) {
-      const key = c.agentId
-      if (!grouped[key]) grouped[key] = { id: c.agent.id, name: c.agent.name, avatarUrl: c.agent.avatarUrl, credits: 0, conversations: 0 }
-      grouped[key].credits += c.creditsUsed
-      grouped[key].conversations++
-    }
-
-    return reply.send(Object.values(grouped).sort((a, b) => b.credits - a.credits).slice(0, 10))
-  })
-
+  // Relatório 8: Eleitores Mais Engajados (Top 20)
   app.get('/analytics/top-contacts', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const contacts = await prisma.contact.findMany({
+      where: { candidateId },
+      orderBy: { totalInteractions: 'desc' },
+      take: 20,
+      select: { id: true, name: true, phone: true, totalInteractions: true, firstContactAt: true },
+    })
+
+    return reply.send(contacts)
+  })
+
+  // Relatório 9: Evolução Semanal (volume de conversas ao longo do tempo)
+  app.get('/analytics/timeline', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
     const range = dateRange(start, end)
 
     const conversations = await prisma.conversation.findMany({
-      where: { workspaceId, createdAt: range },
-      include: { contact: true },
+      where: { candidateId, createdAt: range },
+      select: { createdAt: true },
     })
 
-    const grouped: Record<string, { name: string | null; phone: string | null; interactions: number; credits: number }> = {}
+    const grouped: Record<string, number> = {}
     for (const c of conversations) {
-      const key = c.contactId
-      if (!grouped[key]) grouped[key] = { name: c.contact.name, phone: c.contact.phone, interactions: 0, credits: 0 }
-      grouped[key].interactions += c.interactionCount
-      grouped[key].credits += c.creditsUsed
+      const day = c.createdAt.toISOString().split('T')[0]
+      grouped[day] = (grouped[day] || 0) + 1
     }
 
-    return reply.send(Object.values(grouped).sort((a, b) => b.interactions - a.interactions).slice(0, 10))
+    return reply.send(Object.entries(grouped).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)))
   })
 
+  // Relatório 10: Status das Solicitações
+  app.get('/analytics/requests-status', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const byStatus = await prisma.request.groupBy({
+      by: ['status'],
+      where: { candidateId },
+      _count: true,
+    })
+
+    return reply.send(Object.fromEntries(byStatus.map((s) => [s.status, s._count])))
+  })
+
+  // Painel "ao vivo" do dashboard principal (seção 4.2 da spec)
   app.get('/analytics/realtime', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-    const [openConversations, waitingHuman, channels, agents, recentConversations, newContactsToday] = await prisma.$transaction([
-      prisma.conversation.count({ where: { workspaceId, status: { in: [ConversationStatus.AI_ACTIVE, ConversationStatus.HUMAN_ACTIVE] } } }),
-      prisma.conversation.count({ where: { workspaceId, status: ConversationStatus.WAITING_HUMAN } }),
-      prisma.channel.findMany({ where: { workspaceId }, select: { id: true, name: true, type: true, isActive: true } }),
-      prisma.agent.findMany({ where: { workspaceId }, select: { id: true, name: true, funcao: true, isActive: true, _count: { select: { conversations: true } } } }),
+    const [openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests] = await prisma.$transaction([
+      prisma.conversation.count({ where: { candidateId, status: 'ACTIVE' } }),
+      prisma.conversation.count({ where: { candidateId, status: 'URGENT' } }),
+      prisma.channel.findMany({ where: { candidateId }, select: { id: true, name: true, type: true, isActive: true } }),
       prisma.conversation.findMany({
-        where: { workspaceId, updatedAt: { gte: since24h } },
-        orderBy: { updatedAt: 'desc' },
-        take: 8,
-        select: { id: true, status: true, updatedAt: true, creditsUsed: true, interactionCount: true, contact: { select: { name: true, phone: true } }, agent: { select: { name: true } }, channel: { select: { type: true } } },
+        where: { candidateId, lastMessageAt: { gte: since24h } },
+        orderBy: { lastMessageAt: 'desc' },
+        take: 5,
+        select: { id: true, status: true, lastMessageAt: true, contact: { select: { name: true, phone: true } }, channel: { select: { type: true } } },
       }),
-      prisma.contact.count({ where: { workspaceId, createdAt: { gte: since24h } } }),
+      prisma.contact.count({ where: { candidateId, createdAt: { gte: since24h } } }),
+      prisma.request.count({ where: { candidateId, status: { in: ['RECEIVED', 'ANALYZING'] } } }),
     ])
 
-    return reply.send({ openConversations, waitingHuman, channels, agents, recentConversations, newContactsToday })
-  })
-
-  app.get('/analytics/attendance', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const [total, byStatus, avgCredits, avgInteractions] = await prisma.$transaction([
-      prisma.conversation.count({ where: { workspaceId, createdAt: range } }),
-      prisma.conversation.groupBy({ by: ['status'], where: { workspaceId, createdAt: range }, _count: true, orderBy: { _count: { status: 'desc' } } }),
-      prisma.conversation.aggregate({ where: { workspaceId, createdAt: range }, _avg: { creditsUsed: true } }),
-      prisma.conversation.aggregate({ where: { workspaceId, createdAt: range }, _avg: { interactionCount: true }, _min: { interactionCount: true }, _max: { interactionCount: true } }),
-    ])
-
-    return reply.send({
-      total,
-      byStatus: Object.fromEntries(byStatus.map((s) => [s.status, s._count])),
-      avgCreditsPerAttendance: Math.round(avgCredits._avg.creditsUsed || 0),
-      avgInteractions: Math.round(avgInteractions._avg.interactionCount || 0),
-      minInteractions: avgInteractions._min.interactionCount,
-      maxInteractions: avgInteractions._max.interactionCount,
-    })
+    return reply.send({ openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests })
   })
 }

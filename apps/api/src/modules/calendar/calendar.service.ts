@@ -1,302 +1,86 @@
 import { prisma } from '../../lib/prisma'
-import {
-  getValidToken,
-  createCalendarEvent,
-  listCalendarEvents,
-  deleteCalendarEvent,
-  GoogleCalendarEvent,
-} from '../../lib/google'
-import { callLLM } from '../ai/ai.service'
-import { reminderQueue } from '../../lib/queue'
-
-const REMINDER_LEAD_MS = 60 * 60 * 1000 // lembrete enviado 1h antes do horário marcado
+import { getValidToken, listCalendarEvents } from '../../lib/google'
 
 const TZ = 'America/Sao_Paulo'
 
-// Converte Date para string ISO local (sem Z) no fuso America/Sao_Paulo
-// Necessário porque Google Calendar interpreta dateTime+timeZone como horário local,
-// mas toISOString() retorna UTC (com Z), fazendo o Google ignorar o timeZone e salvar errado.
-function toLocalISOString(date: Date): string {
-  const formatter = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: TZ,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
-  return formatter.format(date).replace(' ', 'T')
-}
+// O agente eleitoral apenas INFORMA compromissos cadastrados pela equipe/candidato
+// ou importados do Google Calendar — nunca cria, altera ou cancela eventos
+// (Resolução TSE nº 23.755/2026, ver docs/spec-eleicoes/04-modulos/4.7-agenda.md).
 
-// Extrai dados de agendamento da mensagem do usuário usando IA
-async function extractEventData(userMessage: string, contactName: string, conversationHistory?: { role: string; content: string }[]): Promise<{
-  summary: string
-  description: string
-  startDateTime: string | null
-  endDateTime: string | null
-  attendeeEmail: string | null
-} | null> {
-  const now = new Date().toLocaleString('pt-BR', { timeZone: TZ })
-
-  // Monta contexto da conversa para a IA entender horários mencionados anteriormente
-  const historyContext = conversationHistory && conversationHistory.length > 0
-    ? '\n\nHistórico da conversa:\n' + conversationHistory.slice(-10).map(m => `${m.role === 'user' ? 'Cliente' : 'Assistente'}: ${m.content}`).join('\n')
-    : ''
-
-  const res = await callLLM({
-    model: 'claude-haiku-4-5',
-    system: `Você extrai dados de agendamento de mensagens de WhatsApp.
-Data/hora atual: ${now} (fuso: ${TZ}).
-Retorne JSON com: summary (título do evento), description (observações), startDateTime (ISO 8601), endDateTime (ISO 8601, padrão = start + 1h), attendeeEmail (email do cliente se mencionado, senão null).
-Se não houver data/hora clara na mensagem atual, use o horário mencionado anteriormente na conversa.
-Responda APENAS com JSON válido, sem texto adicional.`,
-    messages: [{
-      role: 'user',
-      content: `Nome do cliente: ${contactName}${historyContext}\n\nÚltima mensagem: ${userMessage}`,
-    }],
-    maxTokens: 300,
-  })
-
-  try {
-    const json = res.content.trim().replace(/```json|```/g, '')
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
-// Cria evento no Google Calendar do workspace
-export async function scheduleAppointment(opts: {
-  workspaceId: string
-  userMessage: string
-  contactName: string
-  contactPhone?: string
-  contactId?: string
-  channelId?: string
-  conversationHistory?: { role: string; content: string }[]
-}): Promise<{ success: boolean; message: string; eventId?: string }> {
-  const { workspaceId, userMessage, contactName, contactPhone, contactId, channelId, conversationHistory } = opts
-
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: {
-      googleCalendarEnabled: true,
-      googleCalendarId: true,
-    } as any,
-  }) as any
-
-  if (!ws?.googleCalendarEnabled) {
-    return { success: false, message: 'A agenda não está conectada. Configure o Google Calendar nas integrações.' }
-  }
-
-  const accessToken = await getValidToken(workspaceId)
-  if (!accessToken) {
-    return { success: false, message: 'Não foi possível acessar a agenda. Reconecte o Google Calendar.' }
-  }
-
-  const calendarId = ws.googleCalendarId || 'primary'
-  const extracted = await extractEventData(userMessage, contactName, conversationHistory)
-
-  if (!extracted || !extracted.startDateTime) {
-    return {
-      success: false,
-      message: 'Não consegui identificar a data e hora da consulta. Poderia me informar quando prefere agendar?',
-    }
-  }
-
-  const startDate = new Date(extracted.startDateTime)
-  const endDate = extracted.endDateTime
-    ? new Date(extracted.endDateTime)
-    : new Date(startDate.getTime() + 60 * 60 * 1000)
-
-  const event: GoogleCalendarEvent = {
-    summary: extracted.summary || `Consulta — ${contactName}`,
-    description: [
-      extracted.description || '',
-      contactPhone ? `WhatsApp: ${contactPhone}` : '',
-    ].filter(Boolean).join('\n'),
-    start: { dateTime: toLocalISOString(startDate), timeZone: TZ },
-    end: { dateTime: toLocalISOString(endDate), timeZone: TZ },
-    attendees: extracted.attendeeEmail ? [{ email: extracted.attendeeEmail }] : undefined,
-  }
-
-  const eventId = await createCalendarEvent(accessToken, calendarId, event)
-
-  if (!eventId) {
-    return { success: false, message: 'Erro ao criar o evento na agenda. Tente novamente.' }
-  }
-
-  // Agenda o lembrete automático (mensagem ativa) se tivermos contato/canal identificados
-  // e a consulta ainda estiver a mais de 1h de distância
-  if (contactId && channelId) {
-    const reminderAt = startDate.getTime() - REMINDER_LEAD_MS
-    const delay = reminderAt - Date.now()
-    if (delay > 0) {
-      const appointment = await prisma.appointment.create({
-        data: { workspaceId, contactId, channelId, googleEventId: eventId, startAt: startDate, summary: event.summary },
-      })
-      const job = await reminderQueue.add('reminder', { appointmentId: appointment.id }, { delay })
-      await prisma.appointment.update({ where: { id: appointment.id }, data: { reminderJobId: job.id } })
-    }
-  }
-
-  const dataFormatada = startDate.toLocaleString('pt-BR', {
-    timeZone: TZ,
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  return {
-    success: true,
-    eventId,
-    message: `✅ Consulta agendada com sucesso!\n📅 ${dataFormatada}\n📋 ${event.summary}`,
-  }
-}
-
-// Lista os próximos eventos da agenda do workspace (para o agente consultar disponibilidade)
-export async function listUpcomingAppointments(workspaceId: string, days = 7): Promise<{
+// Lista os próximos eventos da agenda do candidato (para o agente informar)
+export async function listUpcomingEvents(candidateId: string, days = 7): Promise<{
   available: boolean
-  events: { summary: string; start: string; end: string }[]
+  events: { title: string; startsAt: Date; location: string | null; link: string | null }[]
   message: string
 }> {
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: {
-      googleCalendarEnabled: true,
-      googleCalendarId: true,
-    } as any,
-  }) as any
+  const now = new Date()
+  const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 
-  if (!ws?.googleCalendarEnabled) {
-    return { available: false, events: [], message: 'Agenda não configurada.' }
-  }
+  const events = await prisma.event.findMany({
+    where: { candidateId, isPublic: true, startsAt: { gte: now, lte: until } },
+    orderBy: { startsAt: 'asc' },
+  })
 
-  const accessToken = await getValidToken(workspaceId)
-  if (!accessToken) {
-    return { available: false, events: [], message: 'Sem acesso à agenda.' }
-  }
-
-  const calendarId = ws.googleCalendarId || 'primary'
-  const timeMin = new Date().toISOString()
-  const timeMax = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
-
-  const events = await listCalendarEvents(accessToken, calendarId, timeMin, timeMax)
-
-  const formatted = events.map((e) => ({
-    summary: e.summary,
-    start: e.start.dateTime,
-    end: e.end.dateTime,
-  }))
-
-  const eventLines = formatted.map((e) => {
-    const start = new Date(e.start).toLocaleString('pt-BR', { timeZone: TZ, weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    return `• ${start} — ${e.summary}`
+  const eventLines = events.map((e) => {
+    const start = e.startsAt.toLocaleString('pt-BR', { timeZone: TZ, weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return `• ${start} — ${e.title}${e.location ? ` (${e.location})` : ''}`
   }).join('\n')
 
   return {
     available: true,
-    events: formatted,
-    message: formatted.length === 0
-      ? `Não há consultas agendadas nos próximos ${days} dias.`
-      : `Consultas agendadas nos próximos ${days} dias:\n${eventLines}`,
+    events: events.map(e => ({ title: e.title, startsAt: e.startsAt, location: e.location, link: e.link })),
+    message: events.length === 0
+      ? `Não há compromissos públicos agendados nos próximos ${days} dias.`
+      : `Compromissos da agenda nos próximos ${days} dias:\n${eventLines}`,
   }
 }
 
-// Cancela o próximo evento que corresponda ao nome/descrição
-export async function cancelAppointment(opts: {
-  workspaceId: string
-  userMessage: string
-  contactName: string
-}): Promise<{ success: boolean; message: string }> {
-  const { workspaceId, userMessage, contactName } = opts
+// Sincroniza eventos públicos do Google Calendar do candidato (chamado a cada 30 min)
+export async function syncGoogleCalendarEvents(candidateId: string): Promise<void> {
+  const config = await prisma.agentConfig.findUnique({
+    where: { candidateId },
+    select: { googleCalendarEnabled: true, googleCalendarId: true },
+  })
+  if (!config?.googleCalendarEnabled) return
 
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { googleCalendarEnabled: true, googleCalendarId: true } as any,
-  }) as any
+  const accessToken = await getValidToken(candidateId)
+  if (!accessToken) return
 
-  if (!ws?.googleCalendarEnabled) {
-    return { success: false, message: 'Agenda não configurada.' }
-  }
-
-  const accessToken = await getValidToken(workspaceId)
-  if (!accessToken) return { success: false, message: 'Sem acesso à agenda.' }
-
-  const calendarId = ws.googleCalendarId || 'primary'
+  const calendarId = config.googleCalendarId || 'primary'
   const timeMin = new Date().toISOString()
-  const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-
+  const timeMax = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
   const events = await listCalendarEvents(accessToken, calendarId, timeMin, timeMax)
 
-  // Procura evento do contato
-  const match = events.find((e) =>
-    e.summary?.toLowerCase().includes(contactName.toLowerCase()) ||
-    e.description?.toLowerCase().includes(contactName.toLowerCase())
-  )
-
-  if (!match?.id) {
-    return { success: false, message: `Não encontrei nenhuma consulta agendada para ${contactName} nos próximos 30 dias.` }
-  }
-
-  await deleteCalendarEvent(accessToken, calendarId, match.id)
-
-  // Cancela o lembrete agendado (se existir) e remove o registro local
-  const appointment = await prisma.appointment.findFirst({ where: { workspaceId, googleEventId: match.id } })
-  if (appointment) {
-    if (appointment.reminderJobId) {
-      const job = await reminderQueue.getJob(appointment.reminderJobId)
-      await job?.remove().catch(() => {})
-    }
-    await prisma.appointment.delete({ where: { id: appointment.id } })
-  }
-
-  const dateStr = match.start.dateTime || (match.start as any).date
-  const dataFormatada = new Date(dateStr).toLocaleString('pt-BR', {
-    timeZone: TZ, weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
-  })
-
-  return {
-    success: true,
-    message: `✅ Consulta cancelada!\n📅 ${dataFormatada}\n📋 ${match.summary}`,
+  for (const e of events) {
+    if (!e.id || !e.start?.dateTime) continue
+    await prisma.event.upsert({
+      where: { googleEventId: e.id },
+      update: {
+        title: e.summary || 'Evento',
+        description: e.description || null,
+        startsAt: new Date(e.start.dateTime),
+        endsAt: e.end?.dateTime ? new Date(e.end.dateTime) : null,
+      },
+      create: {
+        candidateId,
+        title: e.summary || 'Evento',
+        description: e.description || null,
+        eventType: 'PRESENCIAL',
+        startsAt: new Date(e.start.dateTime),
+        endsAt: e.end?.dateTime ? new Date(e.end.dateTime) : null,
+        isPublic: true,
+        googleEventId: e.id,
+      },
+    })
   }
 }
 
-// Retorna contexto de agenda filtrado pelo contato atual — evita vazar dados de outros clientes
-export async function getAgendaContextForPrompt(workspaceId: string, contactName?: string): Promise<string> {
+// Contexto de agenda para o prompt do agente — apenas eventos públicos futuros
+export async function getAgendaContextForPrompt(candidateId: string): Promise<string> {
   try {
-    const ws = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { googleCalendarEnabled: true } as any,
-    }) as any
-    if (!ws?.googleCalendarEnabled) return ''
-
-    const accessToken = await getValidToken(workspaceId)
-    if (!accessToken) return ''
-
-    const calendarId = (ws as any).googleCalendarId || 'primary'
-    const timeMin = new Date().toISOString()
-    const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    const events = await listCalendarEvents(accessToken, calendarId, timeMin, timeMax)
-
-    // Filtra apenas eventos deste contato para não vazar dados de outros clientes
-    const contactEvents = contactName
-      ? events.filter(e =>
-          e.summary?.toLowerCase().includes(contactName.toLowerCase()) ||
-          e.description?.toLowerCase().includes(contactName.toLowerCase())
-        )
-      : []
-
-    if (contactEvents.length === 0) {
-      return `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO: Nenhuma consulta agendada para este contato. Só informe isso se o cliente perguntar diretamente sobre um agendamento dele. NUNCA comente sobre disponibilidade de agenda, horários livres ou ocupados do dono do número.]`
-    }
-
-    const lines = contactEvents.map(e => {
-      const dt = e.start.dateTime || (e.start as any).date
-      const formatted = new Date(dt).toLocaleString('pt-BR', { timeZone: TZ, weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
-      return `• ${formatted} — ${e.summary}`
-    }).join('\n')
-
-    return `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO: Consulta(s) agendada(s) para este contato:\n${lines}\nUse apenas para confirmar, remarcar ou cancelar SE o cliente pedir. NUNCA revele horários, disponibilidade ou agenda do dono do número.]`
+    const { events, message } = await listUpcomingEvents(candidateId, 14)
+    if (events.length === 0) return ''
+    return `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO: ${message}\nUse esta lista apenas para responder se o eleitor perguntar sobre compromissos/eventos da campanha. Você NUNCA cria, altera ou cancela compromissos — apenas informa os já cadastrados.]`
   } catch {
     return ''
   }

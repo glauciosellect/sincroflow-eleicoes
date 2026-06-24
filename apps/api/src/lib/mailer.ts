@@ -11,23 +11,30 @@ const transporter = nodemailer.createTransport({
 
 export async function sendEmail(to: string, subject: string, html: string) {
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'noreply@syncroflow.com',
+    from: process.env.SMTP_FROM || 'TODO: substituir pelo valor do SyncroFlowEleições',
     to,
     subject,
     html,
   })
 }
 
-export function workspaceInviteEmail(inviterName: string, workspaceName: string, role: string, acceptUrl: string): string {
-  const roleLabel = role === 'ADMIN' ? 'Administrador' : 'Agente'
+const TEAM_ROLE_LABELS: Record<string, string> = {
+  ADMINISTRADOR: 'Administrador',
+  ATENDIMENTO: 'Atendimento',
+  CONTEUDO: 'Conteúdo',
+  RELATORIOS: 'Relatórios',
+}
+
+export function teamInviteEmail(inviterName: string, candidateName: string, role: string, acceptUrl: string): string {
+  const roleLabel = TEAM_ROLE_LABELS[role] || role
   return `
     <h2>Você foi convidado!</h2>
-    <p><strong>${inviterName}</strong> convidou você para participar do workspace <strong>${workspaceName}</strong> como <strong>${roleLabel}</strong>.</p>
+    <p><strong>${inviterName}</strong> convidou você para participar da campanha de <strong>${candidateName}</strong> como <strong>${roleLabel}</strong>.</p>
     <p>Clique no botão abaixo para aceitar o convite:</p>
-    <a href="${acceptUrl}" style="background:#1565C0;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
+    <a href="${acceptUrl}" style="background:#009C3B;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
       Aceitar Convite
     </a>
-    <p>Este convite expira em 7 dias. Se você não esperava este convite, pode ignorar este email.</p>
+    <p>Este convite expira em 48 horas. Se você não esperava este convite, pode ignorar este email.</p>
   `
 }
 

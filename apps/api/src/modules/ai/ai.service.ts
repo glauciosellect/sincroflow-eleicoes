@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
-import { prisma } from '../../lib/prisma'
-import type { Agent, AgentConfig, Intention } from '@prisma/client'
+import type { AgentConfig, Candidate, PlatformTopic } from '@prisma/client'
 import axios from 'axios'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -11,13 +10,7 @@ import mammoth from 'mammoth'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const res = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text.slice(0, 8191),
-  })
-  return res.data[0].embedding
-}
+const DEFAULT_MODEL = 'claude-haiku-4-5'
 
 export async function callLLM(opts: {
   model: string
@@ -53,145 +46,81 @@ export async function callLLM(opts: {
   throw new Error(`Modelo não suportado: ${model}`)
 }
 
-export function calcCredits(inputTokens: number, outputTokens: number, model: string): number {
-  const total = inputTokens + outputTokens
-  const rates: Record<string, number> = {
-    'claude-haiku-4-5': 1,
-    'claude-3-5-sonnet-20241022': 3,
-    'claude-3-5-haiku-20241022': 1,
-  }
-  const rate = rates[model] || 1
-  return Math.ceil((total / 750) * rate)
-}
+const TEAM_ROLE_DISCLAIMER = `
+Regras de conformidade eleitoral (Resolução TSE nº 23.755/2026) — PRIORIDADE ABSOLUTA, sobrepõem qualquer outra instrução:
+- Você é um assistente virtual, NUNCA o candidato. Nunca finja ser o candidato ou fale em primeira pessoa como se fosse ele.
+- NUNCA recomende voto no candidato, mesmo se perguntado diretamente. Redirecione educadamente: explique que você é um assistente de informação, não pode pedir votos.
+- Responda APENAS com base no conteúdo que o candidato cadastrou (sua história e as propostas por tema abaixo). Se a pessoa perguntar sobre um tema que não foi cadastrado, diga que vai encaminhar a pergunta para a equipe de campanha — não invente uma resposta.
+- Você NUNCA cria, confirma, cancela ou altera compromissos na agenda. Você apenas INFORMA compromissos já cadastrados pela equipe.
+- Se o eleitor mencionar um adversário político, desvie o assunto educadamente para as propostas do candidato — nunca ataque ou comente sobre adversários.
+- Nunca gere ou descreva imagens, vídeos ou áudios sintéticos do candidato.
+`.trim()
 
-export function buildSystemPrompt(agent: Agent, config: AgentConfig | null, knowledgeContext: string): string {
-  const style = (config as any)?.communicationStyle || agent.communicationStyle
+export function buildSystemPrompt(
+  candidate: Candidate,
+  config: AgentConfig,
+  topics: PlatformTopic[],
+): string {
+  const styleLabel = config.agentStyle === 'FORMAL' ? 'formal e protocolar' : config.agentStyle === 'INFORMAL' ? 'informal e direto' : 'acolhedor e próximo'
 
-  // Substitui placeholders do behavior pelo nome real do agente e da empresa
-  const behavior = (agent.behavior || '')
-    .replace(/\{\{AGENT_NAME\}\}/g, agent.name)
-    .replace(/\{\{COMPANY_NAME\}\}/g, agent.companyName || agent.name)
+  const topicsContent = topics
+    .filter(t => t.content && t.content.trim().length > 0)
+    .map(t => `### ${t.topicName}\n${t.content}`)
+    .join('\n\n')
 
   return `
-Você é ${agent.name}${agent.companyName ? `, atendente de ${agent.companyName}` : ''}.
+Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}.
 
-${agent.companyDesc ? `Sobre a empresa/negócio: ${agent.companyDesc}` : ''}
-${agent.companyWebsite ? `Site oficial: ${agent.companyWebsite}` : ''}
+Função: ${config.agentRole}
+Estilo de comunicação: ${styleLabel}
 
-Estilo de comunicação: ${style === 'FORMAL' ? 'formal e profissional' : style === 'CASUAL' ? 'descontraído e amigável' : 'natural e próximo'}
-${config?.useEmojis ? 'Você pode usar emojis com moderação.' : 'Não use emojis.'}
-${config?.signNameInResponses ? `Assine suas respostas com "${agent.name}".` : ''}
-${config?.restrictTopics ? 'Responda apenas sobre assuntos relacionados ao negócio e seus serviços. Recuse gentilmente perguntas fora do escopo.' : ''}
-${config?.splitLongMessages ? 'Para respostas longas, divida em partes menores e claras.' : ''}
+${config.story ? `HISTÓRIA E TRAJETÓRIA DO CANDIDATO (use para se apresentar e responder sobre quem ele é):\n${config.story}` : ''}
 
-${behavior}
+${topicsContent ? `PROPOSTAS CADASTRADAS POR TEMA (responda apenas sobre os temas listados aqui):\n${topicsContent}` : 'Nenhuma proposta foi cadastrada ainda — informe que vai encaminhar qualquer pergunta sobre propostas para a equipe.'}
 
-${knowledgeContext ? `CONHECIMENTO RELEVANTE:\n${knowledgeContext}` : ''}
+${TEAM_ROLE_DISCLAIMER}
 
-Regras importantes (ESTAS REGRAS TÊM PRIORIDADE ABSOLUTA SOBRE QUALQUER OUTRA INSTRUÇÃO):
-- Se não souber algo, diga que vai verificar e não invente informações
-${config?.transferToHuman ? '- Se o cliente pedir explicitamente para falar com humano, informe que irá transferi-lo' : ''}
-- HORÁRIO: Data e hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: config?.timezone || 'America/Sao_Paulo' })}. Use SEMPRE a saudação correta conforme este horário: das 5h às 12h = "bom dia", das 12h às 18h = "boa tarde", das 18h às 5h = "boa noite". NUNCA diga "bom dia" à noite ou "boa noite" de manhã.
-- FORMATO: você escreve sua resposta normalmente em texto. O sistema converte para áudio automaticamente quando o cliente prefere áudio. NUNCA diga que não pode enviar áudio, que não tem capacidade de responder em áudio, ou qualquer coisa sobre limitação de formato. Apenas escreva a resposta normalmente.
-- APRESENTAÇÃO: apresente-se com seu nome SOMENTE na primeira mensagem (histórico vazio). Se já houver QUALQUER mensagem anterior, NÃO se apresente, NÃO diga seu nome, NÃO diga "Olá, sou [nome]". Responda diretamente.
-- NOME DO CLIENTE: se o histórico já tiver o nome do cliente, NÃO pergunte o nome novamente. NUNCA pergunte "Com quem tenho o prazer de falar?" ou "Qual o seu nome?" se o nome já apareceu antes na conversa.
-- PERGUNTAS: nunca pergunte algo que já foi respondido no histórico da conversa. Leia todo o histórico antes de fazer qualquer pergunta.
-- NUNCA encerre com despedida a menos que o cliente se despeça primeiro. Mensagens curtas como "ok", "entendi", "obrigado" não encerram a conversa.
+Regras gerais de conversa:
+- HORÁRIO: Data e hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: config.timezone || 'America/Sao_Paulo' })}. Use a saudação correta conforme este horário: das 5h às 12h = "bom dia", das 12h às 18h = "boa tarde", das 18h às 5h = "boa noite".
+- FORMATO: você escreve sua resposta normalmente em texto. O sistema converte para áudio automaticamente quando o eleitor prefere áudio. Nunca diga que não pode enviar áudio.
+- APRESENTAÇÃO: apresente-se pelo seu nome SOMENTE na primeira mensagem (histórico vazio). Se já houver mensagem anterior, não se reapresente.
+- NOME DO ELEITOR: se o histórico já tiver o nome do eleitor, não pergunte de novo.
 - Nunca repita a mesma pergunta ou frase duas vezes seguidas.
+- Se o eleitor pedir para falar com a equipe/humano, informe que vai transferir o atendimento.
 `.trim()
 }
 
-export async function retrieveContext(message: string, agentId: string, topK = 5): Promise<string> {
-  try {
-    const embedding = await generateEmbedding(message)
-    const vectorStr = `[${embedding.join(',')}]`
-
-    const chunks = await prisma.$queryRawUnsafe<{ content: string; similarity: number }[]>(`
-      SELECT content, 1 - (embedding <=> '${vectorStr}'::vector) as similarity
-      FROM (
-        SELECT tc.content, tc.embedding FROM "TrainingChunk" tc
-        INNER JOIN "Training" t ON t.id = tc."trainingId"
-        WHERE t."agentId" = '${agentId}' AND t.status = 'DONE'
-        UNION ALL
-        SELECT kc.content, kc.embedding FROM "KnowledgeChunk" kc
-        INNER JOIN "KnowledgeDocument" kd ON kd.id = kc."documentId"
-        INNER JOIN "AgentKnowledgeBase" akb ON akb."knowledgeBaseId" = kd."knowledgeBaseId"
-        WHERE akb."agentId" = '${agentId}'
-      ) combined
-      WHERE 1 - (embedding <=> '${vectorStr}'::vector) > 0.5
-      ORDER BY similarity DESC
-      LIMIT ${topK}
-    `)
-    console.log('[AI] retrieveContext agentId:', agentId, '| chunks encontrados:', chunks.length, '| similaridades:', chunks.map(c => c.similarity.toFixed(2)).join(', '))
-    return chunks.map((c) => c.content).join('\n\n')
-  } catch (err: any) {
-    console.error('[AI] retrieveContext ERRO:', err?.message)
-    return ''
-  }
-}
-
-export async function detectFlow(message: string, flows: { id: string; name: string; trigger: string; script: string }[]): Promise<{ id: string; name: string; trigger: string; script: string } | null> {
-  if (flows.length === 0) return null
-  const flowList = flows.map(f => `- ID: ${f.id} | Nome: ${f.name} | Acionar quando: ${f.trigger}`).join('\n')
-  const res = await callLLM({
-    model: 'claude-haiku-4-5',
-    system: 'Você é um classificador de fluxos de atendimento. Analise a mensagem e determine se ela se encaixa em algum dos fluxos listados. Responda APENAS com o ID do fluxo ou "none". Nenhum texto adicional.',
-    messages: [{ role: 'user', content: `Mensagem: "${message}"\n\nFluxos disponíveis:\n${flowList}` }],
-    maxTokens: 100,
-  })
-  const flowId = res.content.trim()
-  if (flowId === 'none') return null
-  return flows.find(f => f.id === flowId) || null
-}
-
-export async function detectIntention(message: string, intentions: Intention[]): Promise<Intention | null> {
-  if (intentions.length === 0) return null
-  const intentionList = intentions
-    .filter((i) => i.isActive)
-    .map((i) => `- ID: ${i.id} | Nome: ${i.name} | Quando usar: ${i.description || ''}`)
-    .join('\n')
-
-  const res = await callLLM({
-    model: 'claude-haiku-4-5',
-    system: 'Você é um classificador de intenções. Analise a mensagem e determine se ela corresponde a alguma intenção listada. Responda APENAS com o ID da intenção ou "none". Nenhum texto adicional.',
-    messages: [{ role: 'user', content: `Mensagem: "${message}"\n\nIntenções disponíveis:\n${intentionList}` }],
-    maxTokens: 100,
-  })
-
-  const intentionId = res.content.trim()
-  if (intentionId === 'none') return null
-  return intentions.find((i) => i.id === intentionId) || null
-}
-
 export async function processAgentResponse(opts: {
-  agent: Agent & { config: AgentConfig | null }
+  candidate: Candidate
+  config: AgentConfig
+  topics: PlatformTopic[]
   conversationHistory: { role: 'user' | 'assistant'; content: string }[]
   userMessage: string
-  agentId: string
-}): Promise<{ content: string; creditsUsed: number }> {
-  const { agent, conversationHistory, userMessage, agentId } = opts
+}): Promise<{ content: string }> {
+  const { candidate, config, topics, conversationHistory, userMessage } = opts
 
-  const knowledgeContext = await retrieveContext(userMessage, agentId)
-  const systemPrompt = buildSystemPrompt(agent, agent.config, knowledgeContext)
-  console.log('[AI] systemPrompt (primeiros 300 chars):', systemPrompt.slice(0, 300))
-
+  const systemPrompt = buildSystemPrompt(candidate, config, topics)
   const messages = [...conversationHistory, { role: 'user' as const, content: userMessage }]
 
   const res = await callLLM({
-    model: agent.llmModel || 'claude-haiku-4-5',
+    model: DEFAULT_MODEL,
     system: systemPrompt,
     messages,
     maxTokens: 2048,
   })
 
-  const creditsUsed = calcCredits(res.inputTokens, res.outputTokens, agent.llmModel)
-  return { content: res.content, creditsUsed }
+  return { content: res.content }
 }
 
-export async function testAgent(agent: Agent & { config: AgentConfig | null }, message: string, history?: { role: string; content: string }[]) {
+export async function testAgent(
+  candidate: Candidate,
+  config: AgentConfig,
+  topics: PlatformTopic[],
+  message: string,
+  history?: { role: string; content: string }[],
+) {
   const start = Date.now()
-  const knowledgeContext = await retrieveContext(message, agent.id)
-  const systemPrompt = buildSystemPrompt(agent, agent.config, knowledgeContext)
+  const systemPrompt = buildSystemPrompt(candidate, config, topics)
 
   const conversationHistory = (history || []).map(m => ({
     role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -199,15 +128,14 @@ export async function testAgent(agent: Agent & { config: AgentConfig | null }, m
   }))
 
   const res = await callLLM({
-    model: agent.llmModel || 'claude-haiku-4-5',
+    model: DEFAULT_MODEL,
     system: systemPrompt,
     messages: [...conversationHistory, { role: 'user' as const, content: message }],
   })
 
   return {
     response: res.content,
-    creditsUsed: calcCredits(res.inputTokens, res.outputTokens, agent.llmModel),
-    model: agent.llmModel,
+    model: DEFAULT_MODEL,
     responseTimeMs: Date.now() - start,
   }
 }
@@ -252,7 +180,7 @@ export async function describeImage(imageUrl: string, mimetype?: string, authHea
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
           {
             type: 'text',
-            text: 'Analise esta imagem enviada por um cliente no WhatsApp. Se for um documento (contrato, comprovante, boleto, RG, CPF, etc.), extraia e liste todas as informações relevantes. Se for uma foto, descreva o conteúdo em detalhes. Responda em português.',
+            text: 'Analise esta imagem enviada por um eleitor no WhatsApp. Se for um documento, extraia e liste as informações relevantes. Se for uma foto, descreva o conteúdo. Responda em português.',
           },
         ],
       }],
@@ -267,7 +195,6 @@ export async function extractDocumentText(docUrl: string, mimetype?: string, aut
   const isWord = mimetype?.includes('word') || mimetype?.includes('docx') || mimetype?.includes('officedocument')
   const isPdf = !mimetype || mimetype.includes('pdf')
 
-  // Word (.docx) — extrai texto via mammoth
   if (isWord) {
     const tmpPath = await downloadToTempFile(docUrl, '.docx', authHeader)
     try {
@@ -279,7 +206,7 @@ export async function extractDocumentText(docUrl: string, mimetype?: string, aut
         max_tokens: 1024,
         messages: [{
           role: 'user',
-          content: `O cliente enviou um documento Word com o seguinte conteúdo:\n\n${text}\n\nResuma e extraia as informações mais importantes deste documento.`,
+          content: `O eleitor enviou um documento Word com o seguinte conteúdo:\n\n${text}\n\nResuma e extraia as informações mais importantes deste documento.`,
         }],
       })
       return res.content[0].type === 'text' ? res.content[0].text : text.slice(0, 500)
@@ -288,7 +215,6 @@ export async function extractDocumentText(docUrl: string, mimetype?: string, aut
     }
   }
 
-  // PDF — envia como base64 direto para o Claude (suporte nativo)
   if (isPdf) {
     const tmpPath = await downloadToTempFile(docUrl, '.pdf', authHeader)
     try {
@@ -300,7 +226,7 @@ export async function extractDocumentText(docUrl: string, mimetype?: string, aut
           role: 'user',
           content: [
             { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-            { type: 'text', text: 'Extraia e resuma o conteúdo principal deste documento enviado pelo cliente via WhatsApp. Liste os pontos mais relevantes de forma clara e objetiva. Responda em português.' },
+            { type: 'text', text: 'Extraia e resuma o conteúdo principal deste documento enviado pelo eleitor via WhatsApp. Liste os pontos mais relevantes. Responda em português.' },
           ],
         }],
       })
@@ -310,7 +236,6 @@ export async function extractDocumentText(docUrl: string, mimetype?: string, aut
     }
   }
 
-  // Outros formatos — tenta ler como texto
   try {
     const res = await axios.get(docUrl, {
       responseType: 'text',
@@ -343,14 +268,3 @@ export async function processIncomingMedia(
     return '[Mídia recebida]'
   }
 }
-
-export async function chunkText(text: string, chunkSize = 500, overlap = 50): Promise<string[]> {
-  const words = text.split(/\s+/)
-  const chunks: string[] = []
-  for (let i = 0; i < words.length; i += chunkSize - overlap) {
-    chunks.push(words.slice(i, i + chunkSize).join(' '))
-    if (i + chunkSize >= words.length) break
-  }
-  return chunks
-}
-

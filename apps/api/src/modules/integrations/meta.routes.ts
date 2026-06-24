@@ -169,9 +169,9 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
       return reply.redirect(`${FRONTEND_URL}/settings?meta_error=invalid_token`)
     }
 
-    const member = await prisma.workspaceMember.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } })
-    if (!member) return reply.redirect(`${FRONTEND_URL}/settings?meta_error=workspace_not_found`)
-    const workspaceId = member.workspaceId
+    const member = await prisma.teamMember.findFirst({ where: { userId }, orderBy: { acceptedAt: 'asc' } })
+    if (!member) return reply.redirect(`${FRONTEND_URL}/settings?meta_error=candidate_not_found`)
+    const candidateId = member.candidateId
 
     const redirectUri = `${API_URL}/integrations/meta/callback`
 
@@ -201,53 +201,72 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
       }
 
       const created: string[] = []
-      for (const page of pages) {
-        if (channelType === 'instagram' && page.instagram_business_account) {
+      // Cada candidato conecta no máximo 1 página/conta por tipo de canal —
+      // usamos a primeira página elegível encontrada.
+      if (channelType === 'instagram') {
+        const page = pages.find(p => p.instagram_business_account)
+        if (page?.instagram_business_account) {
           const ig = page.instagram_business_account
-          const existing = await prisma.channel.findFirst({
-            where: { workspaceId, type: 'INSTAGRAM', config: { path: ['igAccountId'], equals: ig.id } },
-          })
-          if (!existing) {
-            const channel = await prisma.channel.create({
-              data: {
-                workspaceId,
-                type: 'INSTAGRAM',
-                name: ig.username ? `@${ig.username}` : (ig.name || 'Instagram'),
-                config: {
-                  pageAccessToken: page.access_token,
-                  pageId: page.id,
-                  igAccountId: ig.id,
-                  igUsername: ig.username,
-                  igName: ig.name,
-                  tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-                  verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
-                },
+          const channel = await prisma.channel.upsert({
+            where: { candidateId_type: { candidateId, type: 'INSTAGRAM' } },
+            update: {
+              name: ig.username ? `@${ig.username}` : (ig.name || 'Instagram'),
+              config: {
+                pageAccessToken: page.access_token,
+                pageId: page.id,
+                igAccountId: ig.id,
+                igUsername: ig.username,
+                igName: ig.name,
+                tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+                verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
               },
-            })
-            await setupMetaWebhook(page.id, page.access_token, channel.id)
-            created.push(ig.username || ig.name)
-          }
-        } else if (channelType === 'facebook') {
-          const existing = await prisma.channel.findFirst({
-            where: { workspaceId, type: 'FACEBOOK', config: { path: ['pageId'], equals: page.id } },
-          })
-          if (!existing) {
-            const channel = await prisma.channel.create({
-              data: {
-                workspaceId,
-                type: 'FACEBOOK',
-                name: page.name,
-                config: {
-                  pageAccessToken: page.access_token,
-                  pageId: page.id,
-                  tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-                  verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
-                },
+            },
+            create: {
+              candidateId,
+              type: 'INSTAGRAM',
+              name: ig.username ? `@${ig.username}` : (ig.name || 'Instagram'),
+              config: {
+                pageAccessToken: page.access_token,
+                pageId: page.id,
+                igAccountId: ig.id,
+                igUsername: ig.username,
+                igName: ig.name,
+                tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+                verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
               },
-            })
-            await setupMetaWebhook(page.id, page.access_token, channel.id)
-            created.push(page.name)
-          }
+            },
+          })
+          await setupMetaWebhook(page.id, page.access_token, channel.id)
+          created.push(ig.username || ig.name)
+        }
+      } else if (channelType === 'facebook') {
+        const page = pages[0]
+        if (page) {
+          const channel = await prisma.channel.upsert({
+            where: { candidateId_type: { candidateId, type: 'FACEBOOK' } },
+            update: {
+              name: page.name,
+              config: {
+                pageAccessToken: page.access_token,
+                pageId: page.id,
+                tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+                verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+              },
+            },
+            create: {
+              candidateId,
+              type: 'FACEBOOK',
+              name: page.name,
+              config: {
+                pageAccessToken: page.access_token,
+                pageId: page.id,
+                tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+                verifyToken: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+              },
+            },
+          })
+          await setupMetaWebhook(page.id, page.access_token, channel.id)
+          created.push(page.name)
         }
       }
 
@@ -268,11 +287,11 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
   app.post('/integrations/meta/refresh/:channelId', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub } = req.user as { sub: string }
     const { channelId } = req.params as { channelId: string }
-    const member = await prisma.workspaceMember.findFirst({ where: { userId: sub } })
+    const member = await prisma.teamMember.findFirst({ where: { userId: sub } })
     if (!member) return reply.status(403).send({ error: 'Sem permissão' })
 
     const channel = await prisma.channel.findFirst({
-      where: { id: channelId, workspaceId: member.workspaceId },
+      where: { id: channelId, candidateId: member.candidateId },
     })
     if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
 

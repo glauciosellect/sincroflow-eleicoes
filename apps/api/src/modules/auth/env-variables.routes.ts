@@ -10,9 +10,9 @@ export async function envVariableRoutes(app: FastifyInstance) {
 
   app.get('/env-variables', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const vars = await prisma.envVariable.findMany({
-      where: { workspaceId },
+      where: { candidateId },
       select: { id: true, key: true, type: true, createdAt: true, updatedAt: true },
     })
     return reply.send(vars)
@@ -20,31 +20,31 @@ export async function envVariableRoutes(app: FastifyInstance) {
 
   app.post('/env-variables', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { key, value, type } = z.object({ key: z.string().regex(/^[A-Z_][A-Z0-9_]*$/), value: z.string(), type: z.enum(['TEXT', 'NUMBER']).optional() }).parse(req.body)
     const encryptedValue = encrypt(value)
     const variable = await prisma.envVariable.upsert({
-      where: { workspaceId_key: { workspaceId, key } },
+      where: { candidateId_key: { candidateId, key } },
       update: { value: encryptedValue, type: type || 'TEXT' },
-      create: { workspaceId, key, value: encryptedValue, type: type || 'TEXT' },
+      create: { candidateId, key, value: encryptedValue, type: type || 'TEXT' },
     })
     return reply.status(201).send({ id: variable.id, key: variable.key, type: variable.type })
   })
 
   app.patch('/env-variables/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
     const { value } = z.object({ value: z.string() }).parse(req.body)
-    await prisma.envVariable.updateMany({ where: { id, workspaceId }, data: { value: encrypt(value) } })
+    await prisma.envVariable.updateMany({ where: { id, candidateId }, data: { value: encrypt(value) } })
     return reply.send({ ok: true })
   })
 
   app.delete('/env-variables/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    await prisma.envVariable.deleteMany({ where: { id, workspaceId } })
+    await prisma.envVariable.deleteMany({ where: { id, candidateId } })
     return reply.send({ ok: true })
   })
 }

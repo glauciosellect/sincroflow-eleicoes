@@ -10,20 +10,19 @@ export async function channelRoutes(app: FastifyInstance) {
 
   app.get('/channels', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const channels = await prisma.channel.findMany({
-      where: { workspaceId },
-      include: { agentChannels: { include: { agent: { select: { id: true, name: true } } } } },
-    })
+    const candidateId = await getWorkspaceId(sub, wid)
+    const channels = await prisma.channel.findMany({ where: { candidateId } })
     return reply.send(channels)
   })
 
   app.post('/channels/telegram', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { name, botToken } = z.object({ name: z.string(), botToken: z.string() }).parse(req.body)
-    const channel = await prisma.channel.create({
-      data: { workspaceId, type: 'TELEGRAM', name, config: { botToken } },
+    const channel = await prisma.channel.upsert({
+      where: { candidateId_type: { candidateId, type: 'TELEGRAM' } },
+      update: { name, config: { botToken } },
+      create: { candidateId, type: 'TELEGRAM', name, config: { botToken } },
     })
     const webhookUrl = `${process.env.API_URL}/webhooks/telegram/${channel.id}`
     const axios = (await import('axios')).default
@@ -31,83 +30,41 @@ export async function channelRoutes(app: FastifyInstance) {
     return reply.status(201).send(channel)
   })
 
-  app.post('/channels/widget', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { name, color, position, welcomeMessage, allowedDomains } = z.object({
-      name: z.string(),
-      color: z.string().optional(),
-      position: z.enum(['bottom-right', 'bottom-left']).optional(),
-      welcomeMessage: z.string().optional(),
-      allowedDomains: z.array(z.string()).optional(),
-    }).parse(req.body)
-    const channel = await prisma.channel.create({
-      data: {
-        workspaceId, type: 'WIDGET', name,
-        config: { color: color || '#6366f1', position: position || 'bottom-right', welcomeMessage, allowedDomains },
-      },
-    })
-    return reply.status(201).send(channel)
-  })
-
   app.post('/channels/instagram', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
-    const channel = await prisma.channel.create({
-      data: { workspaceId, type: 'INSTAGRAM', name, config: { pageAccessToken, pageId } },
+    const channel = await prisma.channel.upsert({
+      where: { candidateId_type: { candidateId, type: 'INSTAGRAM' } },
+      update: { name, config: { pageAccessToken, pageId } },
+      create: { candidateId, type: 'INSTAGRAM', name, config: { pageAccessToken, pageId } },
     })
     return reply.status(201).send(channel)
   })
 
   app.post('/channels/facebook', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
-    const channel = await prisma.channel.create({
-      data: { workspaceId, type: 'FACEBOOK', name, config: { pageAccessToken, pageId } },
-    })
-    return reply.status(201).send(channel)
-  })
-
-  // LinkedIn — via Webhook URL + Page Access Token
-  app.post('/channels/linkedin', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { name, accessToken, organizationId } = z.object({
-      name: z.string().min(1),
-      accessToken: z.string().min(10),
-      organizationId: z.string().optional(),
-    }).parse(req.body)
-
-    // Valida o token contra a API do LinkedIn
-    const testRes = await fetch('https://api.linkedin.com/v2/me', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!testRes.ok) return reply.status(400).send({ error: 'Access Token do LinkedIn inválido' })
-    const profile = await testRes.json() as any
-    const linkedinId = profile?.id || organizationId || ''
-
-    const channel = await prisma.channel.create({
-      data: {
-        workspaceId, type: 'LINKEDIN', name,
-        config: { accessToken, organizationId, linkedinId, profileName: profile?.localizedFirstName || name },
-      },
+    const channel = await prisma.channel.upsert({
+      where: { candidateId_type: { candidateId, type: 'FACEBOOK' } },
+      update: { name, config: { pageAccessToken, pageId } },
+      create: { candidateId, type: 'FACEBOOK', name, config: { pageAccessToken, pageId } },
     })
     return reply.status(201).send(channel)
   })
 
   app.delete('/channels/:id', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
+    const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    const channel = await prisma.channel.findFirst({ where: { id, workspaceId } })
+    const channel = await prisma.channel.findFirst({ where: { id, candidateId } })
     if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
     if (channel.type === 'WHATSAPP') {
       const provider = getWhatsAppProvider()
       try { await provider.deleteInstance(id) } catch {}
     }
-    // Deleta em cascata: mensagens → conversas → contatos → agentChannels → canal
+    // Deleta em cascata: mensagens → conversas → contatos → canal
     const conversations = await prisma.conversation.findMany({ where: { channelId: id }, select: { id: true } })
     const convIds = conversations.map(c => c.id)
     if (convIds.length > 0) {
@@ -115,24 +72,7 @@ export async function channelRoutes(app: FastifyInstance) {
       await prisma.conversation.deleteMany({ where: { id: { in: convIds } } })
     }
     await prisma.contact.deleteMany({ where: { channelId: id } })
-    await prisma.agentChannel.deleteMany({ where: { channelId: id } })
     await prisma.channel.delete({ where: { id } })
     return reply.send({ ok: true })
   })
-
-  app.patch('/channels/:id/agents', async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const workspaceId = await getWorkspaceId(sub, wid)
-    const { id } = req.params as { id: string }
-    const channel = await prisma.channel.findFirst({ where: { id, workspaceId } })
-    if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
-    const { agentIds } = z.object({ agentIds: z.array(z.string()) }).parse(req.body)
-    await prisma.agentChannel.deleteMany({ where: { channelId: id } })
-    await prisma.agentChannel.createMany({
-      data: agentIds.map((agentId) => ({ agentId, channelId: id })),
-      skipDuplicates: true,
-    })
-    return reply.send({ ok: true })
-  })
-
 }

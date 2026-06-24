@@ -8,13 +8,12 @@ const strongPassword = z.string()
 
 export const registerSchema = z.object({
   name: z.string().min(2).max(100),
+  cpf: z.string().regex(/^\d{11}$/, 'CPF deve ter 11 dígitos'),
+  candidateNumber: z.string().max(20).optional(),
   email: z.string().email(),
+  whatsapp: z.string().min(10).max(20),
   password: strongPassword,
-  workspaceName: z.string().min(2).max(64).optional(),
-  phone: z.string().max(20).optional(),
-  segment: z.string().max(64).optional(),
-  role: z.string().max(64).optional(),
-  teamSize: z.string().max(32).optional(),
+  acceptedTerms: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar os Termos de Uso e a Política de Privacidade' }) }),
 })
 
 export const loginSchema = z.object({
