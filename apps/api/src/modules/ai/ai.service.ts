@@ -90,6 +90,26 @@ Regras gerais de conversa:
 `.trim()
 }
 
+// Detecta se a mensagem é um pedido/reclamação que deve gerar protocolo de solicitação
+// (seção 4.12 da spec) — ex: "queria pedir para arrumar a iluminação da minha rua".
+// Não classifica perguntas simples sobre propostas como solicitação.
+export async function detectRequestIntent(message: string): Promise<{ isRequest: boolean; subject?: string }> {
+  try {
+    const res = await callLLM({
+      model: DEFAULT_MODEL,
+      system: `Você classifica mensagens de eleitores para uma campanha eleitoral. Determine se a mensagem é um PEDIDO ou RECLAMAÇÃO que deve ser registrado como solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre um serviço público, denúncia, pedido de ajuda).
+NÃO classifique como solicitação: perguntas sobre propostas do candidato, perguntas sobre agenda/eventos, cumprimentos, conversas gerais.
+Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do pedido em até 8 palavras"} (subject pode ser omitido se isRequest for false). Nenhum texto adicional.`,
+      messages: [{ role: 'user', content: message }],
+      maxTokens: 100,
+    })
+    const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
+    return { isRequest: !!parsed.isRequest, subject: parsed.subject }
+  } catch {
+    return { isRequest: false }
+  }
+}
+
 export async function processAgentResponse(opts: {
   candidate: Candidate
   config: AgentConfig

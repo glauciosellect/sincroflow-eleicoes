@@ -27,6 +27,7 @@ import { emailChannelRoutes } from './modules/channels/email/email.routes'
 import { rbacRoutes } from './modules/rbac/rbac.routes'
 import { statusRoutes } from './modules/status/status.routes'
 import { complianceRoutes } from './modules/compliance/compliance.routes'
+import { requestRoutes } from './modules/requests/requests.routes'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
 import { startEmailPollingWorker } from './modules/channels/email/email-poll.worker'
@@ -109,6 +110,7 @@ async function bootstrap() {
   await app.register(emailChannelRoutes)
   await app.register(conversationRoutes)
   await app.register(contactRoutes)
+  await app.register(requestRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)

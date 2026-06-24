@@ -1,12 +1,13 @@
 import { createWorker } from '../../lib/queue'
 import { prisma } from '../../lib/prisma'
-import { processAgentResponse, processIncomingMedia } from '../ai/ai.service'
+import { processAgentResponse, processIncomingMedia, detectRequestIntent } from '../ai/ai.service'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { redis } from '../../lib/redis'
 import { getAgendaContextForPrompt } from '../calendar/calendar.service'
 import { generateSpeech } from '../tts/tts.service'
 import { getValidGmailToken, sendReply } from '../../lib/gmail'
+import { createRequest, getRequestStatusMessage } from '../requests/requests.service'
 import axios from 'axios'
 
 // Detecta se o remetente é um grupo do WhatsApp (@g.us)
@@ -241,6 +242,32 @@ export function startMessageWorker() {
       // que activeMsgsAvailable seja false. O limite só se aplica a envios iniciados pelo agente
       // (disclaimer no 1º contato, lembretes futuros, broadcasts).
 
+      // ── Consulta de protocolo existente (seção 4.12 da spec) ────────────────
+      const protocolMatch = text.match(/#?(EL-\d{4}-\d{5})/i)
+      if (protocolMatch) {
+        const statusMsg = await getRequestStatusMessage(candidate.id, protocolMatch[1].toUpperCase())
+        if (statusMsg) {
+          if (channelType === 'WHATSAPP') await getWhatsAppProvider().sendText(channelId, from, statusMsg)
+          const replyMsg = await prisma.message.create({ data: { conversationId: conversation.id, senderType: 'AGENT', content: statusMsg } })
+          try { emitNewMessage(candidate.id, conversation.id, replyMsg) } catch {}
+          return
+        }
+      }
+
+      // ── Registro de solicitação (pedido/reclamação → protocolo, seção 4.12) ──
+      let requestContext = ''
+      const requestIntent = await detectRequestIntent(text)
+      if (requestIntent.isRequest) {
+        const request = await createRequest({
+          candidateId: candidate.id,
+          contactId: contact.id,
+          conversationId: conversation.id,
+          subject: requestIntent.subject || text.slice(0, 100),
+          description: text,
+        })
+        requestContext = `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO ESTE TEXTO, MAS INFORME O PROTOCOLO NATURALMENTE NA SUA RESPOSTA: Esta mensagem foi identificada como uma solicitação e foi registrada com o protocolo ${request.protocolNumber}. Confirme o registro e informe este número de protocolo ao eleitor, e diga que a equipe entrará em contato em breve.]`
+      }
+
       // ── Resposta via IA, restrita ao conteúdo cadastrado (Minha História + Plataforma Eleitoral) ──
       const topics = await prisma.platformTopic.findMany({ where: { candidateId: candidate.id } })
       const conversationHistory = history.map((m) => ({
@@ -259,7 +286,7 @@ export function startMessageWorker() {
         config: agentConfig,
         topics,
         conversationHistory,
-        userMessage: text + contactContext + agendaContext,
+        userMessage: text + contactContext + requestContext + agendaContext,
       })
       const responseText = aiRes.content
 
