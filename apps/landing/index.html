@@ -3,48 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SyncroFlow — Atendimento Inteligente. Fluxo que Conecta.</title>
-  <meta name="description" content="Plataforma SaaS de atendimento omnichannel com IA. Crie agentes inteligentes para WhatsApp, Instagram, Facebook e mais. Sem código, sem complicação." />
+  <title>SyncroFlowEleições — Seu eleitor merece atenção 24 horas por dia</title>
+  <meta name="description" content="O assistente virtual inteligente para candidatos que levam a campanha a sério. Atenda eleitores 24/7 no WhatsApp e outros canais, em conformidade com a Resolução TSE nº 23.755/2026." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <!-- Meta Pixel — substitua 990433977062746 pelo ID real do seu pixel -->
-  <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '990433977062746');
-    fbq('track', 'PageView');
-  </script>
-  <noscript>
-    <img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=990433977062746&ev=PageView&noscript=1"/>
-  </noscript>
+  <!-- TODO: inserir Meta Pixel e Google Analytics próprios do SyncroFlowEleições (não reaproveitar IDs do SyncroFlow original) -->
 
-  <!-- Google Analytics — substitua G-F346T28WVJ pelo ID real -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-F346T28WVJ"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-F346T28WVJ');
-  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green: #2E7D32;
-      --green-light: #4CAF50;
-      --green-bright: #69F0AE;
-      --blue: #1565C0;
-      --blue-dark: #0D47A1;
-      --blue-light: #29B6F6;
-      --blue-pale: #E3F2FD;
+      --verde: #009C3B;
+      --verde-escuro: #00702A;
+      --amarelo: #FFDF00;
+      --azul: #002776;
+      --azul-claro: #1A4FA0;
       --gray-50: #F8FAFC;
       --gray-100: #F1F5F9;
       --gray-200: #E2E8F0;
@@ -62,2208 +36,263 @@
       overflow-x: hidden;
     }
 
-    /* ── UTILITIES ── */
     .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
     .gradient-text {
-      background: linear-gradient(135deg, var(--green-light), var(--blue));
+      background: linear-gradient(135deg, var(--verde), var(--azul));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+
     .btn-primary {
       display: inline-flex; align-items: center; gap: 8px;
-      background: linear-gradient(135deg, var(--blue), var(--green));
+      background: linear-gradient(135deg, var(--verde), var(--azul));
       color: white; font-weight: 600; font-size: 15px;
       padding: 14px 28px; border-radius: 50px; border: none;
       cursor: pointer; text-decoration: none;
       transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 20px rgba(21,101,192,0.3);
+      box-shadow: 0 4px 20px rgba(0,39,118,0.3);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(21,101,192,0.4); }
-    .btn-outline {
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,39,118,0.4); }
+
+    .btn-secondary {
       display: inline-flex; align-items: center; gap: 8px;
-      background: transparent; color: var(--blue); font-weight: 600; font-size: 15px;
-      padding: 13px 28px; border-radius: 50px;
-      border: 2px solid var(--blue); cursor: pointer; text-decoration: none;
-      transition: all 0.2s;
+      background: transparent; color: var(--azul); font-weight: 600; font-size: 15px;
+      padding: 14px 24px; border: 2px solid var(--gray-200); border-radius: 50px;
+      cursor: pointer; text-decoration: none; transition: border-color 0.2s;
     }
-    .btn-outline:hover { background: var(--blue); color: white; transform: translateY(-2px); }
-    .section-label {
-      display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: var(--green-light);
-      background: rgba(76,175,80,0.1); padding: 6px 16px; border-radius: 50px;
-      margin-bottom: 16px;
-    }
+    .btn-secondary:hover { border-color: var(--azul); }
 
-    /* ── ANIMATIONS ── */
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
-    @keyframes pulse-ring { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(1.4);opacity:0} }
-    @keyframes slide-up { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-    @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-    @keyframes fade-in { from{opacity:0} to{opacity:1} }
-    @keyframes blob { 0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%} 50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%} }
-    @keyframes marquee { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-    @keyframes marquee-pills { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-    @keyframes pulse-dot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.6} }
-    @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
-    @keyframes count-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes border-spin {
-      0%{border-image-source:linear-gradient(0deg,var(--blue),var(--green))}
-      100%{border-image-source:linear-gradient(360deg,var(--blue),var(--green))}
-    }
-    @keyframes agent-pulse {
-      0%,100%{box-shadow:0 0 0 0 rgba(21,101,192,0.3)}
-      50%{box-shadow:0 0 0 8px rgba(21,101,192,0)}
-    }
-    @keyframes gradient-hero {
-      0%{background-position:0% 50%}
-      50%{background-position:100% 50%}
-      100%{background-position:0% 50%}
-    }
-
-    .animate-float { animation: float 4s ease-in-out infinite; }
-    .animate-float-delay { animation: float 4s ease-in-out infinite 1.5s; }
-    .fade-up { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .fade-up.visible { opacity: 1; transform: translateY(0); }
-    .fade-left { opacity: 0; transform: translateX(-30px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .fade-left.visible { opacity: 1; transform: translateX(0); }
-    .fade-right { opacity: 0; transform: translateX(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .fade-right.visible { opacity: 1; transform: translateX(0); }
-    .scale-in { opacity: 0; transform: scale(0.9); transition: opacity 0.6s ease, transform 0.6s ease; }
-    .scale-in.visible { opacity: 1; transform: scale(1); }
-
-    /* ── NAV ── */
-    nav {
+    /* ── HEADER ── */
+    header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      padding: 16px 0; transition: all 0.3s;
+      background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--gray-200);
     }
-    nav.scrolled {
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 1px 20px rgba(0,0,0,0.08);
-    }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; }
-    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-icon { height: 40px; width: auto; display: block; }
-    .logo-wordmark { height: 110px; width: auto; display: block; }
-    .logo-text { font-size: 22px; font-weight: 800; }
-    .logo-text span:first-child { color: var(--green-light); }
-    .logo-text span:last-child { color: var(--blue); }
-    .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
-    .nav-links a { color: var(--gray-600); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--blue); }
-    .nav-cta { display: flex; align-items: center; gap: 12px; }
-    .nav-hamburger {
-      display: none; background: none; border: none; cursor: pointer;
-      padding: 8px; border-radius: 8px; color: var(--gray-900);
-    }
-    .nav-hamburger:hover { background: var(--gray-100); }
-    .nav-hamburger svg { display: block; }
-    .mobile-menu {
-      display: none; position: fixed; inset: 0; z-index: 99;
-      background: rgba(15,23,42,0.5); backdrop-filter: blur(4px);
-    }
-    .mobile-menu.open { display: block; }
-    .mobile-menu-panel {
-      position: absolute; top: 0; right: 0; bottom: 0; width: min(320px, 85vw);
-      background: white; padding: 24px 20px; display: flex; flex-direction: column; gap: 8px;
-      box-shadow: -4px 0 40px rgba(0,0,0,0.15);
-    }
-    .mobile-menu-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .mobile-menu-close { background: none; border: none; cursor: pointer; padding: 8px; border-radius: 8px; color: var(--gray-600); }
-    .mobile-menu-close:hover { background: var(--gray-100); }
-    .mobile-menu-links { list-style: none; display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .mobile-menu-links a { display: block; padding: 12px 16px; font-size: 16px; font-weight: 500; color: var(--gray-900); text-decoration: none; border-radius: 10px; transition: background 0.15s; }
-    .mobile-menu-links a:hover { background: var(--gray-100); color: var(--blue); }
-    .mobile-menu-cta { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-    .mobile-menu-cta .btn-outline, .mobile-menu-cta .btn-primary { justify-content: center; text-align: center; width: 100%; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+    .logo { font-weight: 800; font-size: 20px; color: var(--azul); }
+    .logo span { color: var(--verde); }
+    nav { display: flex; align-items: center; gap: 32px; }
+    nav a { color: var(--gray-600); text-decoration: none; font-weight: 500; font-size: 15px; }
+    nav a:hover { color: var(--azul); }
+    .nav-links { display: flex; gap: 32px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .btn-ghost { color: var(--azul); font-weight: 600; text-decoration: none; padding: 10px 16px; font-size: 15px; }
+    @media (max-width: 768px) { .nav-links { display: none; } }
 
     /* ── HERO ── */
     .hero {
-      min-height: 100vh; display: flex; align-items: center;
-      padding: 100px 0 60px;
-      background: linear-gradient(160deg, #F0F7FF 0%, #E8F5E9 50%, #F0F7FF 100%);
-      background-size: 300% 300%;
-      animation: gradient-shift 8s ease infinite;
-      position: relative; overflow: hidden;
+      padding: 160px 24px 80px;
+      background: linear-gradient(160deg, #FFFFFF 0%, #F0F9F4 100%);
+      text-align: center;
     }
-    .hero::before {
-      content: ''; position: absolute; top: -200px; right: -200px;
-      width: 600px; height: 600px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(21,101,192,0.08) 0%, transparent 70%);
-      animation: blob 8s ease-in-out infinite;
-    }
-    .hero::after {
-      content: ''; position: absolute; bottom: -150px; left: -150px;
-      width: 500px; height: 500px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(76,175,80,0.08) 0%, transparent 70%);
-      animation: blob 10s ease-in-out infinite reverse;
-    }
-    .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; position: relative; z-index: 1; }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: white; border: 1px solid var(--gray-200);
-      padding: 8px 16px; border-radius: 50px; font-size: 13px;
-      color: var(--gray-600); font-weight: 500; margin-bottom: 24px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06); animation: slide-up 0.6s ease both;
-    }
-    .hero-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-light); animation: pulse-ring 1.5s ease-out infinite; }
-    .hero h1 {
-      font-size: clamp(40px, 5vw, 64px); font-weight: 900; line-height: 1.1;
-      margin-bottom: 24px; animation: slide-up 0.6s ease 0.1s both;
-    }
-    .hero p {
-      font-size: 18px; color: var(--gray-600); line-height: 1.7;
-      margin-bottom: 36px; max-width: 480px; animation: slide-up 0.6s ease 0.2s both;
-    }
-    .hero-btns { display: flex; gap: 14px; flex-wrap: wrap; animation: slide-up 0.6s ease 0.3s both; }
-    .hero-stats { display: flex; gap: 32px; margin-top: 48px; animation: slide-up 0.6s ease 0.4s both; }
-    .hero-stat strong { display: block; font-size: 28px; font-weight: 800; color: var(--blue); }
-    .hero-stat span { font-size: 13px; color: var(--gray-600); }
+    .hero h1 { font-size: 48px; font-weight: 800; line-height: 1.15; max-width: 800px; margin: 0 auto 20px; }
+    .hero p.subhead { font-size: 19px; color: var(--gray-600); max-width: 600px; margin: 0 auto 36px; }
+    .hero-ctas { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    @media (max-width: 600px) { .hero h1 { font-size: 32px; } }
 
-    /* Hero Visual */
-    .hero-visual { position: relative; animation: slide-up 0.8s ease 0.2s both; }
-    .hero-mockup {
-      background: white; border-radius: 20px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.12);
-      overflow: hidden; border: 1px solid var(--gray-200);
-    }
-    .mockup-topbar {
-      background: linear-gradient(135deg, var(--blue-dark), var(--blue));
-      padding: 14px 20px; display: flex; align-items: center; gap: 10px;
-    }
-    .mockup-dots { display: flex; gap: 6px; }
-    .mockup-dots span { width: 10px; height: 10px; border-radius: 50%; }
-    .mockup-dots span:nth-child(1) { background: #FF5F57; }
-    .mockup-dots span:nth-child(2) { background: #FFBD2E; }
-    .mockup-dots span:nth-child(3) { background: #28CA41; }
-    .mockup-title { color: white; font-size: 13px; font-weight: 600; margin-left: 8px; }
-    .mockup-body { padding: 20px; background: #F8FAFC; min-height: 280px; }
-    .chat-msg { display: flex; gap: 10px; margin-bottom: 14px; }
-    .chat-msg.user { flex-direction: row-reverse; }
-    .chat-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; }
-    .chat-avatar.bot { background: linear-gradient(135deg, var(--blue), var(--green)); }
-    .chat-avatar.user-av { background: linear-gradient(135deg, var(--green-light), var(--blue-light)); }
-    .chat-bubble { background: white; border-radius: 12px; padding: 10px 14px; font-size: 13px; max-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); line-height: 1.5; }
-    .chat-msg.user .chat-bubble { background: linear-gradient(135deg, var(--blue), var(--green)); color: white; }
-    .typing { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
-    .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--gray-200); animation: float 1s ease-in-out infinite; }
-    .typing span:nth-child(2) { animation-delay: 0.15s; }
-    .typing span:nth-child(3) { animation-delay: 0.3s; }
+    /* ── SECTIONS ── */
+    section { padding: 80px 24px; }
+    .section-title { text-align: center; font-size: 36px; font-weight: 800; margin-bottom: 16px; }
+    .section-subtitle { text-align: center; color: var(--gray-600); font-size: 17px; max-width: 560px; margin: 0 auto 56px; }
 
-    /* Floating badges */
-    .float-badge {
-      position: absolute; background: white; border-radius: 12px;
-      padding: 10px 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
-      border: 1px solid var(--gray-200); white-space: nowrap;
-    }
-    .float-badge-1 { top: -20px; right: -20px; animation: float 3s ease-in-out infinite; }
-    .float-badge-2 { bottom: 40px; left: -30px; animation: float 3.5s ease-in-out infinite 1s; }
-    .badge-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-
-    /* Hero mini-preview — só mobile */
-    .hero-mobile-preview { display: none; }
-    @media (max-width: 900px) {
-      .hero-mobile-preview {
-        display: block; margin: 28px auto 0; max-width: 340px;
-        background: white; border-radius: 18px; overflow: hidden;
-        box-shadow: 0 12px 40px rgba(21,101,192,0.15); border: 1px solid var(--gray-200);
-      }
-      .hmp-topbar {
-        background: linear-gradient(135deg, #0D47A1, #1565C0);
-        padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;
-        color: white; font-size: 12px; font-weight: 600;
-      }
-      .hmp-body { padding: 14px; background: #F8FAFC; }
-      .hmp-msg { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; }
-      .hmp-msg.user { flex-direction: row-reverse; }
-      .hmp-avatar {
-        width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #1565C0, #2E7D32);
-        display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
-      }
-      .hmp-bubble {
-        background: white; border-radius: 12px; padding: 8px 12px; font-size: 12px;
-        line-height: 1.5; box-shadow: 0 1px 4px rgba(0,0,0,0.06); max-width: 220px; color: var(--gray-900);
-      }
-      .hmp-bubble.user { background: linear-gradient(135deg, #1565C0, #2E7D32); color: white; }
-      .hmp-channels {
-        display: flex; gap: 8px; padding: 10px 14px; background: #F1F5F9;
-        border-top: 1px solid var(--gray-200); flex-wrap: wrap; justify-content: center;
-      }
-      .hmp-channels span { font-size: 11px; font-weight: 600; color: #2E7D32; }
-    }
-
-    /* ── STATS BAR ── */
-    .stats-bar { background: white; border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); padding: 40px 0; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-    .stat-item { text-align: center; padding: 0 24px; border-right: 1px solid var(--gray-200); }
-    .stat-item:last-child { border-right: none; }
-    .stat-item strong { display: block; font-size: 36px; font-weight: 900; background: linear-gradient(135deg, var(--blue), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .stat-item span { font-size: 14px; color: var(--gray-600); }
-
-    /* ── WHATSAPP OFICIAL ── */
-    .wa-official-section {
-      padding: 90px 0; position: relative; overflow: hidden;
-      background: linear-gradient(160deg, #0a3d1f 0%, #1b5e20 45%, #0D47A1 100%);
-    }
-    .wa-official-section::before {
-      content: ''; position: absolute; top: -180px; left: -180px;
-      width: 550px; height: 550px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(105,240,174,0.18) 0%, transparent 70%);
-      animation: blob 9s ease-in-out infinite;
-    }
-    .wa-official-section::after {
-      content: ''; position: absolute; bottom: -200px; right: -200px;
-      width: 600px; height: 600px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(41,182,246,0.18) 0%, transparent 70%);
-      animation: blob 11s ease-in-out infinite reverse;
-    }
-    .wa-official-section .section-label { background: rgba(105,240,174,0.15); color: #69F0AE; border: 1px solid rgba(105,240,174,0.3); }
-    .wa-official-section .section-header h2 { color: white; }
-    .wa-official-section .section-header p { color: rgba(255,255,255,0.75); }
-    .wa-official-grid {
-      display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center;
-      position: relative; z-index: 1; margin-top: 12px;
-    }
-    .wa-official-badge {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
-      border: 1px solid rgba(105,240,174,0.35); border-radius: 50px;
-      padding: 10px 20px; font-size: 13px; font-weight: 700; color: #69F0AE;
-      margin-bottom: 22px; animation: agent-pulse 2.5s ease-in-out infinite;
-    }
-    .wa-official-badge .wa-dot { width: 8px; height: 8px; border-radius: 50%; background: #69F0AE; animation: pulse-dot 1.5s ease infinite; }
-    .wa-official-text h3 {
-      font-size: clamp(26px, 3.2vw, 38px); font-weight: 900; color: white;
-      line-height: 1.2; margin-bottom: 18px;
-    }
-    .wa-official-text h3 em { font-style: normal; color: #69F0AE; }
-    .wa-official-text p { font-size: 16px; color: rgba(255,255,255,0.7); line-height: 1.7; margin-bottom: 28px; max-width: 480px; }
-    .wa-official-benefits { display: flex; flex-direction: column; gap: 14px; }
-    .wa-benefit-item {
-      display: flex; align-items: center; gap: 14px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px; padding: 14px 18px;
-      transition: background 0.3s, transform 0.3s, border-color 0.3s;
-    }
-    .wa-benefit-item:hover { background: rgba(255,255,255,0.12); transform: translateX(6px); border-color: rgba(105,240,174,0.3); }
-    .wa-benefit-icon {
-      width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; font-size: 20px;
-      background: rgba(105,240,174,0.15);
-    }
-    .wa-benefit-item strong { display: block; color: white; font-size: 14px; font-weight: 700; }
-    .wa-benefit-item span { font-size: 12.5px; color: rgba(255,255,255,0.6); line-height: 1.5; }
-
-    /* Visual — selo oficial flutuante */
-    .wa-official-visual { position: relative; display: flex; justify-content: center; }
-    .wa-seal {
-      position: relative; width: 280px; height: 280px;
-      display: flex; align-items: center; justify-content: center;
-      animation: float 5s ease-in-out infinite;
-    }
-    .wa-seal-ring {
-      position: absolute; inset: 0; border-radius: 50%;
-      border: 2px dashed rgba(105,240,174,0.4);
-      animation: spin-slow 18s linear infinite;
-    }
-    .wa-seal-core {
-      width: 200px; height: 200px; border-radius: 50%;
-      background: linear-gradient(135deg, #25D366, #128C7E);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.35), 0 0 0 10px rgba(255,255,255,0.06);
-      gap: 6px;
-    }
-    .wa-seal-core .wa-seal-icon { font-size: 52px; }
-    .wa-seal-core strong { color: white; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
-    .wa-seal-core span { color: rgba(255,255,255,0.85); font-size: 10.5px; font-weight: 600; }
-    .wa-float-badge {
-      position: absolute; background: white; border-radius: 12px;
-      padding: 9px 14px; box-shadow: 0 8px 26px rgba(0,0,0,0.2);
-      display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
-    }
-    .wa-float-badge-1 { top: 6%; right: -4%; animation: float 4s ease-in-out infinite; }
-    .wa-float-badge-2 { bottom: 10%; left: -8%; animation: float 4s ease-in-out infinite 1s; }
-
-    /* Carrossel de selos/confiança */
-    .wa-trust-track {
-      display: flex; gap: 16px; width: max-content;
-      animation: marquee-pills 24s linear infinite; margin-top: 56px;
-    }
-    .wa-trust-track:hover { animation-play-state: paused; }
-    .wa-trust-pill {
-      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
-      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 999px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.9);
-      white-space: nowrap;
-    }
-    .wa-trust-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #69F0AE; animation: pulse-dot 2s ease-in-out infinite; flex-shrink: 0; }
-
-    /* ── CHANNELS ── */
-    .channels { padding: 100px 0; background: var(--gray-50); }
-    .section-header { text-align: center; margin-bottom: 60px; }
-    .section-header h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 800; margin-bottom: 16px; }
-    .section-header p { font-size: 17px; color: var(--gray-600); max-width: 560px; margin: 0 auto; }
-    .channels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 700px; margin: 0 auto; }
-    .channel-card {
-      background: white; border-radius: 16px; padding: 28px 16px; text-align: center;
-      border: 1px solid var(--gray-200); transition: all 0.3s;
-      cursor: default;
-    }
-    .channel-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px rgba(0,0,0,0.08); border-color: var(--blue); }
-    .channel-icon { font-size: 36px; margin-bottom: 12px; display: block; }
-    .channel-card h3 { font-size: 14px; font-weight: 600; color: var(--gray-900); }
-    .channel-card p { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
-
-    /* ── FEATURES ── */
-    .features { padding: 100px 0; background: linear-gradient(180deg, white 0%, #f0f7ff 50%, white 100%); }
-    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-    .feature-card {
-      padding: 32px; border-radius: 20px; border: 1px solid var(--gray-200);
-      transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1); background: white;
-      position: relative; overflow: hidden;
-    }
-    .feature-card::before {
-      content: ''; position: absolute; inset: 0; opacity: 0;
-      background: linear-gradient(135deg, rgba(21,101,192,0.04), rgba(46,125,50,0.04));
-      transition: opacity 0.3s;
-    }
-    .feature-card:hover { transform: translateY(-8px) scale(1.01); box-shadow: 0 24px 60px rgba(21,101,192,0.12); border-color: var(--blue); }
-    .feature-card:hover::before { opacity: 1; }
-    .feature-card:hover .feature-icon { transform: scale(1.15) rotate(-5deg); }
-    .feature-icon {
-      width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center;
-      justify-content: center; font-size: 24px; margin-bottom: 20px;
-      background: linear-gradient(135deg, var(--blue-pale), #E8F5E9);
-      transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    .feature-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
-    .feature-card p { font-size: 14px; color: var(--gray-600); line-height: 1.7; }
-
-    /* ── COMPARISON ── */
-    .comparison { padding: 100px 0; background: var(--gray-50); }
-    .comparison-table { margin-top: 60px; border-radius: 20px; overflow: hidden; border: 1px solid var(--gray-200); background: white; }
-    .comp-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; border-bottom: 1px solid var(--gray-200); }
-    .comp-row:last-child { border-bottom: none; }
-    .comp-row.header { background: var(--gray-900); }
-    .comp-cell {
-      padding: 18px 20px; font-size: 14px; color: var(--gray-600);
-      display: flex; align-items: center;
-      border-right: 1px solid var(--gray-200);
-    }
-    .comp-cell:last-child { border-right: none; }
-    .comp-row.header .comp-cell { color: rgba(255,255,255,0.7); font-size: 13px; font-weight: 700; letter-spacing: 0.5px; padding: 20px; }
-    .comp-row.header .comp-cell.highlighted { background: linear-gradient(135deg, var(--blue), var(--green)); color: white; font-size: 14px; text-align: center; justify-content: center; }
-    .comp-cell.feature-name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
-    .comp-cell.no { color: #EF4444; }
-    .comp-cell.yes { color: #16A34A; font-weight: 600; }
-    .comp-cell.highlighted { background: rgba(21,101,192,0.04); font-weight: 600; color: var(--blue); justify-content: center; text-align: center; }
-    .comp-cell.center { justify-content: center; text-align: center; }
-    @media (max-width: 700px) {
-      .comp-row { grid-template-columns: 1fr 1fr; }
-      .comp-cell:nth-child(2) { display: none; }
-    }
-
-    /* ── HOW IT WORKS ── */
-    .how { padding: 100px 0; background: linear-gradient(135deg, #0D47A1 0%, #1565C0 50%, #2E7D32 100%); color: white; }
-    .steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 60px; }
+    /* ── COMO FUNCIONA ── */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; max-width: 1000px; margin: 0 auto; }
     .step { text-align: center; }
-    .step-number {
-      width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.15);
+    .step-num {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--verde), var(--azul));
+      color: white; font-weight: 800; font-size: 22px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 900; margin: 0 auto 20px;
-      border: 2px solid rgba(255,255,255,0.3);
+      margin: 0 auto 20px;
     }
-    .step-icon { font-size: 28px; margin-bottom: 16px; display: block; }
-    .step h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .step p { font-size: 14px; opacity: 0.8; line-height: 1.6; }
-    .step-connector { display: none; }
+    .step h3 { font-size: 19px; margin-bottom: 8px; }
+    .step p { color: var(--gray-600); font-size: 15px; }
+    @media (max-width: 768px) { .steps { grid-template-columns: 1fr; } }
 
-    /* ── PLANS ── */
-    .plans { padding: 100px 0; background: var(--gray-50); }
-    .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 60px; }
-    .plan-card {
-      background: white; border-radius: 24px; padding: 40px 32px;
-      border: 2px solid var(--gray-200); position: relative; transition: all 0.3s;
+    /* ── RECURSOS ── */
+    .features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1100px; margin: 0 auto; }
+    .feature-card {
+      background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 16px;
+      padding: 28px; text-align: left;
     }
-    .plan-card:hover { transform: translateY(-4px); box-shadow: 0 20px 50px rgba(0,0,0,0.08); }
-    .plan-card.popular { border-color: var(--blue); box-shadow: 0 20px 50px rgba(21,101,192,0.15); }
-    .popular-badge {
-      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
-      background: linear-gradient(135deg, var(--blue), var(--green));
-      color: white; font-size: 11px; font-weight: 700; padding: 6px 20px;
-      border-radius: 50px; white-space: nowrap; letter-spacing: 0.5px;
-    }
-    .plan-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-600); margin-bottom: 12px; }
-    .plan-price { font-size: 44px; font-weight: 900; color: var(--gray-900); line-height: 1; }
-    .plan-price span { font-size: 16px; font-weight: 400; color: var(--gray-600); }
-    .plan-credits { display: flex; align-items: center; gap: 8px; margin: 16px 0 24px; padding: 12px 16px; background: var(--blue-pale); border-radius: 12px; }
-    .plan-credits strong { font-size: 15px; font-weight: 700; color: var(--blue); }
-    .plan-credits span { font-size: 13px; color: var(--gray-600); }
-    .plan-features { list-style: none; margin-bottom: 32px; }
-    .plan-features li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--gray-600); padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
-    .plan-features li:last-child { border-bottom: none; }
-    .plan-features li::before { content: '✓'; color: var(--green-light); font-weight: 700; flex-shrink: 0; }
-    .plan-btn {
-      display: block; text-align: center; padding: 14px; border-radius: 50px;
-      font-weight: 700; font-size: 15px; text-decoration: none; transition: all 0.2s;
-      cursor: pointer; border: 2px solid var(--blue); color: var(--blue); background: transparent;
-    }
-    .plan-btn:hover { background: var(--blue); color: white; }
-    .plan-btn.primary-btn { background: linear-gradient(135deg, var(--blue), var(--green)); color: white; border: none; }
-    .plan-btn.primary-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .feature-icon { font-size: 28px; margin-bottom: 14px; }
+    .feature-card h3 { font-size: 17px; margin-bottom: 8px; }
+    .feature-card p { color: var(--gray-600); font-size: 14px; line-height: 1.5; }
+    @media (max-width: 900px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .features-grid { grid-template-columns: 1fr; } }
 
-    /* ── CREDITS SECTION ── */
-    .credits-section { padding: 80px 0; background: white; }
-    .credits-table { max-width: 600px; margin: 40px auto 0; background: var(--gray-50); border-radius: 20px; overflow: hidden; border: 1px solid var(--gray-200); }
-    .credits-row { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 16px 24px; border-bottom: 1px solid var(--gray-200); font-size: 14px; }
-    .credits-row:last-child { border-bottom: none; }
-    .credits-row.header { background: linear-gradient(135deg, var(--blue), var(--green)); color: white; font-weight: 700; }
-    .credits-row:not(.header):hover { background: var(--blue-pale); }
-
-    /* ── FAQ ── */
-    .faq { padding: 100px 0; background: white; }
-    .faq-list { max-width: 780px; margin: 60px auto 0; }
-    .faq-item { border: 1px solid var(--gray-200); border-radius: 16px; margin-bottom: 12px; overflow: hidden; transition: box-shadow 0.2s; }
-    .faq-item:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-    .faq-question {
-      width: 100%; text-align: left; background: white; border: none; cursor: pointer;
-      padding: 22px 24px; font-size: 16px; font-weight: 600; color: var(--gray-900);
-      display: flex; justify-content: space-between; align-items: center; gap: 16px;
-      transition: background 0.2s;
+    /* ── COMPLIANCE TSE ── */
+    .compliance {
+      background: linear-gradient(135deg, var(--azul), var(--azul-claro));
+      color: white; border-radius: 24px; max-width: 1100px; margin: 0 auto;
+      padding: 56px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center;
     }
-    .faq-question:hover { background: var(--gray-50); }
-    .faq-question .faq-icon {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--blue-pale);
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      color: var(--blue); font-size: 18px; font-weight: 400; transition: transform 0.3s, background 0.2s;
-    }
-    .faq-item.open .faq-question .faq-icon { transform: rotate(45deg); background: var(--blue); color: white; }
-    .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.35s ease, padding 0.25s ease; padding: 0 24px; }
-    .faq-answer p { font-size: 15px; color: var(--gray-600); line-height: 1.75; padding-bottom: 20px; }
-    .faq-cta { text-align: center; margin-top: 48px; }
-    .faq-cta p { font-size: 16px; color: var(--gray-600); margin-bottom: 20px; }
-
-    /* ── TESTIMONIALS ── */
-    .testimonials { padding: 100px 0; background: var(--gray-50); }
-    .testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 60px; }
-    .testimonial-card { background: white; border-radius: 20px; padding: 32px; border: 1px solid var(--gray-200); }
-    .stars { color: #F59E0B; font-size: 16px; margin-bottom: 16px; }
-    .testimonial-text { font-size: 15px; color: var(--gray-600); line-height: 1.7; margin-bottom: 20px; font-style: italic; }
-    .testimonial-author { display: flex; align-items: center; gap: 12px; }
-    .author-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 16px; }
-    .author-name { font-size: 14px; font-weight: 700; }
-    .author-role { font-size: 12px; color: var(--gray-600); }
-
-    /* ── MULTI-AGENT SECTION ── */
-    .multiagent-section { padding: 90px 0; background: linear-gradient(135deg, #f0f7ff 0%, white 50%, #f0fdf4 100%); }
-    .multiagent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-top: 48px; }
-    /* multiagent mobile — handled in responsive block below */
-    .agent-flow {
-      display: flex; flex-direction: column; gap: 12px;
-    }
-    .agent-node {
-      display: flex; align-items: center; gap: 16px;
-      background: white; border: 2px solid #e2e8f0; border-radius: 16px;
-      padding: 16px 20px; transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .agent-node:hover { border-color: #1565C0; box-shadow: 0 4px 16px rgba(21,101,192,0.12); }
-    .agent-node.active { border-color: #3DBE29; background: #f0fdf4; animation: agent-pulse 2s ease-in-out infinite; }
-    .agent-node-icon { font-size: 28px; }
-    .agent-node-info { flex: 1; }
-    .agent-node-info strong { display: block; font-size: 14px; font-weight: 700; }
-    .agent-node-info span { font-size: 12px; color: #64748b; }
-    .agent-arrow { text-align: center; font-size: 20px; color: #94a3b8; }
-    .multiagent-benefits { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
-    .multiagent-benefits li { display: flex; align-items: flex-start; gap: 12px; }
-    .multiagent-benefits li .check { width: 22px; height: 22px; background: #3DBE29; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; shrink: 0; flex-shrink: 0; margin-top: 1px; }
-
-    /* ── SECURITY SECTION ── */
-    .security-section { padding: 90px 0; background: linear-gradient(160deg, #0D47A1 0%, #1565C0 45%, #1b5e20 100%); overflow: hidden; }
-    .security-section .section-label { background: rgba(255,255,255,0.15); color: #69F0AE; }
-    .security-section .section-header h2 { color: white; }
-    .security-section .section-header p { color: rgba(255,255,255,0.75); }
-
-    /* Carrossel infinito */
-    .marquee-outer { overflow: hidden; margin-top: 48px; position: relative; }
-    .marquee-outer::before, .marquee-outer::after {
-      content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2;
-    }
-    .marquee-outer::before { left: 0; background: linear-gradient(to right, #0D47A1, transparent); }
-    .marquee-outer::after { right: 0; background: linear-gradient(to left, #1b5e20, transparent); }
-    .marquee-track {
-      display: flex; gap: 20px; width: max-content;
-      animation: marquee 28s linear infinite;
-    }
-    .marquee-track:hover { animation-play-state: paused; }
-    .security-card {
-      flex-shrink: 0; width: 200px;
-      background: rgba(255,255,255,0.1); backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
-      padding: 28px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;
-      transition: background 0.3s, transform 0.3s;
-      cursor: default;
-    }
-    .security-card:hover { background: rgba(255,255,255,0.18); transform: translateY(-6px); }
-    .security-card-icon {
-      width: 68px; height: 68px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; font-size: 30px;
-    }
-    .security-card span { font-size: 14px; font-weight: 700; color: white; text-align: center; }
-    .security-card small { font-size: 11px; color: rgba(255,255,255,0.7); text-align: center; line-height: 1.5; }
-
-    /* Pills carrossel 2ª linha */
-    .marquee-outer-2 { overflow: hidden; margin-top: 20px; }
-    .marquee-track-2 {
-      display: flex; gap: 12px; width: max-content;
-      animation: marquee-pills 22s linear infinite reverse;
-    }
-    .marquee-track-2:hover { animation-play-state: paused; }
-    .security-pill {
-      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
-      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 999px; padding: 8px 20px; font-size: 13px; color: rgba(255,255,255,0.9);
-      white-space: nowrap;
-    }
-    .security-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #69F0AE; animation: pulse-dot 2s ease-in-out infinite; flex-shrink: 0; }
-
-    /* ── ECOMMERCE SELLERS SECTION ── */
-    .sellers-section {
-      padding: 100px 0;
-      background: var(--gray-900);
-      position: relative; overflow: hidden;
-    }
-    .sellers-section::before {
-      content: '';
-      position: absolute; top: -200px; right: -200px;
-      width: 600px; height: 600px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(21,101,192,0.25) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .sellers-section::after {
-      content: '';
-      position: absolute; bottom: -150px; left: -150px;
-      width: 500px; height: 500px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(46,125,50,0.2) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .sellers-label {
+    .compliance-badge {
       display: inline-flex; align-items: center; gap: 8px;
-      font-size: 12px; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: #69F0AE;
-      background: rgba(105,240,174,0.12); padding: 6px 16px; border-radius: 50px;
-      margin-bottom: 20px; border: 1px solid rgba(105,240,174,0.25);
+      background: rgba(255,255,255,0.15); border-radius: 50px; padding: 8px 16px;
+      font-size: 13px; font-weight: 600; margin-bottom: 16px;
     }
-    .sellers-section h2 { color: white; font-size: clamp(28px, 4vw, 48px); font-weight: 900; line-height: 1.15; margin-bottom: 16px; }
-    .sellers-section h2 em { font-style: normal; color: #69F0AE; }
-    .sellers-subtitle { font-size: 18px; color: rgba(255,255,255,0.65); max-width: 560px; line-height: 1.6; margin-bottom: 48px; }
-    .sellers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
-    /* sellers-grid mobile — handled in responsive block below */
+    .compliance h2 { font-size: 30px; font-weight: 800; margin-bottom: 16px; }
+    .compliance p { font-size: 16px; opacity: 0.9; line-height: 1.6; }
+    .compliance ul { margin-top: 20px; padding-left: 0; list-style: none; }
+    .compliance li { display: flex; gap: 10px; margin-bottom: 12px; font-size: 15px; }
+    @media (max-width: 800px) { .compliance { grid-template-columns: 1fr; padding: 32px 24px; } }
 
-    /* Pain cards — lado esquerdo */
-    .pain-cards { display: flex; flex-direction: column; gap: 16px; }
-    .pain-card {
-      display: flex; align-items: flex-start; gap: 16px;
-      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px; padding: 20px 22px;
-      transition: background 0.3s, border-color 0.3s, transform 0.3s;
+    /* ── PREÇOS ── */
+    .pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; max-width: 760px; margin: 0 auto; }
+    .price-card {
+      border: 2px solid var(--gray-200); border-radius: 20px; padding: 36px;
+      text-align: center;
     }
-    .pain-card:hover { background: rgba(255,255,255,0.09); border-color: rgba(105,240,174,0.3); transform: translateX(6px); }
-    .pain-icon { font-size: 28px; flex-shrink: 0; margin-top: 2px; }
-    .pain-text strong { display: block; color: white; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-    .pain-text span { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.5; }
-    .pain-badge {
-      margin-left: auto; flex-shrink: 0; align-self: center;
-      background: rgba(105,240,174,0.15); color: #69F0AE;
-      font-size: 11px; font-weight: 700; padding: 4px 10px;
-      border-radius: 20px; white-space: nowrap; border: 1px solid rgba(105,240,174,0.25);
-    }
-
-    /* Benefit list — lado direito */
-    .sellers-benefits { display: flex; flex-direction: column; gap: 0; }
-    .sellers-benefit {
-      display: flex; align-items: flex-start; gap: 16px;
-      padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.07);
-      transition: padding-left 0.3s;
-    }
-    .sellers-benefit:last-child { border-bottom: none; }
-    .sellers-benefit:hover { padding-left: 8px; }
-    .sellers-benefit-icon {
-      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; font-size: 20px;
-    }
-    .sellers-benefit-text strong { display: block; color: white; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-    .sellers-benefit-text p { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; margin: 0; }
-    .sellers-benefit-text .stat { color: #69F0AE; font-weight: 700; }
-
-    /* Stats row */
-    .sellers-stats { display: flex; gap: 0; margin-top: 48px; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; }
-    .sellers-stat { flex: 1; text-align: center; padding: 28px 20px; border-right: 1px solid rgba(255,255,255,0.1); }
-    .sellers-stat:last-child { border-right: none; }
-    .sellers-stat strong { display: block; font-size: 36px; font-weight: 900; color: #69F0AE; line-height: 1; margin-bottom: 6px; }
-    .sellers-stat span { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.4; display: block; }
-    @media (max-width: 600px) { .sellers-stats { flex-direction: column; } .sellers-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); } .sellers-stat:last-child { border-bottom: none; } }
-
-    /* CTA dentro da seção */
-    .sellers-cta { margin-top: 40px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .btn-green {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: linear-gradient(135deg, #2E7D32, #4CAF50);
-      color: white; font-weight: 700; font-size: 15px;
-      padding: 14px 28px; border-radius: 50px; border: none;
-      cursor: pointer; text-decoration: none;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 20px rgba(46,125,50,0.4);
-    }
-    .btn-green:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(46,125,50,0.5); }
-    .sellers-cta-note { font-size: 13px; color: rgba(255,255,255,0.45); }
-
-    /* ── CTA SECTION ── */
-    .cta-section {
-      padding: 100px 0;
-      background: linear-gradient(135deg, #0D47A1, #1565C0 40%, #2E7D32);
-      text-align: center; color: white; position: relative; overflow: hidden;
-    }
-    .cta-section::before {
-      content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
-      width: 600px; height: 600px; border-radius: 50%;
-      background: rgba(255,255,255,0.03);
-    }
-    .cta-section h2 { font-size: clamp(28px, 4vw, 48px); font-weight: 900; margin-bottom: 16px; }
-    .cta-section p { font-size: 18px; opacity: 0.85; max-width: 520px; margin: 0 auto 40px; line-height: 1.6; }
-    .cta-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-    .btn-white {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: white; color: var(--blue); font-weight: 700; font-size: 15px;
-      padding: 14px 32px; border-radius: 50px; text-decoration: none;
-      transition: all 0.2s; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    }
-    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
-    .btn-ghost {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(255,255,255,0.15); color: white; font-weight: 600; font-size: 15px;
-      padding: 14px 32px; border-radius: 50px; border: 2px solid rgba(255,255,255,0.3);
-      text-decoration: none; transition: all 0.2s;
-    }
-    .btn-ghost:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
+    .price-card.highlight { border-color: var(--verde); box-shadow: 0 8px 32px rgba(0,156,59,0.15); }
+    .price-card h3 { font-size: 22px; margin-bottom: 8px; }
+    .price-card .price { font-size: 14px; color: var(--gray-600); margin: 16px 0 24px; }
+    @media (max-width: 700px) { .pricing-grid { grid-template-columns: 1fr; } }
 
     /* ── FOOTER ── */
-    footer { background: var(--gray-900); color: white; padding: 60px 0 32px; }
-    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 48px; }
-    .footer-brand p { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 16px; line-height: 1.7; max-width: 280px; }
-    .footer-col h4 { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
-    .footer-col ul { list-style: none; }
-    .footer-col ul li { margin-bottom: 10px; }
-    .footer-col ul li a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; transition: color 0.2s; }
-    .footer-col ul li a:hover { color: var(--green-bright); }
-    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; }
-    .footer-bottom p { font-size: 13px; color: rgba(255,255,255,0.4); }
-    .footer-tagline { font-size: 13px; color: var(--green-bright); font-weight: 600; }
-
-    /* ── RESPONSIVE ── */
-    /* ── TABLET (≤ 900px) ── */
-    @media (max-width: 900px) {
-      .nav-links { display: none; }
-      .nav-cta { display: none; }
-      .nav-hamburger { display: block; }
-      .logo-wordmark { height: 72px; }
-
-      .hero { padding: 100px 0 48px; min-height: auto !important; }
-      .hero-grid { grid-template-columns: 1fr; gap: 32px; text-align: center; }
-      .hero-visual { display: none !important; }
-      .hero-btns { justify-content: center; }
-      .hero-stats { justify-content: center; }
-
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-      .stat-item:nth-child(2) { border-right: none; }
-
-      .channels-grid { grid-template-columns: repeat(3, 1fr); }
-
-      .features-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
-
-      .multiagent-grid { grid-template-columns: 1fr; gap: 32px; }
-
-      .wa-official-grid { grid-template-columns: 1fr; gap: 40px; }
-      .wa-official-visual { order: -1; }
-      .wa-seal { width: 220px; height: 220px; }
-      .wa-seal-core { width: 160px; height: 160px; }
-
-      .sellers-grid { grid-template-columns: 1fr; gap: 32px; }
-      .sellers-stats { flex-wrap: wrap; }
-      .sellers-stat { flex: 1 1 45%; }
-
-      .steps-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-
-      .plans-grid { grid-template-columns: 1fr; max-width: 440px; margin-left: auto; margin-right: auto; }
-
-      .comp-row { grid-template-columns: 2fr 1fr 1fr; }
-      .comp-cell:nth-child(2) { display: none; }
-
-      .testimonials-grid { grid-template-columns: 1fr; }
-
-      .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
-    }
-
-    /* ── MOBILE (≤ 600px) ── */
-    @media (max-width: 600px) {
-      /* Nav */
-      .logo-wordmark { height: 52px; }
-      nav { padding: 10px 0; }
-
-      /* Global */
-      .container { padding: 0 16px; }
-      section { padding: 56px 0 !important; }
-      .section-header { margin-bottom: 36px; }
-      .section-header h2 { font-size: clamp(22px, 7vw, 34px) !important; }
-      .section-header p { font-size: 15px; }
-
-      /* Hero — sem min-height pra não ficar com espaço vazio sem o visual */
-      .hero { padding: 80px 0 40px; min-height: auto !important; text-align: center; }
-      .hero h1 { font-size: clamp(30px, 9vw, 42px); line-height: 1.12; margin-bottom: 16px; }
-      .hero p { font-size: 15px; line-height: 1.65; margin-bottom: 28px; }
-      .hero-badge { font-size: 11px; padding: 6px 14px; justify-content: center; margin-bottom: 18px; }
-      .hero-btns { flex-direction: column; align-items: stretch; gap: 12px; }
-      .hero-btns .btn-primary, .hero-btns .btn-outline { justify-content: center; text-align: center; width: 100%; font-size: 16px; padding: 16px 24px; border-radius: 14px; }
-      .hero-stats { justify-content: center; gap: 0; flex-wrap: nowrap; margin-top: 32px; background: white; border-radius: 16px; padding: 20px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
-      .hero-stat { flex: 1; text-align: center; padding: 0 16px; border-right: 1px solid var(--gray-200); }
-      .hero-stat:last-child { border-right: none; }
-      .hero-stat strong { font-size: 20px; display: block; }
-      .hero-stat span { font-size: 11px; color: var(--gray-600); }
-      .hero-visual { display: none !important; }
-
-      /* Stats bar */
-      .stats-bar { padding: 32px 0; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0; }
-      .stat-item { padding: 20px 12px; border-right: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); }
-      .stat-item:nth-child(2) { border-right: none; }
-      .stat-item:nth-child(3), .stat-item:nth-child(4) { border-bottom: none; }
-      .stat-item:nth-child(4) { border-right: none; }
-      .stat-item strong { font-size: 28px; }
-
-      /* WhatsApp Oficial */
-      .wa-seal { width: 180px; height: 180px; margin: 0 auto; }
-      .wa-seal-core { width: 130px; height: 130px; }
-      .wa-seal-core .wa-seal-icon { font-size: 36px; }
-      .wa-float-badge { font-size: 10px; padding: 7px 10px; }
-      .wa-float-badge-1 { top: 0; right: 0; }
-      .wa-float-badge-2 { bottom: 0; left: 0; }
-      .wa-benefit-item { padding: 12px 14px; }
-
-      /* Channels */
-      .channels-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-      .channel-card { padding: 20px 12px; border-radius: 14px; }
-      .channel-icon { font-size: 28px; }
-      .channel-card h3 { font-size: 13px; }
-      .channel-card p { font-size: 11px; }
-
-      /* Multi-agentes */
-      .multiagent-grid { grid-template-columns: 1fr; gap: 28px; }
-      .agent-node { padding: 14px 16px; }
-      .agent-node-icon { font-size: 22px; }
-      .agent-node-info strong { font-size: 13px; }
-      .agent-node-info span { font-size: 11px; }
-      .multiagent-benefits li { gap: 10px; }
-
-      /* Features — layout horizontal no mobile: ícone à esquerda, texto à direita */
-      .features-grid { grid-template-columns: 1fr; gap: 12px; }
-      .feature-card { padding: 20px 18px; border-radius: 16px; display: flex; align-items: flex-start; gap: 16px; flex-direction: row; }
-      .feature-icon { width: 44px; height: 44px; font-size: 20px; margin-bottom: 0; flex-shrink: 0; border-radius: 12px; }
-      .feature-card h3 { font-size: 15px; margin-bottom: 4px; }
-      .feature-card p { font-size: 13px; line-height: 1.55; }
-
-      /* Vendedores */
-      .sellers-section { padding: 56px 0; }
-      .sellers-section h2 { font-size: clamp(22px, 7vw, 34px) !important; line-height: 1.2; }
-      .sellers-subtitle { font-size: 14px; }
-      .pain-card { padding: 16px; gap: 12px; }
-      .pain-icon { font-size: 22px; }
-      .pain-text strong { font-size: 13px; }
-      .pain-text span { font-size: 12px; }
-      .pain-badge { font-size: 10px; padding: 3px 8px; }
-      .sellers-benefit { padding: 14px 0; gap: 12px; }
-      .sellers-benefit-icon { width: 36px; height: 36px; font-size: 16px; border-radius: 10px; }
-      .sellers-benefit-text strong { font-size: 13px; }
-      .sellers-benefit-text p { font-size: 12px; }
-      .sellers-stats { flex-direction: column; }
-      .sellers-stat { padding: 20px; border-right: none !important; border-bottom: 1px solid rgba(255,255,255,0.1); }
-      .sellers-stat:last-child { border-bottom: none; }
-      .sellers-stat strong { font-size: 28px; }
-      .sellers-cta { flex-direction: column; align-items: stretch; text-align: center; }
-      .sellers-cta .btn-green { justify-content: center; }
-      .sellers-cta-note { font-size: 11px; }
-
-      /* Comparativo */
-      .comp-row { grid-template-columns: 1fr 1fr; }
-      .comp-cell:nth-child(2), .comp-cell:nth-child(3) { display: none; }
-      .comp-cell { padding: 14px 12px; font-size: 13px; }
-
-      /* Como funciona */
-      .steps-grid { grid-template-columns: 1fr; gap: 24px; max-width: 320px; margin-left: auto; margin-right: auto; }
-
-      /* Planos */
-      .plans-grid { grid-template-columns: 1fr; max-width: 100%; }
-      .plan-card { padding: 28px 20px; }
-      .plan-price { font-size: 36px; }
-
-      /* Carrossel segurança */
-      .security-card { width: 170px; padding: 22px 16px; }
-      .security-card-icon { width: 56px; height: 56px; font-size: 24px; }
-      .security-card span { font-size: 13px; }
-      .security-card small { font-size: 10px; }
-
-      /* CTA */
-      .cta-section { padding: 64px 0; }
-      .cta-section h2 { font-size: clamp(22px, 7vw, 36px); }
-      .cta-section p { font-size: 15px; }
-      .cta-btns { flex-direction: column; align-items: stretch; gap: 12px; }
-      .cta-btns a { justify-content: center; text-align: center; }
-
-      /* Testimonials */
-      .testimonial-card { padding: 24px 20px; }
-
-      /* Footer */
-      .footer-grid { grid-template-columns: 1fr; gap: 28px; }
-      .footer-bottom { flex-direction: column; gap: 8px; text-align: center; }
-      footer { padding: 48px 0 24px; }
-    }
-
-    /* ── TINY PHONES (≤ 380px) ── */
-    @media (max-width: 380px) {
-      .logo-wordmark { height: 44px; }
-      .hero h1 { font-size: 26px; }
-      .channels-grid { grid-template-columns: repeat(2, 1fr); }
-      .btn-primary, .btn-outline, .btn-green { font-size: 14px; padding: 12px 20px; }
-    }
+    footer { background: var(--gray-900); color: white; padding: 56px 24px 28px; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 32px; }
+    .footer-col h4 { font-size: 14px; margin-bottom: 16px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+    .footer-col a { display: block; color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+    .footer-col a:hover { color: white; }
+    .footer-bottom { text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; opacity: 0.6; }
   </style>
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav id="navbar">
-    <div class="container">
-      <div class="nav-inner">
-        <a href="#" class="logo">
-          <img src="logotipo-sem-fundo.png" class="logo-wordmark" alt="SyncroFlow" />
-        </a>
-        <ul class="nav-links">
-          <li><a href="#canais">Canais</a></li>
-          <li><a href="#multi-agentes">Multi-Agentes</a></li>
-          <li><a href="#recursos">Recursos</a></li>
-          <li><a href="#vendedores" style="color:#4CAF50;font-weight:700">🛒 Vendedores</a></li>
-          <li><a href="#como-funciona">Como funciona</a></li>
-          <li><a href="#planos">Planos</a></li>
-          <li><a href="#seguranca">Segurança</a></li>
-        </ul>
-        <div class="nav-cta">
-          <a href="https://app.syncroflow.io/login" class="btn-outline" style="padding:10px 20px;font-size:14px">Entrar</a>
-          <a href="https://app.syncroflow.io/register" class="btn-primary" style="padding:10px 20px;font-size:14px">Teste grátis →</a>
-        </div>
-        <button class="nav-hamburger" id="hamburger-btn" aria-label="Abrir menu">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
+  <header>
+    <div class="header-inner">
+      <div class="logo">SyncroFlow<span>Eleições</span></div>
+      <nav class="nav-links">
+        <a href="#como-funciona">Como Funciona</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#compliance">Conformidade TSE</a>
+        <a href="#precos">Preços</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/login" class="btn-ghost">Entrar</a>
+        <a href="/register" class="btn-primary">Registrar</a>
       </div>
     </div>
-  </nav>
+  </header>
 
-  <!-- MOBILE MENU -->
-  <div class="mobile-menu" id="mobile-menu">
-    <div class="mobile-menu-panel">
-      <div class="mobile-menu-header">
-        <a href="#" class="logo">
-          <img src="logotipo-sem-fundo.png" style="height:40px;width:auto" alt="SyncroFlow" />
-        </a>
-        <button class="mobile-menu-close" id="mobile-menu-close" aria-label="Fechar menu">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <ul class="mobile-menu-links">
-        <li><a href="#canais" class="menu-link">Canais</a></li>
-        <li><a href="#multi-agentes" class="menu-link">Multi-Agentes</a></li>
-        <li><a href="#recursos" class="menu-link">Recursos</a></li>
-        <li><a href="#como-funciona" class="menu-link">Como funciona</a></li>
-        <li><a href="#planos" class="menu-link">Planos</a></li>
-        <li><a href="#seguranca" class="menu-link">Segurança</a></li>
-      </ul>
-      <div class="mobile-menu-cta">
-        <a href="https://app.syncroflow.io/login" class="btn-outline">Entrar</a>
-        <a href="https://app.syncroflow.io/register" class="btn-primary">🚀 Criar conta grátis</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- HERO -->
   <section class="hero">
-    <div class="container">
-      <div class="hero-grid">
-        <div>
-          <div class="hero-badge">
-            <div class="dot"></div>
-            Novo: Multi-agentes, E-commerce, Financeiro e Segurança LGPD
-          </div>
-          <h1>
-            Atendimento<br>
-            <span class="gradient-text">Inteligente</span><br>
-            que Vende 24h
-          </h1>
-          <p>
-            Enquanto você dorme, sua IA atende, qualifica e fecha negócios. Conecte WhatsApp, Instagram, Telegram e mais — com agentes especializados que trabalham por você.
-          </p>
-          <div class="hero-btns">
-            <a href="https://app.syncroflow.io/register" class="btn-primary">Começar grátis — 14 dias →</a>
-            <a href="#como-funciona" class="btn-outline">Ver como funciona</a>
-          </div>
-          <!-- Mini preview mobile — visível só no mobile via CSS -->
-          <div class="hero-mobile-preview">
-            <div class="hmp-topbar">
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="width:8px;height:8px;border-radius:50%;background:#4CAF50;animation:pulse-dot 1.5s ease infinite"></div>
-                <span>💬 SyncroFlow — IA ativa</span>
-              </div>
-              <span style="font-size:11px;opacity:0.7">Haiku · 1 crédito</span>
-            </div>
-            <div class="hmp-body">
-              <div class="hmp-msg bot"><div class="hmp-avatar">S</div><div class="hmp-bubble">Olá! Sou o Jarbas. Como posso ajudar você hoje? 😊</div></div>
-              <div class="hmp-msg user"><div class="hmp-bubble user">Quero saber sobre os planos</div></div>
-              <div class="hmp-msg bot"><div class="hmp-avatar">S</div><div class="hmp-bubble">Temos Basic, Standard e Corporate. Qual o tamanho da sua operação?</div></div>
-            </div>
-            <div class="hmp-channels">
-              <span>📱 WhatsApp ✓</span>
-              <span>📸 Instagram ✓</span>
-              <span>💬 Telegram ✓</span>
-            </div>
-          </div>
+    <h1>Seu eleitor merece atenção <span class="gradient-text">24 horas por dia</span>.</h1>
+    <p class="subhead">O assistente virtual inteligente para candidatos que levam a campanha a sério. Sempre identificado, sempre em conformidade com a Resolução TSE nº 23.755/2026.</p>
+    <div class="hero-ctas">
+      <a href="/register" class="btn-primary">Registrar agora</a>
+      <a href="#como-funciona" class="btn-secondary">Ver como funciona</a>
+    </div>
+  </section>
 
-          <div class="hero-stats">
-            <div class="hero-stat">
-              <strong>14 dias</strong>
-              <span>de trial grátis</span>
-            </div>
-            <div class="hero-stat">
-              <strong>24/7</strong>
-              <span>atendimento</span>
-            </div>
-            <div class="hero-stat">
-              <strong>5min</strong>
-              <span>para configurar</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-visual">
-          <div style="position:relative; max-width:420px; margin-left:auto;">
-            <div class="hero-mockup animate-float">
-              <div class="mockup-topbar">
-                <div class="mockup-dots">
-                  <span></span><span></span><span></span>
-                </div>
-                <span class="mockup-title">💬 SyncroFlow — Chat ao vivo</span>
-              </div>
-              <div class="mockup-body">
-                <div class="chat-msg">
-                  <div class="chat-avatar bot">S</div>
-                  <div class="chat-bubble">Olá! Sou o Jarbas, assistente virtual da SyncroFlow. Como posso ajudar você hoje? 😊</div>
-                </div>
-                <div class="chat-msg user">
-                  <div class="chat-avatar user-av">C</div>
-                  <div class="chat-bubble">Quero saber mais sobre os planos</div>
-                </div>
-                <div class="chat-msg">
-                  <div class="chat-avatar bot">S</div>
-                  <div class="chat-bubble">Temos 3 planos: Basic, Standard e Corporate. Qual o tamanho da sua operação? Assim indico o melhor para você!</div>
-                </div>
-                <div class="chat-msg">
-                  <div class="chat-avatar bot">S</div>
-                  <div class="chat-bubble" style="background:white">
-                    <div class="typing"><span></span><span></span><span></span></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="float-badge float-badge-1">
-              <div class="badge-icon" style="background:#E8F5E9">🤖</div>
-              <div>
-                <div style="font-size:12px;color:#666">IA respondendo</div>
-                <div style="color:#2E7D32">Haiku · 1 crédito</div>
-              </div>
-            </div>
-            <div class="float-badge float-badge-2">
-              <div class="badge-icon" style="background:#E3F2FD">📱</div>
-              <div>
-                <div style="font-size:12px;color:#666">WhatsApp</div>
-                <div style="color:#1565C0">Conectado ✓</div>
-              </div>
-            </div>
-          </div>
-        </div>
+  <section id="como-funciona">
+    <h2 class="section-title">Como funciona</h2>
+    <p class="section-subtitle">Em 3 passos simples, seu assistente já está atendendo eleitores.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Cadastre suas propostas</h3>
+        <p>Conte sua história e preencha os temas da sua plataforma eleitoral.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Conecte seus canais</h3>
+        <p>WhatsApp, Instagram, Facebook, Telegram e e-mail — tudo em um só lugar.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Atenda eleitores 24/7</h3>
+        <p>Seu assistente responde dúvidas, registra solicitações e informa sua agenda.</p>
       </div>
     </div>
   </section>
 
-  <!-- STATS -->
-  <div class="stats-bar">
-    <div class="container">
-      <div class="stats-grid">
-        <div class="stat-item fade-up">
-          <strong>7+</strong>
-          <span>Canais integrados</span>
-        </div>
-        <div class="stat-item fade-up">
-          <strong>24/7</strong>
-          <span>Atendimento automático</span>
-        </div>
-        <div class="stat-item fade-up">
-          <strong>5min</strong>
-          <span>Para configurar</span>
-        </div>
-        <div class="stat-item fade-up">
-          <strong>∞</strong>
-          <span>Agentes por workspace</span>
-        </div>
+  <section id="recursos" style="background: var(--gray-50);">
+    <h2 class="section-title">Recursos</h2>
+    <p class="section-subtitle">Tudo que sua campanha precisa para não perder nenhum eleitor.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>Assistente 24/7</h3>
+        <p>Responde eleitores a qualquer hora, sempre se identificando como assistente virtual.</p>
       </div>
-    </div>
-  </div>
-
-  <!-- WHATSAPP OFICIAL -->
-  <section class="wa-official-section" id="whatsapp-oficial">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">WhatsApp Cloud API</span>
-        <h2>Conectado direto na <span class="gradient-text" style="background:linear-gradient(135deg,#69F0AE,#29B6F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">API Oficial</span> do WhatsApp</h2>
-        <p>NuClick Sistemas é Provedora de Tecnologia certificada pela Meta. Seu número conecta com segurança máxima, sem risco de bloqueio.</p>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Painel de Inteligência</h3>
+        <p>Relatórios sobre temas mais perguntados, engajamento e solicitações da sua base.</p>
       </div>
-
-      <div class="wa-official-grid">
-        <div class="wa-official-text fade-left">
-          <div class="wa-official-badge"><span class="wa-dot"></span> Tech Provider oficial Meta</div>
-          <h3>Diga adeus ao <em>risco de banimento</em></h3>
-          <p>Diferente de soluções não oficiais, o SyncroFlow usa a infraestrutura oficial da Meta para WhatsApp Business — seu número fica protegido, estável e dentro das regras da plataforma.</p>
-
-          <div class="wa-official-benefits">
-            <div class="wa-benefit-item">
-              <div class="wa-benefit-icon">🛡️</div>
-              <div><strong>Zero risco de bloqueio</strong><span>Infraestrutura homologada — seu número nunca é banido por uso indevido de API não oficial</span></div>
-            </div>
-            <div class="wa-benefit-item">
-              <div class="wa-benefit-icon">⚡</div>
-              <div><strong>Conexão em 3 minutos</strong><span>Conecte seu WhatsApp com um clique — sem QR Code, sem app aberto 24h no celular</span></div>
-            </div>
-            <div class="wa-benefit-item">
-              <div class="wa-benefit-icon">📈</div>
-              <div><strong>Estabilidade de verdade</strong><span>Mensagens entregues com a confiabilidade da própria infraestrutura da Meta</span></div>
-            </div>
-            <div class="wa-benefit-item">
-              <div class="wa-benefit-icon">🔗</div>
-              <div><strong>Mesmo webhook, mais canais</strong><span>Desbloqueia Instagram Direct e Messenger automaticamente, sem configuração extra</span></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wa-official-visual fade-right">
-          <div class="wa-seal">
-            <div class="wa-seal-ring"></div>
-            <div class="wa-seal-core">
-              <span class="wa-seal-icon">✅</span>
-              <strong>OFICIAL</strong>
-              <span>WhatsApp Business API</span>
-            </div>
-            <div class="wa-float-badge wa-float-badge-1">📲 Conectado</div>
-            <div class="wa-float-badge wa-float-badge-2">🤝 Tech Provider</div>
-          </div>
-        </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚖️</div>
+        <h3>Compliance TSE</h3>
+        <p>Desativação automática 72h antes de cada turno e log de auditoria imutável.</p>
       </div>
-
-      <div class="marquee-outer" style="margin-top:8px">
-        <div class="wa-trust-track">
-          <div class="wa-trust-pill"><span class="dot"></span>Provedor de Tecnologia certificado Meta</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Sem QR Code expirando</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Sem app aberto no celular 24h</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Mensagens com selo oficial Meta</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Suporte a templates aprovados</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Provedor de Tecnologia certificado Meta</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Sem QR Code expirando</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Sem app aberto no celular 24h</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Mensagens com selo oficial Meta</div>
-          <div class="wa-trust-pill"><span class="dot"></span>Suporte a templates aprovados</div>
-        </div>
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <h3>Múltiplos Canais</h3>
+        <p>WhatsApp, Instagram, Facebook, Telegram e e-mail, tudo integrado.</p>
       </div>
     </div>
   </section>
 
-  <!-- CHANNELS -->
-  <section class="channels" id="canais">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Canais</span>
-        <h2>Atenda em todos os <span class="gradient-text">canais</span></h2>
-        <p>Conecte seus canais favoritos e gerencie tudo em um só lugar, com um único agente de IA.</p>
+  <section id="compliance">
+    <div class="compliance">
+      <div>
+        <span class="compliance-badge">✓ Em conformidade</span>
+        <h2>Conformidade TSE garantida</h2>
+        <p>A Resolução TSE nº 23.755/2026 exige identificação clara, conteúdo restrito e desativação automática perto do pleito. O SyncroFlowEleições cuida de tudo isso por você.</p>
       </div>
-      <div class="channels-grid">
-        <div class="channel-card fade-up">
-          <span class="channel-icon">📱</span>
-          <h3>WhatsApp</h3>
-          <p>Conexão via QR Code</p>
-        </div>
-        <div class="channel-card fade-up">
-          <span class="channel-icon">📸</span>
-          <h3>Instagram</h3>
-          <p>DMs automáticas</p>
-        </div>
-        <div class="channel-card fade-up">
-          <span class="channel-icon">📘</span>
-          <h3>Facebook</h3>
-          <p>Messenger integrado</p>
-        </div>
-        <div class="channel-card fade-up">
-          <span class="channel-icon">✈️</span>
-          <h3>Telegram</h3>
-          <p>Bot com webhook próprio</p>
-        </div>
-        <div class="channel-card fade-up">
-          <span class="channel-icon">💼</span>
-          <h3>LinkedIn</h3>
-          <p>Mensagens e comentários</p>
-        </div>
-        <div class="channel-card fade-up">
-          <span class="channel-icon">💬</span>
-          <h3>Chat Widget</h3>
-          <p>Embed no seu site</p>
-        </div>
+      <ul>
+        <li>✓ Identificação obrigatória como assistente virtual</li>
+        <li>✓ Sem recomendação de voto, mesmo se perguntado</li>
+        <li>✓ Respostas restritas ao conteúdo que você cadastrou</li>
+        <li>✓ Desativação automática 72h antes de cada turno</li>
+        <li>✓ Log de auditoria imutável para defesa legal</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="precos">
+    <h2 class="section-title">Preços</h2>
+    <p class="section-subtitle">Planos claros para cada momento da sua campanha.</p>
+    <div class="pricing-grid">
+      <div class="price-card highlight">
+        <h3>Plano Campanha</h3>
+        <p class="price"><!-- TODO: definir valor do plano Campanha --></p>
+        <a href="/register" class="btn-primary" style="width:100%; justify-content:center;">Assinar</a>
+      </div>
+      <div class="price-card">
+        <h3>Plano Mandato</h3>
+        <p class="price">Disponível após a eleição<!-- TODO: definir valor do plano Mandato --></p>
+        <a href="/register" class="btn-secondary" style="width:100%; justify-content:center;">Saber mais</a>
       </div>
     </div>
   </section>
 
-  <!-- MULTI-AGENTES -->
-  <section class="multiagent-section" id="multi-agentes">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Multi-Agentes</span>
-        <h2>Uma equipe de IAs <span class="gradient-text">trabalhando juntas</span></h2>
-        <p>Crie agentes especializados que se transferem automaticamente — cada um focado no que faz melhor.</p>
-      </div>
-      <div class="multiagent-grid">
-        <div class="agent-flow fade-left">
-          <div class="agent-node active">
-            <span class="agent-node-icon">👋</span>
-            <div class="agent-node-info">
-              <strong>Agente A — Atendimento Inicial</strong>
-              <span>Recebe, qualifica e entende a necessidade do cliente</span>
-            </div>
-          </div>
-          <div class="agent-arrow">↓ transfere automaticamente</div>
-          <div class="agent-node">
-            <span class="agent-node-icon">💰</span>
-            <div class="agent-node-info">
-              <strong>Agente B — Financeiro</strong>
-              <span>Gera links de pagamento PIX, verifica cobranças, emite boletos</span>
-            </div>
-          </div>
-          <div class="agent-arrow">↓ ou transfere para</div>
-          <div class="agent-node">
-            <span class="agent-node-icon">🛒</span>
-            <div class="agent-node-info">
-              <strong>Agente C — Comercial</strong>
-              <span>Consulta estoque, processa pedidos, acompanha entrega</span>
-            </div>
-          </div>
-        </div>
-        <div class="fade-right">
-          <h3 style="font-size:22px;font-weight:800;margin-bottom:24px">Por que usar multi-agentes?</h3>
-          <ul class="multiagent-benefits">
-            <li>
-              <div class="check">✓</div>
-              <div>
-                <strong style="display:block;margin-bottom:4px">Especialização real</strong>
-                <span style="color:#64748b;font-size:14px">Cada agente tem treinamento, tom e ferramentas específicos para sua função</span>
-              </div>
-            </li>
-            <li>
-              <div class="check">✓</div>
-              <div>
-                <strong style="display:block;margin-bottom:4px">Transferência fluida</strong>
-                <span style="color:#64748b;font-size:14px">O cliente não percebe a mudança — a conversa continua naturalmente</span>
-              </div>
-            </li>
-            <li>
-              <div class="check">✓</div>
-              <div>
-                <strong style="display:block;margin-bottom:4px">Escalabilidade</strong>
-                <span style="color:#64748b;font-size:14px">Adicione novos agentes conforme o negócio cresce, sem refazer tudo</span>
-              </div>
-            </li>
-            <li>
-              <div class="check">✓</div>
-              <div>
-                <strong style="display:block;margin-bottom:4px">Controle por canal</strong>
-                <span style="color:#64748b;font-size:14px">WhatsApp usa Agente A, e-mail usa Agente B — cada canal com seu especialista</span>
-              </div>
-            </li>
-          </ul>
-          <a href="https://app.syncroflow.io/register" class="btn-primary" style="display:inline-flex;margin-top:32px">
-            Criar minha equipe de IAs →
-          </a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FEATURES -->
-  <section class="features" id="recursos">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Recursos</span>
-        <h2>Tudo que você precisa para <span class="gradient-text">escalar</span> o atendimento</h2>
-        <p>Funcionalidades pensadas para empresas que querem resultados reais, não apenas automação.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🤝</div>
-          <h3>Multi-agentes especializados</h3>
-          <p>Crie agentes separados para Atendimento, Comercial e Financeiro. Eles se transferem automaticamente conforme a conversa evolui.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🛒</div>
-          <h3>E-commerce integrado</h3>
-          <p>Conecte Nuvemshop, Mercado Livre, Shopee ou TikTok Shop. O agente consulta pedidos e estoque em tempo real.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">💳</div>
-          <h3>Financeiro com IA</h3>
-          <p>Integre Asaas ou Pagar.me. O agente gera links de pagamento PIX, verifica boletos e envia cobranças automaticamente.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🤖</div>
-          <h3>Multi-modelo de IA</h3>
-          <p>Escolha entre Claude Haiku ou Sonnet. Cada agente pode ter seu próprio modelo configurado.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🧠</div>
-          <h3>Treinamento com RAG</h3>
-          <p>Cole textos, FAQs, sites ou documentos. A IA aprende com o conteúdo da sua empresa e responde com precisão.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🎯</div>
-          <h3>Intenções automáticas</h3>
-          <p>Detecta quando o cliente quer agendar, comprar ou falar com humano — e age automaticamente.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🎙️</div>
-          <h3>Áudio, imagem e PDF</h3>
-          <p>O agente entende mensagens de voz, analisa imagens e lê documentos enviados pelos clientes.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">📋</div>
-          <h3>Templates prontos</h3>
-          <p>Marketplace com fluxos prontos para e-commerce, clínicas, jurídico, imobiliário e mais. Ative em 1 clique.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">👥</div>
-          <h3>Equipe com permissões</h3>
-          <p>RBAC completo: Owner, Admin, Membro, Agente e Viewer. Controle quem acessa o quê com log de auditoria.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">📊</div>
-          <h3>Analytics avançado</h3>
-          <p>Acompanhe créditos gastos, top agentes, tempo de resposta, taxa de resolução e muito mais.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🔐</div>
-          <h3>Segurança LGPD</h3>
-          <p>AES-256, JWT 15min, rate limiting anti-brute force, HSTS e conformidade com a LGPD. Dados no Brasil.</p>
-        </div>
-        <div class="feature-card fade-up">
-          <div class="feature-icon">🔗</div>
-          <h3>API & Webhooks</h3>
-          <p>API REST completa e webhooks para integrar com seu CRM, ERP ou qualquer ferramenta externa.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- VENDEDORES ONLINE -->
-  <section class="sellers-section" id="vendedores">
-    <div class="container" style="position:relative;z-index:1">
-
-      <div class="fade-up" style="text-align:center;margin-bottom:64px">
-        <div class="sellers-label">🛒 Para quem vende pela internet</div>
-        <h2>Você atende 50 clientes por dia<br>no <em>WhatsApp, Mercado Livre e Instagram</em>.<br>Quanto tempo você perde?</h2>
-        <p class="sellers-subtitle" style="margin:16px auto 0">A maioria das perguntas são sempre as mesmas: "chegou?", "qual o prazo?", "tem em estoque?". Enquanto você responde manualmente, seus concorrentes já automatizaram.</p>
-      </div>
-
-      <div class="sellers-grid">
-        <!-- Coluna esquerda: dores reais -->
-        <div class="pain-cards fade-left">
-          <div class="pain-card">
-            <span class="pain-icon">😫</span>
-            <div class="pain-text">
-              <strong>3h por dia respondendo as mesmas perguntas</strong>
-              <span>"Qual o prazo de entrega?" "Tem esse produto em outra cor?" "Já enviou meu pedido?" — toda hora, todo dia.</span>
-            </div>
-            <div class="pain-badge">-3h/dia</div>
-          </div>
-          <div class="pain-card">
-            <span class="pain-icon">💸</span>
-            <div class="pain-text">
-              <strong>Venda perdida por demora na resposta</strong>
-              <span>O cliente perguntou. Você estava ocupado. Ele comprou do concorrente. Acontece todo dia e você nem sabe.</span>
-            </div>
-            <div class="pain-badge">-40% conversão</div>
-          </div>
-          <div class="pain-card">
-            <span class="pain-icon">⭐</span>
-            <div class="pain-text">
-              <strong>Avaliação ruim por atendimento lento</strong>
-              <span>No ML e Shopee, tempo de resposta impacta direto na sua reputação. Uma estrela a menos custa caro.</span>
-            </div>
-            <div class="pain-badge">Reputação ↓</div>
-          </div>
-          <div class="pain-card">
-            <span class="pain-icon">🌙</span>
-            <div class="pain-text">
-              <strong>Cliente não espera até amanhã de manhã</strong>
-              <span>Compras acontecem à noite e nos fins de semana. Sem atendimento, o carrinho é abandonado.</span>
-            </div>
-            <div class="pain-badge">24/7 resolve</div>
-          </div>
-        </div>
-
-        <!-- Coluna direita: solução -->
-        <div class="sellers-benefits fade-right">
-          <div class="sellers-benefit">
-            <div class="sellers-benefit-icon" style="background:rgba(105,240,174,0.12)">🤖</div>
-            <div class="sellers-benefit-text">
-              <strong>Agente responde por você instantaneamente</strong>
-              <p>Prazo, estoque, status do pedido — tudo respondido em segundos, direto do seu Mercado Livre, Nuvemshop ou Shopee. <span class="stat">Resposta em menos de 5 segundos.</span></p>
-            </div>
-          </div>
-          <div class="sellers-benefit">
-            <div class="sellers-benefit-icon" style="background:rgba(41,182,246,0.12)">💳</div>
-            <div class="sellers-benefit-text">
-              <strong>Gera link de pagamento PIX na hora</strong>
-              <p>Integrado com Asaas e Pagar.me. O cliente pede, o agente gera o link e envia — sem você tocar no celular. <span class="stat">Cobranças no automático.</span></p>
-            </div>
-          </div>
-          <div class="sellers-benefit">
-            <div class="sellers-benefit-icon" style="background:rgba(105,240,174,0.12)">📦</div>
-            <div class="sellers-benefit-text">
-              <strong>Consulta pedidos e rastreio em tempo real</strong>
-              <p>O cliente pergunta "cadê meu pedido?" — o agente puxa o código de rastreio e responde. Você não precisa fazer nada. <span class="stat">Zero chamados desnecessários.</span></p>
-            </div>
-          </div>
-          <div class="sellers-benefit">
-            <div class="sellers-benefit-icon" style="background:rgba(41,182,246,0.12)">🌙</div>
-            <div class="sellers-benefit-text">
-              <strong>Atende enquanto você dorme</strong>
-              <p>Fim de semana, feriado, madrugada. Seu agente nunca descansa. <span class="stat">+37% de vendas fora do horário comercial</span> em média.</p>
-            </div>
-          </div>
-          <div class="sellers-benefit">
-            <div class="sellers-benefit-icon" style="background:rgba(105,240,174,0.12)">⭐</div>
-            <div class="sellers-benefit-text">
-              <strong>Melhora sua reputação no ML e Shopee</strong>
-              <p>Tempo de resposta curto = mais medalhas = mais visibilidade. <span class="stat">Vendedores com IA têm 2× mais avaliações positivas.</span></p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stats row -->
-      <div class="sellers-stats fade-up" style="margin-top:56px">
-        <div class="sellers-stat">
-          <strong>3h</strong>
-          <span>economizadas por dia em respostas repetitivas</span>
-        </div>
-        <div class="sellers-stat">
-          <strong>87%</strong>
-          <span>das perguntas respondidas sem intervenção humana</span>
-        </div>
-        <div class="sellers-stat">
-          <strong>24/7</strong>
-          <span>atendimento ativo sem você estar online</span>
-        </div>
-        <div class="sellers-stat">
-          <strong>5s</strong>
-          <span>tempo médio de resposta do agente IA</span>
-        </div>
-      </div>
-
-      <!-- CTA -->
-      <div class="sellers-cta fade-up" style="justify-content:center;margin-top:48px">
-        <a href="https://app.syncroflow.io/register" class="btn-green">🚀 Quero automatizar minhas vendas →</a>
-        <span class="sellers-cta-note">✓ 14 dias grátis &nbsp; ✓ Conecta com ML, Nuvemshop, Shopee &nbsp; ✓ Sem cartão</span>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- COMPARISON -->
-  <section class="comparison" id="comparativo">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Comparativo</span>
-        <h2>Por que o <span class="gradient-text">SyncroFlow</span> é a melhor escolha?</h2>
-        <p>Veja lado a lado como cada opção impacta o seu negócio.</p>
-      </div>
-      <div class="comparison-table fade-up">
-        <div class="comp-row header">
-          <div class="comp-cell">Situação</div>
-          <div class="comp-cell center">❌ Sem atendimento<br>automático</div>
-          <div class="comp-cell center">👤 Com Secretária</div>
-          <div class="comp-cell highlighted">✅ Com SyncroFlow</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Horário de atendimento</div>
-          <div class="comp-cell no center">Só horário comercial</div>
-          <div class="comp-cell no center">Só horário comercial</div>
-          <div class="comp-cell yes highlighted">24h / 7 dias</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Resposta ao primeiro contato</div>
-          <div class="comp-cell no center">Horas ou dias depois</div>
-          <div class="comp-cell center" style="color:#F59E0B">Minutos (se disponível)</div>
-          <div class="comp-cell yes highlighted">Instantânea, em segundos</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Custo mensal</div>
-          <div class="comp-cell no center">R$0 (perde clientes)</div>
-          <div class="comp-cell no center">R$1.800 a R$3.500/mês</div>
-          <div class="comp-cell yes highlighted">A partir de R$60/mês</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Atende múltiplos clientes ao mesmo tempo</div>
-          <div class="comp-cell no center">Não</div>
-          <div class="comp-cell no center">Não</div>
-          <div class="comp-cell yes highlighted">Sim, ilimitado</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Agenda consultas/pedidos automaticamente</div>
-          <div class="comp-cell no center">Não</div>
-          <div class="comp-cell center" style="color:#F59E0B">Sim, manualmente</div>
-          <div class="comp-cell yes highlighted">Sim, automaticamente</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Disponível em feriados e fins de semana</div>
-          <div class="comp-cell no center">Não</div>
-          <div class="comp-cell no center">Raramente</div>
-          <div class="comp-cell yes highlighted">Sempre</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">Consistência nas respostas</div>
-          <div class="comp-cell no center">Variável</div>
-          <div class="comp-cell center" style="color:#F59E0B">Depende do humor</div>
-          <div class="comp-cell yes highlighted">Sempre igual, profissional</div>
-        </div>
-        <div class="comp-row">
-          <div class="comp-cell feature-name">WhatsApp, Instagram e Facebook</div>
-          <div class="comp-cell no center">Não</div>
-          <div class="comp-cell center" style="color:#F59E0B">Manual</div>
-          <div class="comp-cell yes highlighted">Automática e simultânea</div>
-        </div>
-      </div>
-      <div style="text-align:center;margin-top:48px" class="fade-up">
-        <a href="https://app.syncroflow.io/register" class="btn-primary">Começar Trial Gratuito — 14 dias sem cartão →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="how" id="como-funciona">
-    <div class="container">
-      <div class="section-header fade-up" style="color:white">
-        <span class="section-label" style="background:rgba(255,255,255,0.15);color:white">Como funciona</span>
-        <h2>Em 4 passos você está <span style="color:#69F0AE">atendendo com IA</span></h2>
-        <p style="color:rgba(255,255,255,0.7)">Sem servidores, sem código, sem dor de cabeça.</p>
-      </div>
-      <div class="steps-grid">
-        <div class="step fade-up">
-          <span class="step-icon">👤</span>
-          <div class="step-number">1</div>
-          <h3>Crie sua conta</h3>
-          <p>Cadastro rápido, 14 dias grátis com 1.000 créditos para testar tudo.</p>
-        </div>
-        <div class="step fade-up">
-          <span class="step-icon">🤖</span>
-          <div class="step-number">2</div>
-          <h3>Crie um agente</h3>
-          <p>Dê um nome, defina o comportamento e treie com o conteúdo da sua empresa.</p>
-        </div>
-        <div class="step fade-up">
-          <span class="step-icon">📱</span>
-          <div class="step-number">3</div>
-          <h3>Conecte o canal</h3>
-          <p>Escaneie o QR Code do WhatsApp ou configure outro canal em segundos.</p>
-        </div>
-        <div class="step fade-up">
-          <span class="step-icon">🚀</span>
-          <div class="step-number">4</div>
-          <h3>Comece a atender</h3>
-          <p>Seu agente já está ativo, respondendo clientes 24/7 automaticamente.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CREDITS -->
-  <section class="credits-section">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Créditos</span>
-        <h2>Pague pelo que <span class="gradient-text">usar</span></h2>
-        <p>Compre créditos avulsos ou assine um plano. Cada modelo consome créditos de forma diferente.</p>
-      </div>
-      <div class="credits-table fade-up">
-        <div class="credits-row header">
-          <div>Modelo de IA</div>
-          <div>Custo / mensagem</div>
-          <div>Velocidade</div>
-        </div>
-        <div class="credits-row">
-          <div>🟢 Claude Haiku</div>
-          <div><strong>1 crédito</strong></div>
-          <div>⚡ Muito rápido</div>
-        </div>
-        <div class="credits-row">
-          <div>🔵 Claude Sonnet</div>
-          <div><strong>3 créditos</strong></div>
-          <div>🚀 Rápido</div>
-        </div>
-        <div class="credits-row" style="background:#FFF8E1">
-          <div>🎙️ Áudio/Imagem/PDF</div>
-          <div><strong>2 créditos</strong></div>
-          <div>📎 Fixo</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PLANS -->
-  <section class="plans" id="planos">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Planos</span>
-        <h2>Escolha o plano ideal para <span class="gradient-text">sua operação</span></h2>
-        <p>14 dias grátis em qualquer plano. Sem cartão de crédito.</p>
-      </div>
-
-      <!-- Toggle Mensal / Anual -->
-      <div style="display:flex;justify-content:center;gap:8px;margin-bottom:40px">
-        <button id="btn-mensal" onclick="setPlanCycle('mensal')" style="padding:8px 24px;border-radius:999px;border:2px solid #1565C0;background:#1565C0;color:white;font-weight:600;cursor:pointer;font-size:14px">Mensal</button>
-        <button id="btn-anual" onclick="setPlanCycle('anual')" style="padding:8px 24px;border-radius:999px;border:2px solid #e5e7eb;background:white;color:#374151;font-weight:600;cursor:pointer;font-size:14px">Anual <span style="color:#2E7D32;font-size:12px">Pague 1x · Economize até R$ 624</span></button>
-      </div>
-
-      <div class="plans-grid">
-        <div class="plan-card fade-up">
-          <div class="plan-name">Starter</div>
-          <div class="plan-price" id="price-basic">R$ 60<span>,00</span></div>
-          <div style="font-size:13px;color:#6b7280;margin-top:-8px;margin-bottom:4px" class="price-period">/mês</div>
-          <div class="price-saving" style="display:none;font-size:12px;color:#2E7D32;margin-bottom:8px;font-weight:600">≈ R$ 53,00/mês · economize R$ 84,00</div>
-          <div class="plan-credits">
-            <strong>2.000 créditos/mês</strong>
-            <span>• Até 5 agentes • 200 mensagens ativas/mês</span>
-          </div>
-          <ul class="plan-features">
-            <li>WhatsApp, Instagram, Facebook</li>
-            <li>Widget para sites</li>
-            <li>Intenções com webhook</li>
-            <li>Base de conhecimento</li>
-            <li>API completa</li>
-            <li>Analytics detalhado</li>
-          </ul>
-          <a href="https://app.syncroflow.io/register" class="plan-btn">Começar grátis</a>
-        </div>
-        <div class="plan-card popular fade-up">
-          <div class="popular-badge">⭐ Mais popular</div>
-          <div class="plan-name">Pro</div>
-          <div class="plan-price" id="price-standard">R$ 147<span>,00</span></div>
-          <div style="font-size:13px;color:#6b7280;margin-top:-8px;margin-bottom:4px" class="price-period">/mês</div>
-          <div class="price-saving" style="display:none;font-size:12px;color:#2E7D32;margin-bottom:8px;font-weight:600">≈ R$ 130,00/mês · economize R$ 204,00</div>
-          <div class="plan-credits" style="background:linear-gradient(135deg,#E3F2FD,#E8F5E9)">
-            <strong>5.000 créditos/mês</strong>
-            <span>• Até 15 agentes • 500 mensagens ativas/mês</span>
-          </div>
-          <ul class="plan-features">
-            <li>WhatsApp, Instagram, Facebook</li>
-            <li>Widget para sites</li>
-            <li>Intenções com webhook</li>
-            <li>Base de conhecimento</li>
-            <li>API completa</li>
-            <li>Analytics detalhado</li>
-          </ul>
-          <a href="https://app.syncroflow.io/register" class="plan-btn primary-btn">Começar grátis</a>
-        </div>
-        <div class="plan-card fade-up">
-          <div class="plan-name">Business</div>
-          <div class="plan-price" id="price-corporate">R$ 439<span>,00</span></div>
-          <div style="font-size:13px;color:#6b7280;margin-top:-8px;margin-bottom:4px" class="price-period">/mês</div>
-          <div class="price-saving" style="display:none;font-size:12px;color:#2E7D32;margin-bottom:8px;font-weight:600">≈ R$ 387,00/mês · economize R$ 624,00</div>
-          <div class="plan-credits">
-            <strong>15.000 créditos/mês</strong>
-            <span>• Até 40 agentes • 1.500 mensagens ativas/mês</span>
-          </div>
-          <ul class="plan-features">
-            <li>WhatsApp, Instagram, Facebook</li>
-            <li>Widget para sites</li>
-            <li>Intenções com webhook</li>
-            <li>Base de conhecimento</li>
-            <li>API completa</li>
-            <li>Analytics detalhado</li>
-          </ul>
-          <a href="https://app.syncroflow.io/register" class="plan-btn">Começar grátis</a>
-        </div>
-      </div>
-      <p style="text-align:center;margin-top:32px;font-size:14px;color:var(--gray-600)">
-        Precisa de mais volume? <a href="https://wa.me/5532988290229" style="color:var(--blue);font-weight:600">Fale com a gente →</a>
-      </p>
-    </div>
-  </section>
-
-  <script>
-    const prices = {
-      mensal: { basic: 'R$ 60<span>,00</span>',  standard: 'R$ 147<span>,00</span>',  corporate: 'R$ 439<span>,00</span>'  },
-      anual:  { basic: 'R$ 636<span>,00</span>', standard: 'R$ 1.560<span>,00</span>', corporate: 'R$ 4.644<span>,00</span>' }
-    }
-    function setPlanCycle(cycle) {
-      document.getElementById('price-basic').innerHTML = prices[cycle].basic
-      document.getElementById('price-standard').innerHTML = prices[cycle].standard
-      document.getElementById('price-corporate').innerHTML = prices[cycle].corporate
-      // Atualiza label /mês ou /ano
-      document.querySelectorAll('.price-period').forEach(el => {
-        el.textContent = cycle === 'anual' ? '/ano (à vista)' : '/mês'
-      })
-      // Mostra/oculta nota de economia anual
-      document.querySelectorAll('.price-saving').forEach(el => {
-        el.style.display = cycle === 'anual' ? 'block' : 'none'
-      })
-      document.getElementById('btn-mensal').style.background = cycle === 'mensal' ? '#1565C0' : 'white'
-      document.getElementById('btn-mensal').style.color = cycle === 'mensal' ? 'white' : '#374151'
-      document.getElementById('btn-mensal').style.borderColor = cycle === 'mensal' ? '#1565C0' : '#e5e7eb'
-      document.getElementById('btn-anual').style.background = cycle === 'anual' ? '#1565C0' : 'white'
-      document.getElementById('btn-anual').style.color = cycle === 'anual' ? 'white' : '#374151'
-      document.getElementById('btn-anual').style.borderColor = cycle === 'anual' ? '#1565C0' : '#e5e7eb'
-    }
-  </script>
-
-  <!-- FAQ -->
-  <section class="faq" id="faq">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">FAQ</span>
-        <h2>Perguntas <span class="gradient-text">frequentes</span></h2>
-        <p>Tudo que você precisa saber antes de começar.</p>
-      </div>
-      <div class="faq-list fade-up">
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Preciso de conhecimento técnico para configurar o SyncroFlow?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Não. O SyncroFlow foi desenvolvido para ser usado por qualquer pessoa, sem precisar saber programar. A configuração é visual, intuitiva e leva menos de 30 minutos. Se precisar de ajuda, nosso suporte está disponível por WhatsApp.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            O SyncroFlow funciona com meu número de WhatsApp atual?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Sim. Você pode conectar seu número de WhatsApp Business existente. Não é necessário trocar de número nem de chip. A integração é feita pelo WhatsApp Business API oficial.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Meus clientes vão saber que é um robô respondendo?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>O SyncroFlow usa inteligência artificial avançada que conversa de forma natural e humanizada. Você configura o nome, a personalidade e o tom do seu atendente virtual. A maioria dos clientes não percebe diferença.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            O que acontece se o cliente fizer uma pergunta que o agente não sabe responder?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Você configura exatamente o que o agente deve fazer nessa situação: redirecionar para um atendente humano, pedir para o cliente aguardar, ou enviar uma mensagem personalizada. Você tem controle total.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Posso usar o SyncroFlow no Instagram e no Facebook também?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Sim. O SyncroFlow atende nos três canais simultaneamente: WhatsApp, Instagram Direct e Facebook Messenger. Todas as conversas ficam centralizadas em um único painel.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            E se eu precisar cancelar? Tem multa ou fidelidade?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Não. O SyncroFlow não tem fidelidade nem multa de cancelamento. Você pode cancelar a qualquer momento pelo painel, sem burocracia. Cobramos apenas pelo período utilizado.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            O trial de 14 dias é realmente gratuito? Preciso de cartão de crédito?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Sim, totalmente gratuito e sem necessidade de cartão de crédito. Você acessa todas as funcionalidades durante 14 dias. Só pedimos seu e-mail e número de WhatsApp para começar.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Quantas mensagens o SyncroFlow consegue responder por dia?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Não há limite de mensagens. O SyncroFlow responde todos os seus clientes simultaneamente, 24 horas por dia, 7 dias por semana, sem atrasos, independente do volume.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Meus dados e os dados dos meus clientes ficam seguros?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Sim. Todos os dados são armazenados com criptografia e seguimos as diretrizes da LGPD (Lei Geral de Proteção de Dados). Seus dados nunca são compartilhados com terceiros.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question" onclick="toggleFaq(this)">
-            Qual a diferença entre o SyncroFlow e um chatbot comum?
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Chatbots comuns seguem um roteiro fixo de perguntas e respostas. O SyncroFlow usa IA generativa (a mesma tecnologia do ChatGPT) para entender a intenção do cliente e responder de forma contextual, como um atendente humano treinado. Além disso, ele aprende com as interações ao longo do tempo.</p>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="faq-cta fade-up">
-        <p>Ainda tem dúvidas? Fale com a gente agora pelo WhatsApp →</p>
-        <a href="https://app.syncroflow.io/register" class="btn-primary">Testar Grátis por 14 Dias →</a>
-      </div>
-    </div>
-  </section>
-
-  <script>
-    function toggleFaq(btn) {
-      const item = btn.closest('.faq-item')
-      const answer = item.querySelector('.faq-answer')
-      const isOpen = item.classList.contains('open')
-      // Fecha todos
-      document.querySelectorAll('.faq-item.open').forEach(el => {
-        el.classList.remove('open')
-        el.querySelector('.faq-answer').style.maxHeight = null
-      })
-      // Abre o clicado se estava fechado
-      if (!isOpen) {
-        item.classList.add('open')
-        answer.style.maxHeight = answer.scrollHeight + 'px'
-      }
-    }
-  </script>
-
-  <!-- TESTIMONIALS -->
-  <section class="testimonials">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Depoimentos</span>
-        <h2>Quem já usa o <span class="gradient-text">SyncroFlow</span></h2>
-      </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card fade-up">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"Reduzi 80% do tempo de atendimento. O agente responde na hora, minha equipe só entra para fechar a venda."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar" style="background:linear-gradient(135deg,#1565C0,#2E7D32)">M</div>
-            <div>
-              <div class="author-name">Ana Paula Mendes</div>
-              <div class="author-role">Advogada · São Paulo</div>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card fade-up">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"Configurei em 20 minutos e já estava atendendo no WhatsApp. Nunca pensei que seria tão simples integrar IA no meu negócio."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar" style="background:linear-gradient(135deg,#2E7D32,#29B6F6)">A</div>
-            <div>
-              <div class="author-name">Leticia Pimentel</div>
-              <div class="author-role">Engenheira · BH</div>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card fade-up">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"Revendo o SyncroFlow para meus clientes. A margem é boa e o produto é sólido. Suporte da equipe é excelente."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar" style="background:linear-gradient(135deg,#0D47A1,#4CAF50)">R</div>
-            <div>
-              <div class="author-name">Marcio Tedesco</div>
-              <div class="author-role">Empresário · RJ</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SEGURANÇA -->
-  <section class="security-section" id="seguranca">
-    <div class="container">
-      <div class="section-header fade-up">
-        <span class="section-label">Segurança</span>
-        <h2>Construído sobre bases sólidas</h2>
-        <p>Seus dados e os dos seus clientes protegidos com as melhores práticas do mercado — criptografia, autenticação segura e conformidade com a LGPD.</p>
-      </div>
-    </div>
-
-    <!-- Carrossel 1: badges (direita → esquerda) -->
-    <div class="marquee-outer" style="margin-top:48px">
-      <div class="marquee-track">
-        <!-- bloco 1 -->
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🔒</div><span>LGPD</span><small>Conformidade com a Lei Geral de Proteção de Dados brasileira</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">🛡️</div><span>AES-256</span><small>Criptografia militar para chaves e tokens armazenados</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(255,255,255,0.12)">🔑</div><span>JWT + OAuth2</span><small>Tokens de curta duração com refresh seguro</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🌐</div><span>HTTPS / TLS 1.3</span><small>Comunicação criptografada ponta-a-ponta</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">👥</div><span>RBAC</span><small>5 papéis: Owner, Admin, Membro, Agente, Viewer</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(255,255,255,0.12)">📋</div><span>Auditoria</span><small>Log completo de todas as ações sensíveis</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🚦</div><span>Rate Limiting</span><small>Máx. 10 tentativas de login por 15 min por IP</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">🔐</div><span>Senha Forte</span><small>Maiúscula + número + mínimo 8 caracteres obrigatório</small></div>
-        <!-- bloco 2 (cópia para loop infinito) -->
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🔒</div><span>LGPD</span><small>Conformidade com a Lei Geral de Proteção de Dados brasileira</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">🛡️</div><span>AES-256</span><small>Criptografia militar para chaves e tokens armazenados</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(255,255,255,0.12)">🔑</div><span>JWT + OAuth2</span><small>Tokens de curta duração com refresh seguro</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🌐</div><span>HTTPS / TLS 1.3</span><small>Comunicação criptografada ponta-a-ponta</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">👥</div><span>RBAC</span><small>5 papéis: Owner, Admin, Membro, Agente, Viewer</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(255,255,255,0.12)">📋</div><span>Auditoria</span><small>Log completo de todas as ações sensíveis</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(105,240,174,0.15)">🚦</div><span>Rate Limiting</span><small>Máx. 10 tentativas de login por 15 min por IP</small></div>
-        <div class="security-card"><div class="security-card-icon" style="background:rgba(41,182,246,0.15)">🔐</div><span>Senha Forte</span><small>Maiúscula + número + mínimo 8 caracteres obrigatório</small></div>
-      </div>
-    </div>
-
-    <!-- Carrossel 2: pills (esquerda → direita, reverso) -->
-    <div class="marquee-outer-2" style="margin-top:20px">
-      <div class="marquee-track-2">
-        <div class="security-pill"><span class="dot"></span>Dados no Brasil — Supabase SA-EAST-1</div>
-        <div class="security-pill"><span class="dot"></span>Senhas com bcrypt (salt 12)</div>
-        <div class="security-pill"><span class="dot"></span>API Keys criptografadas no banco</div>
-        <div class="security-pill"><span class="dot"></span>Zero acesso da SyncroFlow às suas mensagens</div>
-        <div class="security-pill"><span class="dot"></span>Isolamento total por workspace</div>
-        <div class="security-pill"><span class="dot"></span>Headers HSTS + X-Frame-Options</div>
-        <div class="security-pill"><span class="dot"></span>JWT expira em 15 minutos</div>
-        <div class="security-pill"><span class="dot"></span>Dados no Brasil — Supabase SA-EAST-1</div>
-        <div class="security-pill"><span class="dot"></span>Senhas com bcrypt (salt 12)</div>
-        <div class="security-pill"><span class="dot"></span>API Keys criptografadas no banco</div>
-        <div class="security-pill"><span class="dot"></span>Zero acesso da SyncroFlow às suas mensagens</div>
-        <div class="security-pill"><span class="dot"></span>Isolamento total por workspace</div>
-        <div class="security-pill"><span class="dot"></span>Headers HSTS + X-Frame-Options</div>
-        <div class="security-pill"><span class="dot"></span>JWT expira em 15 minutos</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="container" style="position:relative;z-index:1">
-      <div class="fade-up">
-        <h2>Pronto para automatizar<br>seu atendimento?</h2>
-        <p>Comece grátis hoje. 14 dias de trial, 1.000 créditos inclusos, sem cartão de crédito.</p>
-        <div class="cta-btns">
-          <a href="https://app.syncroflow.io/register" class="btn-white">🚀 Criar conta grátis</a>
-          <a href="https://wa.me/5532988290229" class="btn-ghost" target="_blank">💬 Falar no WhatsApp</a>
-        </div>
-        <p style="margin-top:20px;font-size:13px;opacity:0.6">✓ Sem cartão &nbsp; ✓ Cancele a qualquer momento &nbsp; ✓ Suporte incluso</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
   <footer>
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="#" class="logo" style="text-decoration:none">
-            <img src="logotipo-sem-fundo.png" style="height:44px;width:auto;filter:brightness(0) invert(1);" alt="SyncroFlow" />
-          </a>
-          <p>Plataforma SaaS de atendimento omnichannel com IA. Desenvolvido no Brasil para o mercado brasileiro.</p>
-        </div>
-        <div class="footer-col">
-          <h4>Produto</h4>
-          <ul>
-            <li><a href="#recursos">Recursos</a></li>
-            <li><a href="#planos">Planos e preços</a></li>
-            <li><a href="#como-funciona">Como funciona</a></li>
-            <li><a href="https://app.syncroflow.io/register">Teste grátis</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Canais</h4>
-          <ul>
-            <li><a href="#">WhatsApp</a></li>
-            <li><a href="#">Instagram</a></li>
-            <li><a href="#">Facebook</a></li>
-            <li><a href="#">Telegram</a></li>
-            <li><a href="#">LinkedIn</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Empresa</h4>
-          <ul>
-            <li><a href="https://www.nuclick.com.br" target="_blank">NuClick</a></li>
-            <li><a href="mailto:contato@nuclick.com.br">Contato</a></li>
-            <li><a href="/termos.html">Termos de uso</a></li>
-            <li><a href="/privacidade.html">Privacidade</a></li>
-          </ul>
-        </div>
+    <div class="footer-inner">
+      <div class="footer-col">
+        <h4>Produto</h4>
+        <a href="#como-funciona">Como Funciona</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#precos">Preços</a>
       </div>
-      <div class="footer-bottom">
-        <p>© 2026 SyncroFlow · NuClick Tecnologia. Todos os direitos reservados.</p>
-        <span class="footer-tagline">Atendimento Inteligente. Fluxo que Conecta.</span>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="/termos.html">Termos de Uso</a>
+        <a href="/privacidade.html">Política de Privacidade</a>
+        <a href="/exclusao-dados.html">Exclusão de Dados</a>
       </div>
+      <div class="footer-col">
+        <h4>Contato</h4>
+        <a href="mailto:contato@syncroflow.com"><!-- TODO: substituir pelo e-mail do SyncroFlowEleições --></a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      Em conformidade com a Resolução TSE nº 23.755/2026 · SyncroFlowEleições © 2026
     </div>
   </footer>
 
-  <script>
-    // Navbar scroll
-    const navbar = document.getElementById('navbar')
-    window.addEventListener('scroll', () => {
-      navbar.classList.toggle('scrolled', window.scrollY > 20)
-    })
-
-    // Fade-up / fade-left / fade-right / scale-in on scroll (com delay escalonado por grupo)
-    const animClasses = ['.fade-up', '.fade-left', '.fade-right', '.scale-in']
-    const observer = new IntersectionObserver((entries) => {
-      // Agrupa entradas visíveis por seção pai para escalonar
-      const groups = {}
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return
-        const section = entry.target.closest('section, .stats-bar') || document.body
-        const key = section.id || section.className.split(' ')[0]
-        if (!groups[key]) groups[key] = []
-        groups[key].push(entry.target)
-      })
-      Object.values(groups).forEach(group => {
-        group.forEach((el, i) => {
-          setTimeout(() => el.classList.add('visible'), i * 90)
-          observer.unobserve(el)
-        })
-      })
-    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-
-    document.querySelectorAll(animClasses.join(',')).forEach(el => observer.observe(el))
-
-    // Animação escalonada especial para feature-cards e channel-cards
-    const cardObserver = new IntersectionObserver((entries) => {
-      const visible = entries.filter(e => e.isIntersecting)
-      visible.forEach((entry, i) => {
-        setTimeout(() => {
-          entry.target.style.opacity = '1'
-          entry.target.style.transform = 'translateY(0) scale(1)'
-          cardObserver.unobserve(entry.target)
-        }, i * 80)
-      })
-    }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' })
-
-    document.querySelectorAll('.feature-card, .channel-card').forEach(el => {
-      el.style.opacity = '0'
-      el.style.transform = 'translateY(24px) scale(0.97)'
-      el.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)'
-      cardObserver.observe(el)
-    })
-
-    // Smooth scroll for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-      a.addEventListener('click', e => {
-        const id = a.getAttribute('href')
-        if (id === '#') return
-        const el = document.querySelector(id)
-        if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth' }) }
-      })
-    })
-
-    // Contador animado nos stats
-    const counters = document.querySelectorAll('.stat-item strong')
-    const counterObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return
-        const el = entry.target
-        const text = el.textContent.trim()
-        const num = parseFloat(text.replace(/[^\d.]/g, ''))
-        if (!isNaN(num) && num > 0 && num < 10000) {
-          let start = 0; const duration = 1200
-          const step = timestamp => {
-            if (!start) start = timestamp
-            const progress = Math.min((timestamp - start) / duration, 1)
-            const eased = 1 - Math.pow(1 - progress, 3)
-            el.textContent = text.replace(/[\d.]+/, Math.round(eased * num))
-            if (progress < 1) requestAnimationFrame(step)
-            else el.textContent = text
-          }
-          requestAnimationFrame(step)
-        }
-        counterObserver.unobserve(el)
-      })
-    }, { threshold: 0.5 })
-    counters.forEach(c => counterObserver.observe(c))
-
-    // Animação pulsante no agent-node.active (multi-agentes)
-    setInterval(() => {
-      const nodes = document.querySelectorAll('.agent-node')
-      nodes.forEach(n => n.classList.remove('active'))
-      const idx = Math.floor(Date.now() / 2000) % nodes.length
-      if (nodes[idx]) nodes[idx].classList.add('active')
-    }, 2000)
-  </script>
-
-  <script>
-    // Mobile menu
-    const hamburger = document.getElementById('hamburger-btn')
-    const mobileMenu = document.getElementById('mobile-menu')
-    const mobileClose = document.getElementById('mobile-menu-close')
-    function openMenu() { mobileMenu.classList.add('open'); document.body.style.overflow = 'hidden' }
-    function closeMenu() { mobileMenu.classList.remove('open'); document.body.style.overflow = '' }
-    hamburger.addEventListener('click', openMenu)
-    mobileClose.addEventListener('click', closeMenu)
-    mobileMenu.addEventListener('click', (e) => { if (e.target === mobileMenu) closeMenu() })
-    document.querySelectorAll('.menu-link').forEach(a => a.addEventListener('click', closeMenu))
-  </script>
-
-  <!-- Mascote flutuante tira-dúvidas -->
-  <style>
-    #mascote-btn {
-      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-      width: 68px; height: 68px; border-radius: 50%; overflow: hidden;
-      box-shadow: 0 8px 32px rgba(21,101,192,0.35);
-      border: 3px solid #fff; cursor: pointer;
-      transition: transform 0.2s; background: none;
-    }
-    #mascote-btn:hover { transform: scale(1.1); }
-    #mascote-btn img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-    #mascote-chat {
-      position: fixed; bottom: 104px; right: 24px; z-index: 9999;
-      width: 320px; background: #fff; border-radius: 20px;
-      box-shadow: 0 12px 48px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;
-      display: none; flex-direction: column; overflow: hidden;
-      font-family: 'Inter', sans-serif;
-    }
-    #mascote-chat.open { display: flex; }
-    .mascote-header {
-      background: linear-gradient(135deg, #1565C0, #2E7D32);
-      padding: 14px 16px; display: flex; align-items: center; gap: 10px; color: #fff;
-    }
-    .mascote-header img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; object-position: top; border: 2px solid rgba(255,255,255,0.3); }
-    .mascote-header-info { flex: 1; }
-    .mascote-header-info strong { display: block; font-size: 14px; }
-    .mascote-header-info span { font-size: 11px; opacity: 0.7; }
-    .mascote-close { background: none; border: none; color: #fff; cursor: pointer; font-size: 18px; padding: 2px 6px; border-radius: 50%; }
-    .mascote-close:hover { background: rgba(255,255,255,0.2); }
-    .mascote-body { padding: 16px; font-size: 13px; color: #374151; line-height: 1.6; }
-    .mascote-body p { margin: 0 0 12px; }
-    .mascote-faq { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-    .mascote-faq button {
-      font-size: 11px; padding: 5px 10px; border-radius: 20px;
-      background: #EFF6FF; color: #1565C0; border: 1px solid #BFDBFE;
-      cursor: pointer; font-family: inherit; transition: background 0.15s;
-    }
-    .mascote-faq button:hover { background: #DBEAFE; }
-    .mascote-cta {
-      margin: 12px 16px 16px; display: block; text-align: center;
-      background: linear-gradient(135deg, #1565C0, #2E7D32);
-      color: #fff; font-size: 13px; font-weight: 600; padding: 10px;
-      border-radius: 12px; text-decoration: none; transition: opacity 0.2s;
-    }
-    .mascote-cta:hover { opacity: 0.9; }
-    .mascote-answer { display: none; background: #F3F4F6; border-radius: 12px; padding: 12px; margin-top: 8px; font-size: 12px; line-height: 1.6; }
-    .mascote-answer.visible { display: block; }
-    .mascote-answer strong { color: #1565C0; }
-  </style>
-
-  <button id="mascote-btn" title="Ajuda — SyncroFlow" onclick="toggleMascote()">
-    <img src="https://app.syncroflow.io/mascote.png" alt="Mascote SyncroFlow" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg,#1565C0,#2E7D32)'; this.parentElement.innerHTML='<span style=&quot;color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;height:100%&quot;>🤖</span>'" />
-  </button>
-
-  <div id="mascote-chat">
-    <div class="mascote-header">
-      <img src="https://app.syncroflow.io/mascote.png" alt="" onerror="this.style.display='none'" />
-      <div class="mascote-header-info">
-        <strong>Assistente SyncroFlow</strong>
-        <span>Tira-dúvidas · Suporte</span>
-      </div>
-      <button class="mascote-close" onclick="toggleMascote()">✕</button>
-    </div>
-    <div class="mascote-body">
-      <p>Olá! 👋 Posso te ajudar com dúvidas sobre o SyncroFlow. O que você gostaria de saber?</p>
-      <div class="mascote-faq">
-        <button onclick="showAnswer('q1')">O que é o SyncroFlow?</button>
-        <button onclick="showAnswer('q2')">Como funciona a IA?</button>
-        <button onclick="showAnswer('q3')">Quanto custa?</button>
-        <button onclick="showAnswer('q4')">Tem período grátis?</button>
-        <button onclick="showAnswer('q5')">Funciona no WhatsApp?</button>
-        <button onclick="showAnswer('q6')">Precisa de código?</button>
-      </div>
-      <div id="q1" class="mascote-answer">
-        <strong>SyncroFlow</strong> é uma plataforma de atendimento omnichannel com IA. Você cria agentes inteligentes que atendem seus clientes no WhatsApp, Instagram, Facebook e mais — 24h por dia, sem precisar de código.
-      </div>
-      <div id="q2" class="mascote-answer">
-        O agente usa modelos <strong>Claude (Anthropic)</strong>. Você treina ele com informações da sua empresa e ele responde os clientes de forma natural e humanizada.
-      </div>
-      <div id="q3" class="mascote-answer">
-        Temos planos a partir de <strong>R$ 60/mês</strong> (Starter). Também há plano Pro (R$ 147/mês) e Business (R$ 439/mês). No anual você economiza até R$ 624. Veja todos os detalhes em <a href="#planos" style="color:#1565C0">Planos</a>.
-      </div>
-      <div id="q4" class="mascote-answer">
-        Sim! Ao se cadastrar você ganha <strong>14 dias de trial grátis</strong> com 1.000 créditos inclusos, sem precisar de cartão de crédito.
-      </div>
-      <div id="q5" class="mascote-answer">
-        Sim! O SyncroFlow funciona perfeitamente com <strong>WhatsApp Business</strong>. É só conectar via QR Code no painel — leva menos de 2 minutos.
-      </div>
-      <div id="q6" class="mascote-answer">
-        <strong>Não precisa de nenhum código!</strong> A plataforma é 100% visual. Você configura o agente, treina com textos da sua empresa e conecta os canais pelo painel — tudo sem programação.
-      </div>
-    </div>
-    <a href="https://app.syncroflow.io/register" class="mascote-cta">🚀 Começar grátis agora</a>
-  </div>
-
-  <script>
-    function toggleMascote() {
-      var chat = document.getElementById('mascote-chat')
-      chat.classList.toggle('open')
-    }
-    function showAnswer(id) {
-      document.querySelectorAll('.mascote-answer').forEach(function(el) {
-        el.classList.remove('visible')
-      })
-      document.getElementById(id).classList.add('visible')
-    }
-  </script>
-
-  <!-- Nota para o dev: o evento CompleteRegistration deve ser disparado em app.syncroflow.io/register
-       após o usuário concluir o cadastro (ex: na página de confirmação/sucesso). Exemplo:
-       fbq('track', 'CompleteRegistration');
-       gtag('event', 'sign_up', { method: 'email' });
-       Esse código deve ser adicionado no app Next.js, não aqui na landing.
-  -->
 </body>
 </html>
-

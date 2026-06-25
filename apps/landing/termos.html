@@ -3,46 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Termos de Uso — SyncroFlow</title>
-  <meta name="description" content="Termos e Condições de Uso da plataforma SyncroFlow." />
+  <title>Termos de Uso — SyncroFlowEleições</title>
+  <meta name="description" content="Termos e Condições de Uso da plataforma SyncroFlowEleições." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', sans-serif; color: #0F172A; background: #F8FAFC; line-height: 1.7; }
-    .topbar {
-      background: white; border-bottom: 1px solid #E2E8F0; padding: 16px 0; position: sticky; top: 0; z-index: 10;
-    }
+    .topbar { background: white; border-bottom: 1px solid #E2E8F0; padding: 16px 0; position: sticky; top: 0; z-index: 10; }
     .topbar-inner { max-width: 860px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
-    .logo-link { text-decoration: none; display: flex; align-items: center; gap: 8px; }
-    .logo-link img { display: block; }
-    .back-link { font-size: 14px; color: #1565C0; text-decoration: none; font-weight: 500; }
+    .logo-link { text-decoration: none; font-weight: 800; color: #002776; font-size: 18px; }
+    .logo-link span { color: #009C3B; }
+    .back-link { font-size: 14px; color: #002776; text-decoration: none; font-weight: 500; }
     .back-link:hover { text-decoration: underline; }
     .container { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
     .doc-header { margin-bottom: 40px; padding-bottom: 32px; border-bottom: 2px solid #E2E8F0; }
     .doc-header h1 { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
     .doc-header .meta { font-size: 14px; color: #64748B; }
-    .doc-header .meta strong { color: #1565C0; }
-    h2 { font-size: 20px; font-weight: 700; margin: 40px 0 12px; color: #0D47A1; }
-    h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; color: #1565C0; }
+    .doc-header .meta strong { color: #002776; }
+    h2 { font-size: 20px; font-weight: 700; margin: 40px 0 12px; color: #002776; }
     p { margin-bottom: 14px; color: #334155; }
     ul, ol { margin: 8px 0 16px 24px; color: #334155; }
     li { margin-bottom: 6px; }
-    a { color: #1565C0; }
-    .highlight { background: #EFF6FF; border-left: 4px solid #1565C0; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+    a { color: #002776; }
+    .highlight { background: #F0F9F4; border-left: 4px solid #009C3B; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
     .highlight p { margin: 0; font-size: 15px; }
+    .todo { background: #FEF3C7; border-left: 4px solid #D97706; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 13px; color: #92400E; font-weight: 600; }
     footer { background: #0F172A; color: rgba(255,255,255,0.5); text-align: center; padding: 24px; font-size: 13px; }
-    footer a { color: #69F0AE; text-decoration: none; }
+    footer a { color: #FFDF00; text-decoration: none; }
   </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="topbar-inner">
-    <a href="/" class="logo-link">
-      <img src="/icone.png" alt="" style="height:40px;width:auto;mix-blend-mode:multiply;" />
-      <img src="/logotipo.png" alt="SyncroFlow" style="height:28px;width:auto;mix-blend-mode:multiply;" />
-    </a>
+    <a href="/" class="logo-link">SyncroFlow<span>Eleições</span></a>
     <a href="/" class="back-link">← Voltar ao site</a>
   </div>
 </div>
@@ -50,108 +45,85 @@
 <div class="container">
   <div class="doc-header">
     <h1>Termos e Condições de Uso</h1>
-    <p class="meta">Última atualização: <strong>21 de junho de 2026</strong> &nbsp;|&nbsp; Versão 1.1</p>
+    <p class="meta">Última atualização: <strong><!-- TODO: data real da publicação --></strong> &nbsp;|&nbsp; Versão 1.0</p>
   </div>
 
+  <div class="todo">⚠️ TODO JURÍDICO: este documento é um placeholder estrutural. Deve ser revisado por advogado especializado em direito eleitoral e LGPD antes da publicação — em especial as cláusulas de responsabilidade do agente de IA e o tratamento de dados de eleitores.</div>
+
   <div class="highlight">
-    <p>Leia estes Termos com atenção antes de usar a plataforma SyncroFlow. Ao criar uma conta ou utilizar qualquer funcionalidade, você concorda integralmente com estas condições.</p>
+    <p>Leia estes Termos com atenção antes de usar a plataforma SyncroFlowEleições. Ao criar uma conta ou utilizar qualquer funcionalidade, você (o candidato ou sua equipe de campanha) concorda integralmente com estas condições.</p>
   </div>
 
   <h2>1. Das Partes</h2>
-  <p><strong>Contratada:</strong> NuClick Tecnologia, pessoa jurídica com atividade em tecnologia da informação, responsável pela operação da plataforma SyncroFlow, acessível em <a href="https://syncroflow.io">syncroflow.io</a> e <a href="https://app.syncroflow.io">app.syncroflow.io</a>.</p>
-  <p><strong>Contratante (Usuário):</strong> Pessoa física ou jurídica que cria uma conta e utiliza os serviços da plataforma SyncroFlow.</p>
+  <p><strong>Contratada:</strong> <!-- TODO: razão social, CNPJ e endereço do operador --> ("SyncroFlowEleições"), responsável pela operação da plataforma, acessível em <!-- TODO: domínio definitivo -->.</p>
+  <p><strong>Contratante (Usuário):</strong> Candidato(a) a cargo eletivo, ou pessoa por ele(a) autorizada, que cria uma conta e utiliza os serviços da plataforma para fins de campanha eleitoral.</p>
 
   <h2>2. Do Objeto</h2>
-  <p>A SyncroFlow é uma plataforma SaaS (Software as a Service) de atendimento omnichannel com inteligência artificial. O serviço permite ao Usuário criar, configurar e operar agentes de IA para atendimento automatizado via WhatsApp, Instagram, Facebook e outros canais, além de gerenciar conversas, treinar bases de conhecimento e obter relatórios de desempenho.</p>
+  <p>O SyncroFlowEleições é uma plataforma de assistente virtual com inteligência artificial destinada exclusivamente a campanhas eleitorais. O serviço permite ao candidato cadastrar sua trajetória e propostas, conectar canais de atendimento (WhatsApp, Instagram, Facebook, Telegram, e-mail) e operar um assistente que informa eleitores sobre propostas e compromissos de agenda, registra solicitações e gera relatórios.</p>
 
-  <h2>2.1. Da Conexão Oficial com WhatsApp, Instagram e Facebook</h2>
-  <p>A SyncroFlow conecta-se ao WhatsApp Business Platform, Instagram e Facebook Messenger exclusivamente por meio das APIs oficiais da Meta (Meta Cloud API), atuando como Provedor de Tecnologia (Tech Provider) autorizado pela Meta. A conexão do canal do Usuário é feita pelo fluxo oficial de integração (Embedded Signup), sem uso de ferramentas, bibliotecas ou serviços não homologados pela Meta para automação de mensagens.</p>
+  <h2>2.1. Conformidade com a Resolução TSE nº 23.755/2026</h2>
+  <p>O Usuário declara estar ciente de que o uso da plataforma deve observar, a todo momento, a Resolução TSE nº 23.755/2026, incluindo: (i) identificação obrigatória do assistente como ferramenta automatizada em toda primeira interação; (ii) proibição de uso do assistente para recomendar voto; (iii) restrição do conteúdo gerado ao que foi expressamente cadastrado pelo candidato; (iv) desativação automática do assistente 72 horas antes de cada turno eleitoral; (v) vedação ao uso de conteúdo sintético (deepfake) do candidato.</p>
+
+  <h2>2.2. Da Conexão Oficial com WhatsApp, Instagram e Facebook</h2>
+  <p>O SyncroFlowEleições conecta-se ao WhatsApp Business Platform, Instagram e Facebook Messenger exclusivamente por meio das APIs oficiais da Meta (Meta Cloud API), sem uso de ferramentas não homologadas para automação de mensagens.</p>
 
   <h2>3. Do Cadastro e da Conta</h2>
   <ul>
-    <li>O cadastro é permitido a maiores de 18 anos ou pessoas jurídicas devidamente constituídas.</li>
-    <li>O Usuário é responsável pela veracidade de todas as informações fornecidas no cadastro.</li>
-    <li>As credenciais de acesso (e-mail e senha) são pessoais e intransferíveis. O Usuário é o único responsável por manter sua senha segura.</li>
-    <li>Em caso de uso não autorizado da conta, o Usuário deve notificar imediatamente a SyncroFlow pelo e-mail <a href="mailto:contato@nuclick.com.br">contato@nuclick.com.br</a>.</li>
-    <li>A SyncroFlow reserva-se o direito de recusar ou cancelar cadastros que violem estes Termos.</li>
+    <li>O cadastro é restrito a candidatos(as) a cargo eletivo ou seus representantes legalmente autorizados.</li>
+    <li>O Usuário é responsável pela veracidade das informações fornecidas no cadastro, incluindo CPF e número de candidato.</li>
+    <li>As credenciais de acesso são pessoais e intransferíveis.</li>
+    <li><!-- TODO: e-mail/canal de suporte real --></li>
   </ul>
 
-  <h2>4. Do Período de Trial</h2>
-  <p>Novos usuários têm acesso a um período de avaliação gratuita com créditos limitados, conforme informado na plataforma no momento do cadastro. Ao término do trial, a continuidade do uso requer a contratação de um plano pago. Não há cobrança automática ao final do trial sem consentimento explícito do Usuário.</p>
+  <h2>4. Da Criação da Conta e do Pagamento</h2>
+  <p>A conta do candidato só é efetivamente criada após a confirmação do pagamento da assinatura escolhida (Plano Campanha ou Plano Mandato). Não há período de avaliação gratuita.</p>
 
   <h2>5. Dos Planos e Pagamentos</h2>
   <ul>
-    <li>Os planos pagos, valores e benefícios estão descritos na página de preços em <a href="https://syncroflow.io/#planos">syncroflow.io/#planos</a>.</li>
-    <li>Os pagamentos são processados por meio de plataformas de pagamento seguras (Stripe). A SyncroFlow não armazena dados de cartão de crédito.</li>
-    <li>A assinatura é cobrada de forma recorrente (mensal ou anual, conforme a escolha do Usuário) e renovada automaticamente até cancelamento.</li>
-    <li>O cancelamento pode ser feito a qualquer momento pelo painel do Usuário. O acesso permanece ativo até o fim do período já pago.</li>
+    <li><!-- TODO: valores e condições dos planos Campanha/Mandato --></li>
+    <li>Os pagamentos são processados por meio de plataforma de pagamento segura (Stripe). O SyncroFlowEleições não armazena dados de cartão de crédito.</li>
+    <li>O plano inclui uma cota de mensagens ativas por ciclo; mensagens passivas (respostas a eleitores que escrevem primeiro) nunca são limitadas.</li>
     <li>Não há reembolso de períodos já utilizados, salvo nas hipóteses previstas no Código de Defesa do Consumidor (CDC).</li>
   </ul>
 
-  <h2>6. Do Sistema de Créditos</h2>
-  <p>A plataforma opera com um sistema de créditos para uso dos modelos de IA. Cada plano inclui uma quantidade mensal de créditos. Créditos não utilizados não são acumulados para o mês seguinte. Créditos avulsos podem ser adquiridos separadamente e possuem validade conforme informado no momento da compra.</p>
-
-  <h2>7. Das Obrigações do Usuário</h2>
+  <h2>6. Das Obrigações do Usuário</h2>
   <p>O Usuário compromete-se a:</p>
   <ul>
-    <li>Utilizar a plataforma apenas para finalidades lícitas e em conformidade com a legislação brasileira vigente.</li>
-    <li>Não usar a plataforma para envio de spam, conteúdo fraudulento, enganoso, discriminatório ou ilegal.</li>
-    <li>Respeitar as políticas de uso das plataformas de mensagens integradas (WhatsApp Business API, Meta, etc.).</li>
-    <li>Obter o consentimento adequado de seus próprios usuários e clientes antes de coletar e processar dados pessoais via SyncroFlow, em conformidade com a LGPD.</li>
-    <li>Não realizar engenharia reversa, copiar, modificar ou distribuir qualquer parte do software da SyncroFlow.</li>
-    <li>Não utilizar a plataforma para sobrecarregar intencionalmente a infraestrutura (ataques de negação de serviço ou similares).</li>
+    <li>Utilizar a plataforma apenas para finalidades lícitas, em conformidade com a legislação eleitoral e civil brasileira.</li>
+    <li>Não utilizar o assistente para atacar adversários políticos, disseminar desinformação ou conteúdo difamatório.</li>
+    <li>Não remover ou alterar a identificação obrigatória do assistente como ferramenta automatizada.</li>
+    <li>Obter consentimento adequado dos eleitores antes de tratar seus dados pessoais, em conformidade com a LGPD.</li>
+    <li>Não realizar engenharia reversa, copiar ou distribuir qualquer parte do software.</li>
   </ul>
 
-  <h2>8. Das Responsabilidades da SyncroFlow</h2>
-  <p>A SyncroFlow compromete-se a:</p>
+  <h2>7. Das Responsabilidades do SyncroFlowEleições</h2>
+  <p>O SyncroFlowEleições compromete-se a manter a plataforma disponível com esforço razoável, proteger os dados do Usuário conforme a Política de Privacidade, e preservar o log de auditoria imutável das conversas durante o período eleitoral, conforme exigido pela Resolução TSE.</p>
+  <p>O SyncroFlowEleições <strong>não se responsabiliza</strong> por respostas do assistente fora do escopo configurado pelo Usuário, por bloqueios aplicados por plataformas de terceiros (Meta, WhatsApp), nem por uso indevido da conta por terceiros com acesso autorizado pelo próprio Usuário.</p>
+
+  <h2>8. Da Propriedade Intelectual</h2>
+  <p>A tecnologia, interface e marca do SyncroFlowEleições são de propriedade exclusiva da contratada. Os dados, textos e materiais inseridos pelo candidato (história, propostas, configurações) permanecem de propriedade do Usuário.</p>
+
+  <h2>9. Da Confidencialidade</h2>
+  <p>O SyncroFlowEleições trata as informações da campanha do Usuário como confidenciais e não as compartilha com terceiros, salvo nas hipóteses previstas na Política de Privacidade, determinação judicial ou solicitação do TSE.</p>
+
+  <h2>10. Da Suspensão e Rescisão</h2>
+  <p>O SyncroFlowEleições pode suspender o acesso do Usuário em caso de violação destes Termos, uso ilegal da plataforma, inadimplência, ou determinação de autoridade eleitoral competente.</p>
+
+  <h2>11. Das Alterações nos Termos</h2>
+  <p>Estes Termos podem ser atualizados periodicamente, com comunicação ao Usuário com antecedência mínima de 15 dias.</p>
+
+  <h2>12. Do Foro e da Lei Aplicável</h2>
+  <p>Estes Termos são regidos pelas leis da República Federativa do Brasil, incluindo a legislação eleitoral aplicável. Fica eleito o foro da comarca de domicílio do Usuário para resolução de controvérsias, conforme o Código de Defesa do Consumidor.</p>
+
+  <h2>13. Do Contato</h2>
+  <p>Para dúvidas, solicitações ou notificações relacionadas a estes Termos:</p>
   <ul>
-    <li>Manter a plataforma disponível com esforço razoável, visando mínimo de 99% de uptime mensal.</li>
-    <li>Notificar o Usuário com antecedência razoável sobre manutenções programadas.</li>
-    <li>Proteger os dados do Usuário conforme descrito na Política de Privacidade.</li>
-    <li>Suportar o Usuário por meio dos canais de atendimento disponibilizados.</li>
-  </ul>
-  <p>A SyncroFlow <strong>não se responsabiliza</strong> por:</p>
-  <ul>
-    <li>Respostas geradas pelos modelos de IA que sejam imprecisas, incompletas ou inadequadas ao contexto.</li>
-    <li>Bloqueios, restrições ou banimentos aplicados por plataformas de terceiros (WhatsApp, Meta, Instagram, etc.).</li>
-    <li>Perdas decorrentes de uso indevido da plataforma pelo Usuário ou por terceiros com acesso à conta do Usuário.</li>
-    <li>Indisponibilidade de serviços de terceiros (provedores de IA, plataformas de mensagens, serviços de pagamento).</li>
-  </ul>
-
-  <h2>9. Da Propriedade Intelectual</h2>
-  <p>Toda a tecnologia, interface, marca, logotipos e conteúdos da SyncroFlow são de propriedade exclusiva da NuClick Tecnologia. O Usuário recebe uma licença de uso limitada, não exclusiva e intransferível durante o período de vigência da assinatura.</p>
-  <p>Os dados, textos e materiais inseridos pelo Usuário na plataforma (bases de conhecimento, mensagens, configurações) permanecem de propriedade do Usuário.</p>
-
-  <h2>10. Da Confidencialidade</h2>
-  <p>A SyncroFlow trata as informações de negócio do Usuário como confidenciais e não as compartilha com terceiros, salvo nas hipóteses previstas na Política de Privacidade ou por determinação legal.</p>
-
-  <h2>11. Da Suspensão e Rescisão</h2>
-  <p>A SyncroFlow pode suspender ou encerrar o acesso do Usuário, sem aviso prévio, nos seguintes casos:</p>
-  <ul>
-    <li>Violação de qualquer cláusula destes Termos.</li>
-    <li>Uso da plataforma para atividades ilegais ou fraudulentas.</li>
-    <li>Inadimplência no pagamento da assinatura após notificação.</li>
-    <li>Solicitação de autoridades competentes.</li>
-  </ul>
-  <p>O Usuário pode encerrar sua conta a qualquer momento pelo painel de configurações ou pelo e-mail <a href="mailto:contato@nuclick.com.br">contato@nuclick.com.br</a>.</p>
-
-  <h2>12. Das Alterações nos Termos</h2>
-  <p>A SyncroFlow pode atualizar estes Termos periodicamente. Alterações relevantes serão comunicadas por e-mail ou por aviso na plataforma com antecedência mínima de 15 dias. O uso continuado da plataforma após a vigência das novas condições implica aceitação.</p>
-
-  <h2>13. Do Foro e da Lei Aplicável</h2>
-  <p>Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca de domicílio do Usuário, conforme previsto no Código de Defesa do Consumidor, para resolução de quaisquer controvérsias decorrentes deste instrumento.</p>
-
-  <h2>14. Do Contato</h2>
-  <p>Para dúvidas, solicitações ou notificações relacionadas a estes Termos, entre em contato:</p>
-  <ul>
-    <li>E-mail: <a href="mailto:contato@nuclick.com.br">contato@nuclick.com.br</a></li>
-    <li>WhatsApp: <a href="https://wa.me/5532988290229" target="_blank">(32) 98829-0229</a></li>
-    <li>Site: <a href="https://syncroflow.io">syncroflow.io</a></li>
+    <li>E-mail: <!-- TODO: e-mail de contato real --></li>
   </ul>
 </div>
 
 <footer>
-  <p>© 2026 SyncroFlow · NuClick Tecnologia · <a href="/privacidade.html">Política de Privacidade</a> · <a href="/termos.html">Termos de Uso</a></p>
+  <p>© 2026 SyncroFlowEleições · <a href="/privacidade.html">Política de Privacidade</a> · <a href="/termos.html">Termos de Uso</a></p>
 </footer>
 
 </body>
