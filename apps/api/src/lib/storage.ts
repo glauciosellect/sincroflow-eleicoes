@@ -1,6 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import ws from 'ws'
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Usamos só o Storage (upload de criativos), nunca o Realtime — mas o client
+// do Supabase instancia um RealtimeClient internamente de qualquer forma, que
+// exige WebSocket nativo (só disponível a partir do Node 22). Em runtimes
+// Node 20 isso quebra o boot a menos que um transport seja fornecido explicitamente.
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  realtime: { transport: ws as any },
+})
 
 const BUCKET = 'creatives'
 
