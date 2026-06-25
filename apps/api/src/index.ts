@@ -28,12 +28,14 @@ import { rbacRoutes } from './modules/rbac/rbac.routes'
 import { statusRoutes } from './modules/status/status.routes'
 import { complianceRoutes } from './modules/compliance/compliance.routes'
 import { requestRoutes } from './modules/requests/requests.routes'
+import { eventRoutes } from './modules/events/events.routes'
 import { alertRoutes } from './modules/alerts/alerts.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
 import { startEmailPollingWorker } from './modules/channels/email/email-poll.worker'
 import { startComplianceWorker } from './modules/compliance/compliance.worker'
+import { startCalendarSyncWorker } from './modules/calendar/calendar-sync.worker'
 import { initSocket } from './lib/socket'
 
 const app = Fastify({ logger: process.env.NODE_ENV === 'development' })
@@ -113,6 +115,7 @@ async function bootstrap() {
   await app.register(conversationRoutes)
   await app.register(contactRoutes)
   await app.register(requestRoutes)
+  await app.register(eventRoutes)
   await app.register(alertRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
@@ -137,6 +140,7 @@ async function bootstrap() {
   startEmailPollingWorker()
   startComplianceWorker()
   startAlertsWorker()
+  startCalendarSyncWorker()
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })

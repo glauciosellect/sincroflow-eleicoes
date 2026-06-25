@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -22,6 +22,7 @@ const navItems = [
   { section: 'ATENDIMENTO', items: [
     { href: '/chat', label: 'Chat', icon: MessageSquare, module: 'chat' },
     { href: '/contacts', label: 'Contatos', icon: Contact, module: 'contacts' },
+    { href: '/solicitacoes', label: 'Solicitações', icon: FileWarning, module: 'chat' },
   ] },
   { section: 'AGENDA', items: [{ href: '/agenda', label: 'Agenda', icon: CalendarDays, module: 'agenda' }] },
   { section: 'GESTÃO', items: [

@@ -9,11 +9,12 @@ export async function requestRoutes(app: FastifyInstance) {
   app.get('/requests', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { status, search, page = '1', limit = '20' } = req.query as Record<string, string>
+    const { status, search, contactId, page = '1', limit = '20' } = req.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
     const where: any = { candidateId }
     if (status) where.status = status
+    if (contactId) where.contactId = contactId
     if (search) where.OR = [
       { protocolNumber: { contains: search, mode: 'insensitive' } },
       { subject: { contains: search, mode: 'insensitive' } },
