@@ -1,5 +1,5 @@
 'use client'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
@@ -7,106 +7,28 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Check, Coins, Loader2, Zap, AlertTriangle, ExternalLink, CreditCard, MessageSquare } from 'lucide-react'
+import { Check, Loader2, AlertTriangle, ExternalLink, CreditCard, MessageSquare, Award } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { formatDate } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/components/ui/use-toast'
 
-const creditPackages = [
-  { id: 'pack_1000', name: '1.000 créditos', credits: 1000, priceLabel: 'R$ 35,00', popular: true },
-]
+const ACTIVE_MSG_RECHARGE = { amount: 1000, priceLabel: 'A definir' }
 
-const activeMsgPackages = [
-  { id: 'active_msg_100', name: '100 mensagens ativas', amount: 100, priceLabel: 'R$ 10,00', popular: true },
-]
-
-const modelCosts: Record<string, { label: string; credits: number }> = {
-  'claude-haiku-4-5': { label: 'Haiku', credits: 1 },
-  'claude-3-5-sonnet-20241022': { label: 'Sonnet', credits: 3 },
-}
-
-const cycleOptions = [
-  { key: 'MONTHLY', label: 'Mensal',                      badge: ''                   },
-  { key: 'ANNUAL',  label: 'Anual (pague 1x por ano)',    badge: 'Economize até R$ 624' },
-]
-
-// Preços reais por plano (centavos)
-// MONTHLY = cobrado todo mês | ANNUAL = cobrado à vista 1x por ano
-const PLAN_PRICES: Record<string, Record<string, number>> = {
-  STARTER:  { MONTHLY: 6000,   ANNUAL: 63600  },
-  PRO:      { MONTHLY: 14700,  ANNUAL: 156000 },
-  BUSINESS: { MONTHLY: 43900,  ANNUAL: 464400 },
-}
-
-// Label do ciclo para exibição
-const CYCLE_LABELS: Record<string, string> = {
-  MONTHLY: '/mês',
-  ANNUAL:  '/ano',
-}
-
-const features = ['Widget para sites', 'Intenções avançadas', 'API completa', 'Suporte por email', 'Analytics avançado']
+const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDATE: 'Plano Mandato' }
+const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Ativa', SUSPENDED: 'Suspensa', CANCELLED: 'Cancelada' }
 
 export default function BillingPage() {
-  const { workspace } = useAuthStore()
-  const [cycle, setCycle] = useState('MONTHLY')
+  const { candidate, setCandidate } = useAuthStore()
   const { toast } = useToast()
+  const qc = useQueryClient()
   const searchParams = useSearchParams()
   const paymentStatus = searchParams.get('payment')
-  const paymentPlan = searchParams.get('plan')
 
   const [termsOpen, setTermsOpen] = useState(false)
   const [agreed, setAgreed] = useState(false)
-  const [pendingPlan, setPendingPlan] = useState<{ plan: string; cycle: string } | null>(null)
 
-  const isTrialExpired = workspace?.plan === 'TRIAL' &&
-    workspace?.trialEndsAt &&
-    new Date(workspace.trialEndsAt) < new Date()
-
-  // Compra de créditos avulsos
-  const checkoutMutation = useMutation({
-    mutationFn: (packageId: string) => api.post('/billing/checkout', { packageId }).then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
-    onError: () => toast({ title: 'Erro ao processar pagamento', variant: 'destructive' }),
-  })
-
-  // Compra de mensagens ativas avulsas
-  const checkoutActiveMsgsMutation = useMutation({
-    mutationFn: (packageId: string) => api.post('/billing/checkout-active-msgs', { packageId }).then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
-    onError: () => toast({ title: 'Erro ao processar pagamento', variant: 'destructive' }),
-  })
-
-  // Assinatura de plano
-  const subscribeMutation = useMutation({
-    mutationFn: ({ plan, cycle }: { plan: string; cycle: string }) =>
-      api.post('/billing/subscribe', { plan, cycle }).then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
-    onError: () => toast({ title: 'Erro ao iniciar assinatura', variant: 'destructive' }),
-  })
-
-  // Registro do aceite do Termo de Aceite antes de seguir para o pagamento
-  const acceptTermsMutation = useMutation({
-    mutationFn: () => api.post('/billing/terms/accept').then(r => r.data),
-    onSuccess: () => {
-      setTermsOpen(false)
-      setAgreed(false)
-      if (pendingPlan) subscribeMutation.mutate(pendingPlan)
-    },
-    onError: () => toast({ title: 'Erro ao registrar aceite do termo', variant: 'destructive' }),
-  })
-
-  // Portal de gerenciamento (cancelar, trocar cartão)
-  const portalMutation = useMutation({
-    mutationFn: () => api.post('/billing/portal').then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
-    onError: () => toast({ title: 'Erro ao abrir portal de pagamento', variant: 'destructive' }),
-  })
-
-  const { data: plans, isLoading: plansLoading } = useQuery({
-    queryKey: ['billing-plans'],
-    queryFn: () => api.get('/billing/plans').then(r => r.data),
-  })
+  const isSuspended = candidate?.status === 'SUSPENDED'
 
   const { data: billing } = useQuery({
     queryKey: ['billing'],
@@ -124,94 +46,60 @@ export default function BillingPage() {
     enabled: termsOpen,
   })
 
-  function startSubscribe(plan: string, cycle: string) {
-    setPendingPlan({ plan, cycle })
-    setAgreed(false)
-    setTermsOpen(true)
-  }
+  // Recarga avulsa de mensagens ativas
+  const checkoutActiveMsgsMutation = useMutation({
+    mutationFn: () => api.post('/billing/checkout-active-msgs').then(r => r.data),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onError: (err: any) => toast({ title: 'Erro ao processar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
+  })
 
-  const selectedCycleOpt = cycleOptions.find(c => c.key === cycle)
-  const isBusy = subscribeMutation.isPending || checkoutMutation.isPending || acceptTermsMutation.isPending
+  // Modo Mandato — upgrade após a eleição (seção 4.11 da spec)
+  const upgradeMandateMutation = useMutation({
+    mutationFn: () => api.post('/billing/upgrade-mandate').then(r => r.data),
+    onSuccess: (data) => { setCandidate({ plan: data.plan }); qc.invalidateQueries({ queryKey: ['billing'] }); toast({ title: 'Modo Mandato ativado!' }) },
+    onError: (err: any) => toast({ title: 'Erro ao ativar Modo Mandato', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  const acceptTermsMutation = useMutation({
+    mutationFn: () => api.post('/billing/terms/accept').then(r => r.data),
+    onSuccess: () => { setTermsOpen(false); setAgreed(false); toast({ title: 'Termo aceito' }) },
+    onError: () => toast({ title: 'Erro ao registrar aceite do termo', variant: 'destructive' }),
+  })
+
+  // Portal de gerenciamento (cancelar, trocar cartão)
+  const portalMutation = useMutation({
+    mutationFn: () => api.post('/billing/portal').then(r => r.data),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onError: (err: any) => toast({ title: 'Erro ao abrir portal de pagamento', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  const activeMsgsRemaining = billing
+    ? Math.max(0, billing.activeMsgsIncluded + billing.activeMsgsExtra - billing.activeMsgsUsed)
+    : 0
+  const activeMsgsTotal = billing ? billing.activeMsgsIncluded + billing.activeMsgsExtra : 1
+  const usagePct = Math.min(100, Math.round((1 - activeMsgsRemaining / activeMsgsTotal) * 100))
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Faturamento</h1>
-        <p className="text-gray-500 text-sm mt-1">Gerencie sua assinatura e créditos</p>
+        <p className="text-gray-500 text-sm mt-1">Gerencie sua assinatura e mensagens ativas</p>
       </div>
 
-      {/* Banner trial expirado */}
-      {isTrialExpired && (
+      {isSuspended && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold text-red-800">Seu período de teste expirou</p>
-            <p className="text-sm text-red-600 mt-0.5">Assine um plano abaixo para continuar usando o SyncroFlow.</p>
+            <p className="font-semibold text-red-800">Sua assinatura está com pendência de pagamento</p>
+            <p className="text-sm text-red-600 mt-0.5">Regularize para voltar a usar o assistente normalmente.</p>
           </div>
         </div>
       )}
 
-      {/* Card status */}
-      <Card className="text-white border-0" style={{ background: 'linear-gradient(135deg, #0D47A1, #1565C0 50%, #2E7D32)' }}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm opacity-80 mb-1">Sua assinatura</div>
-              <div className="text-2xl font-bold">{workspace?.plan || 'Trial'}</div>
-              {billing?.trialEndsAt && workspace?.plan === 'TRIAL' && (
-                <div className="text-sm opacity-80 mt-1">
-                  Trial {new Date(billing.trialEndsAt) > new Date() ? `até ${formatDate(billing.trialEndsAt)}` : 'expirado'}
-                </div>
-              )}
-              {workspace?.plan !== 'TRIAL' && billing?.subscription && (
-                <div className="text-sm opacity-80 mt-1">
-                  Renova em {formatDate(billing.subscription.currentPeriodEnd)}
-                </div>
-              )}
-            </div>
-            <div className="text-right space-y-2">
-              <div className="flex items-center gap-2 text-2xl font-bold justify-end">
-                <Coins className="w-6 h-6 opacity-80" />
-                {billing?.credits?.toLocaleString() || '—'}
-              </div>
-              <div className="text-sm opacity-80">créditos disponíveis</div>
-              {workspace?.plan !== 'TRIAL' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-white border-white/40 hover:bg-white/10 text-xs"
-                  onClick={() => portalMutation.mutate()}
-                  disabled={portalMutation.isPending}
-                >
-                  {portalMutation.isPending
-                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                    : <CreditCard className="w-3 h-3 mr-1" />
-                  }
-                  Gerenciar assinatura
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Alertas de pagamento */}
-      {paymentStatus === 'subscribed' && paymentPlan && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-          <Check className="w-5 h-5 text-green-600 shrink-0" />
-          <div>
-            <div className="font-medium text-green-800">Assinatura ativada! Bem-vindo ao plano {paymentPlan}.</div>
-            <div className="text-sm text-green-600">Seus créditos foram adicionados à conta.</div>
-          </div>
-        </div>
-      )}
       {paymentStatus === 'success' && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
           <Check className="w-5 h-5 text-green-600 shrink-0" />
-          <div>
-            <div className="font-medium text-green-800">Pagamento confirmado!</div>
-            <div className="text-sm text-green-600">Seus créditos foram adicionados à conta.</div>
-          </div>
+          <div className="font-medium text-green-800">Pagamento confirmado!</div>
         </div>
       )}
       {paymentStatus === 'cancelled' && (
@@ -221,171 +109,85 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Planos */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Escolha seu plano</h2>
-
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {cycleOptions.map((opt) => (
-            <button key={opt.key} onClick={() => setCycle(opt.key)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${cycle === opt.key ? 'bg-[#1565C0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              {opt.label}
-              {opt.badge && <span className={`ml-2 text-xs font-semibold ${cycle === opt.key ? 'text-green-300' : 'text-green-600'}`}>{opt.badge}</span>}
-            </button>
-          ))}
-        </div>
-
-        {plansLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-[#1565C0]" /></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {(plans || []).map((plan: any) => {
-              const price = PLAN_PRICES[plan.id]?.[cycle] ?? plan.priceMonthly
-              const isPopular = plan.id === 'PRO'
-              const isCurrent = workspace?.plan === plan.id
-
-              return (
-                <div key={plan.id} className={`relative rounded-2xl border-2 p-6 ${isPopular ? 'border-[#1565C0] shadow-lg shadow-blue-100' : 'border-gray-200'}`}>
-                  {isPopular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#1565C0] text-white text-xs font-bold px-3 py-1 rounded-full">
-                      Mais popular
-                    </div>
-                  )}
-                  <div className="mb-4">
-                    <h3 className="font-bold text-xl text-gray-900">{plan.name}</h3>
-                    <div className="mt-2">
-                      <span className="text-3xl font-bold text-gray-900">
-                        R$ {(price / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="text-gray-400 text-sm">{CYCLE_LABELS[cycle]}</span>
-                    </div>
-                    {cycle === 'ANNUAL' && (
-                      <p className="text-xs text-green-600 mt-1">
-                        Equivale a R$ {(price / 100 / 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês · pago à vista
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 mb-6 text-sm text-gray-600">
-                    <div className="flex items-center gap-2"><Coins className="w-4 h-4 text-[#1565C0]" />{plan.credits?.toLocaleString()} créditos/mês</div>
-                    <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#1565C0]" />{plan.activeMsgs?.toLocaleString()} mensagens ativas/mês</div>
-                    <div className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" />Até {plan.agents} agentes</div>
-                    {features.map((f) => (
-                      <div key={f} className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" />{f}</div>
-                    ))}
-                  </div>
-
-                  <Button
-                    className="w-full"
-                    variant={isPopular ? 'default' : 'outline'}
-                    disabled={isCurrent || isBusy}
-                    onClick={() => startSubscribe(plan.id, cycle)}
-                  >
-                    {subscribeMutation.isPending
-                      ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      : isCurrent
-                      ? 'Plano atual'
-                      : 'Assinar agora'
-                    }
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Créditos avulsos */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Zap className="w-5 h-5 text-[#1565C0]" />
-          <h2 className="text-lg font-semibold text-gray-900">Comprar créditos avulsos</h2>
-        </div>
-        <p className="text-sm text-gray-500 mb-4">Adicione créditos à sua conta a qualquer momento, sem alterar seu plano.</p>
-
-        <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-100">
-          <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Custo por mensagem</div>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(modelCosts).map(([, m]) => (
-              <div key={m.label} className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2 py-1">
-                <span className="font-medium text-gray-700">{m.label}</span>
-                <span className="text-gray-400">→</span>
-                <span className="font-semibold text-[#1565C0]">{m.credits} crédito{m.credits > 1 ? 's' : ''}/msg</span>
-              </div>
-            ))}
-            <div className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2 py-1">
-              <span className="font-medium text-gray-700">Áudio/Imagem/PDF</span>
-              <span className="text-gray-400">→</span>
-              <span className="font-semibold text-[#1565C0]">2 créditos fixos</span>
+      {/* Card status */}
+      <Card className="text-white border-0" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-sm opacity-80 mb-1">Sua assinatura</div>
+              <div className="text-2xl font-bold">{billing ? PLAN_LABELS[billing.plan] : '—'}</div>
+              <div className="text-sm opacity-80 mt-1">{billing ? STATUS_LABELS[billing.status] : ''}</div>
             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {creditPackages.map((pkg) => (
-            <div key={pkg.id} className={`relative rounded-xl border-2 p-4 text-center ${pkg.popular ? 'border-[#1565C0] shadow-md shadow-blue-100' : 'border-gray-200'}`}>
-              {pkg.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#1565C0] text-white text-xs font-bold px-3 py-0.5 rounded-full">
-                  Mais popular
-                </div>
-              )}
-              <div className="font-bold text-gray-900 mb-1">{pkg.name}</div>
-              <div className="flex items-center justify-center gap-1 text-[#1565C0] mb-1">
-                <Coins className="w-4 h-4" />
-                <span className="font-bold text-lg">{pkg.credits.toLocaleString('pt-BR')}</span>
+            <div className="text-right space-y-2">
+              <div className="flex items-center gap-2 text-2xl font-bold justify-end">
+                <MessageSquare className="w-6 h-6 opacity-80" />
+                {activeMsgsRemaining.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-400 mb-3">créditos</div>
-              <div className="text-xl font-bold text-gray-900 mb-3">{pkg.priceLabel}</div>
+              <div className="text-sm opacity-80">mensagens ativas restantes</div>
               <Button
                 size="sm"
-                className="w-full"
-                variant={pkg.popular ? 'default' : 'outline'}
-                disabled={checkoutMutation.isPending}
-                onClick={() => checkoutMutation.mutate(pkg.id)}
+                variant="outline"
+                className="text-white border-white/40 hover:bg-white/10 text-xs"
+                onClick={() => portalMutation.mutate()}
+                disabled={portalMutation.isPending}
               >
-                {checkoutMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar'}
+                {portalMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CreditCard className="w-3 h-3 mr-1" />}
+                Gerenciar assinatura
               </Button>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+          <div className="mt-4">
+            <div className="w-full bg-white/20 rounded-full h-1.5">
+              <div className="h-1.5 rounded-full bg-white" style={{ width: `${usagePct}%` }} />
+            </div>
+            <div className="text-xs opacity-70 mt-1">{billing?.activeMsgsUsed?.toLocaleString() ?? 0} de {activeMsgsTotal.toLocaleString()} mensagens ativas usadas neste ciclo</div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Mensagens ativas avulsas */}
+      {/* Recarga de mensagens ativas */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <MessageSquare className="w-5 h-5 text-[#1565C0]" />
-          <h2 className="text-lg font-semibold text-gray-900">Comprar mensagens ativas avulsas</h2>
+          <MessageSquare className="w-5 h-5 text-[#002776]" />
+          <h2 className="text-lg font-semibold text-gray-900">Recarregar mensagens ativas</h2>
         </div>
-        <p className="text-sm text-gray-500 mb-4">Use quando esgotar a cota mensal de lembretes/avisos automáticos do seu plano. As respostas normais aos seus clientes nunca são afetadas.</p>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {activeMsgPackages.map((pkg) => (
-            <div key={pkg.id} className={`relative rounded-xl border-2 p-4 text-center ${pkg.popular ? 'border-[#1565C0] shadow-md shadow-blue-100' : 'border-gray-200'}`}>
-              {pkg.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#1565C0] text-white text-xs font-bold px-3 py-0.5 rounded-full">
-                  Mais popular
-                </div>
-              )}
-              <div className="font-bold text-gray-900 mb-1">{pkg.name}</div>
-              <div className="flex items-center justify-center gap-1 text-[#1565C0] mb-1">
-                <MessageSquare className="w-4 h-4" />
-                <span className="font-bold text-lg">{pkg.amount.toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="text-xs text-gray-400 mb-3">mensagens ativas</div>
-              <div className="text-xl font-bold text-gray-900 mb-3">{pkg.priceLabel}</div>
-              <Button
-                size="sm"
-                className="w-full"
-                variant={pkg.popular ? 'default' : 'outline'}
-                disabled={checkoutActiveMsgsMutation.isPending}
-                onClick={() => checkoutActiveMsgsMutation.mutate(pkg.id)}
-              >
-                {checkoutActiveMsgsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar'}
-              </Button>
-            </div>
-          ))}
+        <p className="text-sm text-gray-500 mb-4">
+          Use quando esgotar a cota do ciclo. Mensagens passivas (respostas a eleitores que escrevem primeiro) nunca são afetadas — apenas envios iniciados pelo agente (disclaimer, lembretes) são bloqueados até a recarga.
+        </p>
+        <div className="rounded-xl border-2 border-gray-200 p-4 max-w-xs">
+          <div className="font-bold text-gray-900 mb-1">+{ACTIVE_MSG_RECHARGE.amount.toLocaleString('pt-BR')} mensagens ativas</div>
+          <div className="text-xl font-bold text-gray-900 mb-3">{ACTIVE_MSG_RECHARGE.priceLabel}</div>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={checkoutActiveMsgsMutation.isPending}
+            onClick={() => checkoutActiveMsgsMutation.mutate()}
+          >
+            {checkoutActiveMsgsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar recarga'}
+          </Button>
         </div>
       </div>
+
+      {/* Modo Mandato */}
+      {billing?.plan === 'CAMPAIGN' && (
+        <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Award className="w-5 h-5 text-amber-600" />
+            <h2 className="text-lg font-semibold text-amber-900">Foi eleito? Ative o Modo Mandato</h2>
+          </div>
+          <p className="text-sm text-amber-700 mb-4">
+            Após a eleição, transforme seu assistente em ouvidoria do mandato — novo disclaimer, novo contexto, mesma plataforma.
+          </p>
+          <Button
+            disabled={upgradeMandateMutation.isPending}
+            onClick={() => upgradeMandateMutation.mutate()}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            {upgradeMandateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Ativar Modo Mandato
+          </Button>
+        </div>
+      )}
 
       {/* Histórico de faturas */}
       {invoices && invoices.length > 0 && (
@@ -420,21 +222,18 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Link Stripe Customer Portal */}
-      {workspace?.plan !== 'TRIAL' && (
-        <div className="text-center">
-          <button
-            onClick={() => portalMutation.mutate()}
-            disabled={portalMutation.isPending}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Gerenciar cartão, cancelar ou ver faturas no portal Stripe
-          </button>
-        </div>
-      )}
+      <div className="text-center">
+        <button
+          onClick={() => portalMutation.mutate()}
+          disabled={portalMutation.isPending}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Gerenciar cartão, cancelar ou ver faturas no portal Stripe
+        </button>
+      </div>
 
-      {/* Modal de Termo de Aceite — obrigatório antes de qualquer assinatura */}
+      {/* Modal de Termo de Aceite */}
       <Dialog open={termsOpen} onOpenChange={(open) => { setTermsOpen(open); if (!open) setAgreed(false) }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -456,7 +255,7 @@ export default function BillingPage() {
               onClick={() => acceptTermsMutation.mutate()}
             >
               {acceptTermsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Continuar para pagamento
+              Aceitar termo
             </Button>
           </DialogFooter>
         </DialogContent>
