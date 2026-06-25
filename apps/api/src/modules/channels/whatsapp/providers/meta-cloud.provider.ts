@@ -26,7 +26,7 @@ export function normalizeBrazilianNumber(to: string): string {
 // Detecta o tipo de mídia pela extensão da URL — a Meta Cloud API exige o
 // campo correto (image/video/document) no payload, não aceita um tipo
 // genérico para qualquer arquivo.
-function detectMediaType(url: string): 'image' | 'video' | 'document' {
+export function detectMediaType(url: string): 'image' | 'video' | 'document' {
   const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || ''
   if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'image'
   if (['mp4', '3gp', 'mov'].includes(ext)) return 'video'

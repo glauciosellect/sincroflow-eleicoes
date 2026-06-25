@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Check, Loader2, AlertTriangle, ExternalLink, CreditCard, MessageSquare, Award } from 'lucide-react'
+import { Check, Loader2, AlertTriangle, ExternalLink, CreditCard, MessageSquare, Award, Smartphone } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { formatDate } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/components/ui/use-toast'
 
 const ACTIVE_MSG_RECHARGE = { amount: 1000, priceLabel: 'A definir' }
+const WHATSAPP_LINE_PRICE = 497
+const WHATSAPP_LINE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
 
 const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDATE: 'Plano Mandato' }
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Ativa', SUSPENDED: 'Suspensa', CANCELLED: 'Cancelada' }
@@ -27,6 +29,7 @@ export default function BillingPage() {
 
   const [termsOpen, setTermsOpen] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [whatsappLinesQty, setWhatsappLinesQty] = useState(1)
 
   const isSuspended = candidate?.status === 'SUSPENDED'
 
@@ -51,6 +54,17 @@ export default function BillingPage() {
     mutationFn: () => api.post('/billing/checkout-active-msgs').then(r => r.data),
     onSuccess: (data) => { if (data.url) window.location.href = data.url },
     onError: (err: any) => toast({ title: 'Erro ao processar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  // Recarga de linhas extras de WhatsApp (assinatura recorrente, R$ 497/mês cada)
+  const whatsappLinesMutation = useMutation({
+    mutationFn: () => api.post('/billing/whatsapp-lines', { quantity: whatsappLinesQty }).then(r => r.data),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['billing'] })
+      qc.invalidateQueries({ queryKey: ['channels'] })
+      toast({ title: 'Linha(s) de WhatsApp adicionada(s)!', description: data.message })
+    },
+    onError: (err: any) => toast({ title: 'Erro ao adicionar linhas', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
   // Modo Mandato — upgrade após a eleição (seção 4.11 da spec)
@@ -164,6 +178,42 @@ export default function BillingPage() {
             onClick={() => checkoutActiveMsgsMutation.mutate()}
           >
             {checkoutActiveMsgsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar recarga'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Recarga de linhas de WhatsApp */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Smartphone className="w-5 h-5 text-[#009C3B]" />
+          <h2 className="text-lg font-semibold text-gray-900">Adicionar números de WhatsApp</h2>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Seu plano já inclui 1 número de WhatsApp. Para campanhas maiores, adicione linhas extras — cada uma atendida pelo mesmo assistente, com sua própria conexão e histórico de conversas. R$ {WHATSAPP_LINE_PRICE},00/mês por linha, cobrado junto com sua assinatura.
+        </p>
+        <div className="rounded-xl border-2 border-gray-200 p-4 max-w-xs space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Quantidade de linhas a adicionar</label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={whatsappLinesQty}
+              onChange={(e) => setWhatsappLinesQty(Number(e.target.value))}
+            >
+              {WHATSAPP_LINE_OPTIONS.map((n) => (
+                <option key={n} value={n}>+{n} WhatsApp</option>
+              ))}
+            </select>
+          </div>
+          <div className="text-xl font-bold text-gray-900">
+            R$ {(whatsappLinesQty * WHATSAPP_LINE_PRICE).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+          </div>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={whatsappLinesMutation.isPending}
+            onClick={() => whatsappLinesMutation.mutate()}
+          >
+            {whatsappLinesMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assine agora'}
           </Button>
         </div>
       </div>

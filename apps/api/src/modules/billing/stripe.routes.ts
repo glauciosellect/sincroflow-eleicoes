@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import Stripe from 'stripe'
+import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getPendingRegistration, activatePendingRegistration } from '../auth/auth.service'
@@ -15,6 +16,24 @@ const PLAN_PRICE_IDS: Record<'CAMPAIGN' | 'MANDATE', string | undefined> = {
 
 // Recarga avulsa de mensagens ativas — comprada quando o limite do plano se esgota
 export const ACTIVE_MSG_RECHARGE = { amount: 1000, priceId: process.env.STRIPE_PRICE_RECHARGE_1000 }
+
+// Linha extra de WhatsApp — assinatura recorrente, adicionada como item na subscription
+// principal do candidato (não é um checkout novo, é quantity num price já existente).
+const WHATSAPP_LINE_PRICE_ID = process.env.STRIPE_PRICE_WHATSAPP_LINE
+
+// Recalcula whatsappLineLimit a partir do que está de fato cobrado na subscription do
+// Stripe (1 linha base do plano + soma das quantities do price de linha extra) — evita
+// que incrementos manuais desalinhem do que está realmente sendo cobrado.
+async function syncWhatsAppLineLimit(subscriptionId: string) {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items'] })
+  const extraLines = subscription.items.data
+    .filter((item) => item.price.id === WHATSAPP_LINE_PRICE_ID)
+    .reduce((sum, item) => sum + (item.quantity || 0), 0)
+
+  const candidate = await prisma.candidate.findFirst({ where: { stripeSubscriptionId: subscriptionId } })
+  if (!candidate) return
+  await prisma.candidate.update({ where: { id: candidate.id }, data: { whatsappLineLimit: 1 + extraLines } })
+}
 
 export async function stripeRoutes(app: FastifyInstance) {
 
@@ -66,6 +85,37 @@ export async function stripeRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ url: session.url })
+  })
+
+  // Adiciona N linhas extras de WhatsApp à assinatura já ativa do candidato (recorrente,
+  // R$ 497/mês cada). O limite (whatsappLineLimit) só sobe quando o webhook confirmar.
+  app.post('/billing/whatsapp-lines', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    if (!WHATSAPP_LINE_PRICE_ID) return reply.status(500).send({ error: 'Recarga de WhatsApp não configurada. Contate o suporte.' })
+
+    const { quantity } = z.object({ quantity: z.number().int().min(1).max(30) }).parse(req.body)
+
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
+    if (!candidate?.stripeSubscriptionId) {
+      return reply.status(400).send({ error: 'Assine o plano antes de adicionar linhas de WhatsApp.' })
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(candidate.stripeSubscriptionId, { expand: ['items'] })
+    const existingItem = subscription.items.data.find((item) => item.price.id === WHATSAPP_LINE_PRICE_ID)
+
+    if (existingItem) {
+      await stripe.subscriptionItems.update(existingItem.id, { quantity: (existingItem.quantity || 0) + quantity })
+    } else {
+      await stripe.subscriptionItems.create({
+        subscription: candidate.stripeSubscriptionId,
+        price: WHATSAPP_LINE_PRICE_ID,
+        quantity,
+      })
+    }
+
+    return reply.send({ ok: true, message: 'Linhas adicionadas — disponíveis após confirmação do pagamento.' })
   })
 
   // Registra o aceite do Termo pelo usuário autenticado, para efeitos legais
@@ -171,6 +221,8 @@ export async function stripeRoutes(app: FastifyInstance) {
         await prisma.invoice.create({
           data: { candidateId: candidate.id, amount: invoice.amount_paid || 0, status: 'paid', externalId: invoice.id },
         })
+
+        await syncWhatsAppLineLimit(subscriptionId)
         break
       }
 
@@ -186,6 +238,13 @@ export async function stripeRoutes(app: FastifyInstance) {
         await prisma.invoice.create({
           data: { candidateId: candidate.id, amount: invoice.amount_due || 0, status: 'failed', externalId: invoice.id },
         })
+        break
+      }
+
+      // ── Assinatura alterada (ex: linha de WhatsApp removida pelo Portal) ───
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as any
+        await syncWhatsAppLineLimit(subscription.id)
         break
       }
 

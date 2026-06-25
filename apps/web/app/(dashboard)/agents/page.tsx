@@ -1,6 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,11 +9,35 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Send, MessageSquareText } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Loader2, Send, MessageSquareText, Image as ImageIcon, Upload, Trash2, Megaphone, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const TABS = ['Minha História', 'Disclaimer', 'Plataforma Eleitoral', 'Configuração'] as const
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  VOTER: 'Eleitor',
+  FAMILY_FRIEND: 'Família/Amigo',
+  STAFF: 'Equipe',
+  CONTRACTOR: 'Terceirizado',
+  OTHER: 'Outro',
+}
+const BROADCAST_STATUS_LABELS: Record<string, string> = {
+  QUEUED: 'Na fila',
+  SENDING: 'Enviando',
+  COMPLETED: 'Concluído',
+  COMPLETED_WITH_ERRORS: 'Concluído com erros',
+}
+
+const TABS = ['Minha História', 'Disclaimer', 'Plataforma Eleitoral', 'Criativos', 'Configuração'] as const
 type Tab = typeof TABS[number]
+
+interface Creative {
+  id: string
+  title: string
+  topicKey: string | null
+  fileUrl: string
+  fileType: string
+  createdAt: string
+}
 
 interface AgentConfig {
   agentName: string
@@ -53,7 +78,9 @@ const TTS_VOICES = [
 export default function AgentPage() {
   const { toast } = useToast()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('Minha História')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(tabParam && TABS.includes(tabParam) ? tabParam : 'Minha História')
 
   const { data: config, isLoading: loadingConfig } = useQuery<AgentConfig>({
     queryKey: ['agent-config'],
@@ -201,6 +228,10 @@ export default function AgentPage() {
         <PlatformTopicsTab topics={topics} loading={loadingTopics} />
       )}
 
+      {tab === 'Criativos' && (
+        <CreativesTab topics={topics} />
+      )}
+
       {tab === 'Configuração' && (
         <ConfigTab form={form} setForm={setForm} onSave={() => saveMutation.mutate(form)} saving={saveMutation.isPending} />
       )}
@@ -292,6 +323,248 @@ function PlatformTopicsTab({ topics, loading }: { topics?: PlatformTopic[]; load
           </Card>
         )
       })}
+    </div>
+  )
+}
+
+function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
+  const { toast } = useToast()
+  const qc = useQueryClient()
+  const [file, setFile] = useState<File | null>(null)
+  const [title, setTitle] = useState('')
+  const [topicKey, setTopicKey] = useState('')
+
+  const { data: creatives, isLoading } = useQuery<Creative[]>({
+    queryKey: ['creatives'],
+    queryFn: () => api.get('/creatives').then(r => r.data),
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: () => {
+      const formData = new FormData()
+      formData.append('file', file as File)
+      formData.append('title', title)
+      if (topicKey) formData.append('topicKey', topicKey)
+      return api.post('/creatives', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['creatives'] })
+      setFile(null); setTitle(''); setTopicKey('')
+      toast({ title: 'Criativo enviado!' })
+    },
+    onError: (err: any) => toast({ title: 'Erro ao enviar criativo', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/creatives/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['creatives'] }); toast({ title: 'Criativo removido' }) },
+  })
+
+  const [broadcastCreative, setBroadcastCreative] = useState<Creative | null>(null)
+  const [broadcastContactType, setBroadcastContactType] = useState('VOTER')
+
+  const { data: preview, isLoading: loadingPreview } = useQuery({
+    queryKey: ['broadcast-preview', broadcastCreative?.id, broadcastContactType],
+    queryFn: () => api.get('/broadcasts/preview', { params: { creativeId: broadcastCreative!.id, contactType: broadcastContactType } }).then(r => r.data),
+    enabled: !!broadcastCreative,
+  })
+
+  const { data: broadcasts } = useQuery({
+    queryKey: ['broadcasts'],
+    queryFn: () => api.get('/broadcasts').then(r => r.data),
+  })
+
+  const broadcastMutation = useMutation({
+    mutationFn: () => api.post('/broadcasts', { creativeId: broadcastCreative!.id, contactType: broadcastContactType }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['broadcasts'] })
+      setBroadcastCreative(null)
+      toast({ title: 'Disparo iniciado!', description: 'Os envios serão feitos gradualmente para evitar bloqueio do número.' })
+    },
+    onError: (err: any) => toast({ title: 'Erro ao disparar', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  const exceeds24h = preview && preview.totalTargets > preview.remaining24hCapacity
+  const exceedsMax = preview && preview.totalTargets > preview.maxTargets
+  const exceedsQuota = preview && preview.totalTargets > preview.activeMsgsRemaining
+  const canConfirm = preview && !exceeds24h && !exceedsMax && !exceedsQuota && preview.totalTargets > 0
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        Suba imagens, vídeos ou PDFs ("Santinho") da sua campanha. Vincule a um tema para o assistente anexar automaticamente quando um eleitor perguntar sobre aquele assunto — ou anexe manualmente ao responder no chat.
+      </div>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <Label className="text-base font-semibold">Novo criativo</Label>
+          <div>
+            <Label htmlFor="creative-title">Título</Label>
+            <Input id="creative-title" className="mt-1" placeholder="Ex: Proposta de Saúde" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="creative-topic">Tema vinculado (opcional)</Label>
+            <select
+              id="creative-topic"
+              className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={topicKey}
+              onChange={(e) => setTopicKey(e.target.value)}
+            >
+              <option value="">Nenhum (genérico)</option>
+              {(topics || []).map((t) => (
+                <option key={t.topicKey} value={t.topicKey}>{t.topicName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="creative-file">Arquivo</Label>
+            <Input id="creative-file" type="file" className="mt-1" accept="image/*,video/*,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </div>
+          <Button
+            onClick={() => uploadMutation.mutate()}
+            disabled={!file || !title.trim() || uploadMutation.isPending}
+            style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
+            className="text-white"
+          >
+            {uploadMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+            Enviar criativo
+          </Button>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#002776]" /></div>
+      ) : !creatives?.length ? (
+        <div className="text-center py-12">
+          <ImageIcon className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Nenhum criativo cadastrado ainda</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {creatives.map((c) => {
+            const topicName = topics?.find(t => t.topicKey === c.topicKey)?.topicName
+            return (
+              <Card key={c.id}>
+                <CardContent className="p-3">
+                  {c.fileType === 'image' ? (
+                    <img src={c.fileUrl} alt={c.title} className="w-full h-32 object-cover rounded-lg mb-2" />
+                  ) : (
+                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-2 flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-300" />
+                    </div>
+                  )}
+                  <div className="font-medium text-sm text-gray-900">{c.title}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{topicName || 'Genérico'}</div>
+                  <Button
+                    size="sm"
+                    onClick={() => setBroadcastCreative(c)}
+                    className="w-full mt-2 text-white"
+                    style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
+                  >
+                    <Megaphone className="w-3 h-3 mr-2" />Enviar para eleitores
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteMutation.mutate(c.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full mt-1"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />Remover
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {!!broadcasts?.length && (
+        <div>
+          <Label className="text-base font-semibold">Histórico de disparos</Label>
+          <div className="mt-2 space-y-2">
+            {broadcasts.map((b: any) => (
+              <div key={b.id} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg p-3">
+                <div>
+                  <span className="font-medium text-gray-900">{b.creative?.title}</span>
+                  <span className="text-gray-400 ml-2">{new Date(b.createdAt).toLocaleString('pt-BR')}</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {b.sentCount}/{b.totalTargets} enviados · {BROADCAST_STATUS_LABELS[b.status]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Dialog open={!!broadcastCreative} onOpenChange={(open) => !open && setBroadcastCreative(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enviar "{broadcastCreative?.title}" para eleitores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="broadcast-type">Enviar para</Label>
+              <select
+                id="broadcast-type"
+                className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={broadcastContactType}
+                onChange={(e) => setBroadcastContactType(e.target.value)}
+              >
+                {Object.entries(CONTACT_TYPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {loadingPreview ? (
+              <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[#002776]" /></div>
+            ) : preview && (
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Contatos elegíveis</span><span className="font-medium">{preview.totalTargets}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Mensagens ativas restantes</span><span className="font-medium">{preview.activeMsgsRemaining}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Já enviados nas últimas 24h (esse número)</span><span className="font-medium">{preview.sentLast24h}/{preview.max24hPerLine}</span></div>
+                {preview.alreadyReceivedCount > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800 flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    {preview.alreadyReceivedCount} desses contatos já receberam este criativo antes.
+                  </div>
+                )}
+                {exceedsMax && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
+                    Limite de {preview.maxTargets} contatos por disparo excedido. Restrinja o filtro.
+                  </div>
+                )}
+                {exceedsQuota && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
+                    Mensagens ativas insuficientes para cobrir todos os contatos selecionados.
+                  </div>
+                )}
+                {exceeds24h && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
+                    Esse número já enviaria mais que o limite de 24h ({preview.max24hPerLine}). Aguarde ou use outro WhatsApp.
+                  </div>
+                )}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
+                  Este envio é considerado mensagem ativa e será registrado em log de auditoria. Use apenas para conteúdo já autorizado pela campanha — disparo de propaganda eleitoral deve seguir a Resolução TSE nº 23.755/2026.
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full"
+              disabled={!canConfirm || broadcastMutation.isPending}
+              onClick={() => broadcastMutation.mutate()}
+              style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
+            >
+              {broadcastMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+              Confirmar envio
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

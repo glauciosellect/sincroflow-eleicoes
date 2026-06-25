@@ -83,7 +83,11 @@ export async function conversationRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
-    const { content } = z.object({ content: z.string().min(1) }).parse(req.body)
+    const { content, mediaUrl, mediaType } = z.object({
+      content: z.string().min(1),
+      mediaUrl: z.string().optional(),
+      mediaType: z.string().optional(),
+    }).parse(req.body)
 
     const conv = await prisma.conversation.findFirst({
       where: { id, candidateId },
@@ -92,7 +96,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
 
     const message = await prisma.message.create({
-      data: { conversationId: id, senderType: 'HUMAN', content },
+      data: { conversationId: id, senderType: 'HUMAN', content, mediaUrl, mediaType },
     })
     try { emitNewMessage(candidateId, id, message) } catch {}
 
@@ -100,7 +104,11 @@ export async function conversationRoutes(app: FastifyInstance) {
     try {
       if (conv.channel.type === 'WHATSAPP' && conv.contact.externalId) {
         const provider = getWhatsAppProvider()
-        await provider.sendText(conv.channelId, conv.contact.externalId, content)
+        if (mediaUrl) {
+          await provider.sendMedia(conv.channelId, conv.contact.externalId, mediaUrl, content)
+        } else {
+          await provider.sendText(conv.channelId, conv.contact.externalId, content)
+        }
       }
       if (conv.channel.type === 'TELEGRAM' && conv.contact.externalId) {
         const cfg = conv.channel.config as any

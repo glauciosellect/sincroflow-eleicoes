@@ -13,6 +13,7 @@ export async function billingRoutes(app: FastifyInstance) {
     return reply.send({
       plan: candidate.plan,
       status: candidate.status,
+      whatsappLineLimit: candidate.whatsappLineLimit,
       activeMsgsIncluded: candidate.activeMsgsIncluded,
       activeMsgsUsed: candidate.activeMsgsUsed,
       activeMsgsExtra: candidate.activeMsgsExtra,

@@ -3,6 +3,7 @@ import axios from 'axios'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { assertWhatsAppLimit, WhatsAppLimitExceededError } from '../../lib/whatsapp-limit'
 import { MetaCloudApiProvider } from '../channels/whatsapp/providers/meta-cloud.provider'
 
 const META_APP_ID = process.env.META_APP_ID!
@@ -46,6 +47,26 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'wabaId/phoneNumberId não recebidos do Embedded Signup — tente reconectar' })
     }
 
+    // Reautorização do mesmo número já conectado: não conta contra o limite do plano.
+    const existingChannels = await prisma.channel.findMany({ where: { candidateId, type: 'WHATSAPP' } })
+    const existingChannel = existingChannels.find((c) => (c.config as any)?.phoneNumberId === phoneNumberId)
+
+    if (!existingChannel) {
+      try {
+        await assertWhatsAppLimit(candidateId)
+      } catch (err) {
+        if (err instanceof WhatsAppLimitExceededError) {
+          return reply.status(403).send({
+            error: `Limite de números de WhatsApp do seu plano atingido (${err.current}/${err.limit}). Faça upgrade do plano para conectar mais números.`,
+            code: 'WHATSAPP_LIMIT_EXCEEDED',
+            current: err.current,
+            limit: err.limit,
+          })
+        }
+        throw err
+      }
+    }
+
     let accessToken: string
     try {
       accessToken = await exchangeEmbeddedSignupCode(code)
@@ -64,19 +85,14 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
       console.error('[META-WA-SIGNUP] Erro ao buscar número:', err?.response?.data || err?.message)
     }
 
-    const channel = await prisma.channel.upsert({
-      where: { candidateId_type: { candidateId, type: 'WHATSAPP' } },
-      update: {
-        name: displayPhoneNumber || 'WhatsApp (Meta)',
-        config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },
-      },
-      create: {
-        candidateId,
-        type: 'WHATSAPP',
-        name: displayPhoneNumber || 'WhatsApp (Meta)',
-        config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },
-      },
-    })
+    const channelData = {
+      name: displayPhoneNumber || 'WhatsApp (Meta)',
+      config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },
+    }
+
+    const channel = existingChannel
+      ? await prisma.channel.update({ where: { id: existingChannel.id }, data: channelData })
+      : await prisma.channel.create({ data: { candidateId, type: 'WHATSAPP', ...channelData } })
 
     await subscribeAppToWaba(wabaId, accessToken)
 

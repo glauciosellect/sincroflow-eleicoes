@@ -178,6 +178,16 @@ function ChannelsTab() {
     queryFn: () => api.get('/channels').then(r => r.data),
   })
 
+  const { data: billing } = useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get('/billing').then(r => r.data),
+  })
+
+  const whatsappChannels = (channels || []).filter((c: any) => c.type === 'WHATSAPP')
+  const whatsappLimit = billing?.whatsappLineLimit ?? 1
+  const whatsappUnlimited = whatsappLimit === -1
+  const whatsappAtLimit = !whatsappUnlimited && whatsappChannels.length >= whatsappLimit
+
   const createTelegramMutation = useMutation({
     mutationFn: () => api.post('/channels/telegram', { name: telegramName, botToken: telegramToken }),
     onSuccess: () => {
@@ -219,10 +229,20 @@ function ChannelsTab() {
     mutationFn: (params: { code: string; wabaId?: string; phoneNumberId?: string }) =>
       api.post('/channels/whatsapp-meta/signup', params),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['channels'] }); toast({ title: 'WhatsApp (Meta) conectado!' }) },
-    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Erro ao conectar', variant: 'destructive' }),
+    onError: (err: any) => {
+      if (err.response?.data?.code === 'WHATSAPP_LIMIT_EXCEEDED') {
+        toast({ title: 'Limite do plano atingido', description: err.response.data.error, variant: 'destructive' })
+      } else {
+        toast({ title: 'Erro', description: err.response?.data?.error || 'Erro ao conectar', variant: 'destructive' })
+      }
+    },
   })
 
   const connectWhatsAppMeta = () => {
+    if (whatsappAtLimit) {
+      toast({ title: 'Limite do plano atingido', description: `Seu plano permite ${whatsappLimit} número(s) de WhatsApp. Faça upgrade para conectar mais.`, variant: 'destructive' })
+      return
+    }
     if (!(window as any).FB) {
       toast({ title: 'SDK da Meta ainda não carregou — tente novamente em alguns segundos', variant: 'destructive' })
       return
@@ -242,11 +262,18 @@ function ChannelsTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-gray-500">Conecte os canais pelos quais os eleitores vão falar com seu assistente.</p>
+        <div>
+          <p className="text-sm text-gray-500">Conecte os canais pelos quais os eleitores vão falar com seu assistente.</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {whatsappUnlimited
+              ? `${whatsappChannels.length} número(s) de WhatsApp conectados (plano ilimitado)`
+              : `${whatsappChannels.length} de ${whatsappLimit} número(s) de WhatsApp conectados`}
+          </p>
+        </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={connectWhatsAppMeta} className="border-green-200 text-green-700 hover:bg-green-50" disabled={whatsappEmbeddedSignupMutation.isPending}>
+          <Button variant="outline" size="sm" onClick={connectWhatsAppMeta} className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50" disabled={whatsappEmbeddedSignupMutation.isPending || whatsappAtLimit} title={whatsappAtLimit ? 'Limite do plano atingido — faça upgrade para conectar mais números' : undefined}>
             {whatsappEmbeddedSignupMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Plus className="w-3 h-3 mr-1" />}
-            WhatsApp
+            WhatsApp{whatsappAtLimit ? ' (limite atingido)' : ''}
           </Button>
           <Button variant="outline" size="sm" onClick={() => connectMeta('instagram')} className="border-pink-200 text-pink-700 hover:bg-pink-50">
             <Plus className="w-3 h-3 mr-1" />Instagram

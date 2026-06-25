@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning } from 'lucide-react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -28,6 +28,7 @@ const navItems = [
   { section: 'GESTÃO', items: [
     { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
     { href: '/team', label: 'Equipe', icon: Users, module: 'team' },
+    { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
   ] },
   { section: 'SISTEMA', items: [{ href: '/settings', label: 'Configurações', icon: Settings, module: 'settings' }] },
 ]
@@ -36,6 +37,8 @@ const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDAT
 
 export function Sidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
   const { candidate, role } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -93,7 +96,9 @@ export function Sidebar() {
               </div>
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
-                  const active = pathname === item.href || pathname.startsWith(item.href)
+                  const [itemPath, itemQuery] = item.href.split('?')
+                  const itemTab = itemQuery ? new URLSearchParams(itemQuery).get('tab') : null
+                  const active = pathname === itemPath && (itemTab ? tabParam === itemTab : !tabParam)
                   return (
                     <Link
                       key={item.href}

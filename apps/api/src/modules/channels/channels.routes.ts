@@ -19,11 +19,10 @@ export async function channelRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, botToken } = z.object({ name: z.string(), botToken: z.string() }).parse(req.body)
-    const channel = await prisma.channel.upsert({
-      where: { candidateId_type: { candidateId, type: 'TELEGRAM' } },
-      update: { name, config: { botToken } },
-      create: { candidateId, type: 'TELEGRAM', name, config: { botToken } },
-    })
+    const existing = await prisma.channel.findFirst({ where: { candidateId, type: 'TELEGRAM' } })
+    const channel = existing
+      ? await prisma.channel.update({ where: { id: existing.id }, data: { name, config: { botToken } } })
+      : await prisma.channel.create({ data: { candidateId, type: 'TELEGRAM', name, config: { botToken } } })
     const webhookUrl = `${process.env.API_URL}/webhooks/telegram/${channel.id}`
     const axios = (await import('axios')).default
     await axios.post(`https://api.telegram.org/bot${botToken}/setWebhook`, { url: webhookUrl })
@@ -34,11 +33,10 @@ export async function channelRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
-    const channel = await prisma.channel.upsert({
-      where: { candidateId_type: { candidateId, type: 'INSTAGRAM' } },
-      update: { name, config: { pageAccessToken, pageId } },
-      create: { candidateId, type: 'INSTAGRAM', name, config: { pageAccessToken, pageId } },
-    })
+    const existing = await prisma.channel.findFirst({ where: { candidateId, type: 'INSTAGRAM' } })
+    const channel = existing
+      ? await prisma.channel.update({ where: { id: existing.id }, data: { name, config: { pageAccessToken, pageId } } })
+      : await prisma.channel.create({ data: { candidateId, type: 'INSTAGRAM', name, config: { pageAccessToken, pageId } } })
     return reply.status(201).send(channel)
   })
 
@@ -46,11 +44,10 @@ export async function channelRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
-    const channel = await prisma.channel.upsert({
-      where: { candidateId_type: { candidateId, type: 'FACEBOOK' } },
-      update: { name, config: { pageAccessToken, pageId } },
-      create: { candidateId, type: 'FACEBOOK', name, config: { pageAccessToken, pageId } },
-    })
+    const existing = await prisma.channel.findFirst({ where: { candidateId, type: 'FACEBOOK' } })
+    const channel = existing
+      ? await prisma.channel.update({ where: { id: existing.id }, data: { name, config: { pageAccessToken, pageId } } })
+      : await prisma.channel.create({ data: { candidateId, type: 'FACEBOOK', name, config: { pageAccessToken, pageId } } })
     return reply.status(201).send(channel)
   })
 

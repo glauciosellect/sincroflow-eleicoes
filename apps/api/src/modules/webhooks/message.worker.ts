@@ -332,6 +332,22 @@ export function startMessageWorker() {
         } else {
           await provider.sendText(channelId, from, responseText)
         }
+
+        // Anexa o criativo ("Santinho") do tema identificado, se houver um cadastrado —
+        // sempre em resposta a uma pergunta do eleitor, nunca disparo em massa.
+        if (classification.topicKey) {
+          const creative = await prisma.creative.findFirst({
+            where: { candidateId: candidate.id, topicKey: classification.topicKey },
+            orderBy: { createdAt: 'desc' },
+          })
+          if (creative) {
+            await provider.sendMedia(channelId, from, creative.fileUrl, creative.title)
+            const creativeMsg = await prisma.message.create({
+              data: { conversationId: conversation.id, senderType: 'AGENT', content: creative.title, mediaUrl: creative.fileUrl, mediaType: creative.fileType },
+            })
+            try { emitNewMessage(candidate.id, conversation.id, creativeMsg) } catch {}
+          }
+        }
       } else if (channelType === 'TELEGRAM') {
         const botToken = (channel.config as any).botToken
         await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, { chat_id: from, text: responseText })

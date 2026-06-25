@@ -73,6 +73,10 @@ model Candidate {
   stripeSubscriptionId String?
   status               CandidateStatus @default(ACTIVE)
   plan                 CandidatePlan   @default(CAMPAIGN)
+  // Limite de números de WhatsApp simultâneos permitidos pelo tier de billing
+  // (Starter=1, Pro=3, Business=10, Enterprise=-1 "ilimitado"). Independente
+  // de `plan`, que representa a FASE da campanha (CAMPAIGN/MANDATE), não o volume.
+  whatsappLineLimit    Int             @default(1)
   activeMsgsIncluded   Int             @default(1000)
   activeMsgsUsed       Int             @default(0)
   activeMsgsExtra      Int             @default(0)
@@ -93,6 +97,8 @@ model Candidate {
   apiKeys          ApiKey[]
   envVariables     EnvVariable[]
   invoices         Invoice[]
+  creatives        Creative[]
+  broadcasts       Broadcast[]
 }
 
 model TeamMember {
@@ -154,7 +160,62 @@ model PlatformTopic {
   @@unique([candidateId, topicKey])
 }
 
-// ─── Canais de atendimento (1 por tipo por candidato) ────────────────────────
+// Biblioteca de criativos ("Santinho") — o agente anexa automaticamente ao
+// responder perguntas sobre o tema vinculado, a equipe também pode anexar
+// manualmente no chat, ou disparar em massa controlada (ver model Broadcast).
+model Creative {
+  id          String      @id @default(cuid())
+  candidateId String
+  title       String
+  topicKey    String?
+  fileUrl     String
+  fileType    String
+  createdAt   DateTime    @default(now())
+  candidate   Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  broadcasts  Broadcast[]
+
+  @@index([candidateId, topicKey])
+}
+
+// Disparo segmentado controlado de um criativo para um grupo de contatos.
+// Cada envio consome 1 mensagem ativa (mesma cota do disclaimer) e é limitado
+// por teto de contatos e por limite de 24h por linha de WhatsApp, para reduzir
+// risco de bloqueio do número pela Meta e de disparo de propaganda não solicitada.
+model Broadcast {
+  id           String               @id @default(cuid())
+  candidateId  String
+  creativeId   String
+  channelId    String
+  contactType  ContactType?
+  totalTargets Int
+  sentCount    Int                  @default(0)
+  failedCount  Int                  @default(0)
+  status       BroadcastStatus      @default(QUEUED)
+  createdById  String
+  createdAt    DateTime             @default(now())
+  completedAt  DateTime?
+  candidate    Candidate            @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  creative     Creative             @relation(fields: [creativeId], references: [id])
+  recipients   BroadcastRecipient[]
+}
+
+// Um registro por contato que efetivamente recebeu — usado para aviso de
+// possível duplicidade (não bloqueia reenvio) e para contar o limite de 24h por linha.
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcastId String
+  contactId   String
+  sentAt      DateTime  @default(now())
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+}
+
+// ─── Canais de atendimento ────────────────────────────────────────────────────
+// WhatsApp permite múltiplos números por candidato, até o limite do plano
+// (Candidate.whatsappLineLimit) — todos atendidos pelo mesmo AgentConfig.
+// Instagram/Facebook/Telegram/E-mail continuam limitados a 1 por tipo
+// (regra de negócio aplicada em código, ver channels.routes.ts e meta.routes.ts).
 
 model Channel {
   id            String         @id @default(cuid())
@@ -169,7 +230,7 @@ model Channel {
   contacts      Contact[]
   conversations Conversation[]
 
-  @@unique([candidateId, type])
+  @@index([candidateId, type])
 }
 
 // ─── Contatos (eleitores) e memória de conversa ──────────────────────────────
@@ -187,6 +248,9 @@ model Contact {
   totalInteractions Int            @default(0)
   notes             String?
   audioPreference   String?
+  // Classifica quem é o contato — todo contato nasce VOTER (a maioria de quem
+  // escreve é eleitor mesmo); reclassificado manualmente pela equipe quando não é.
+  contactType       ContactType    @default(VOTER)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @default(now()) @updatedAt
   candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
@@ -195,6 +259,8 @@ model Contact {
   requests          Request[]
 
   @@unique([candidateId, channelId, externalId])
+  @@index([candidateId, createdAt])
+  @@index([candidateId, phone])
 }
 
 model Conversation {
@@ -375,6 +441,21 @@ enum ChannelType {
   FACEBOOK
   TELEGRAM
   EMAIL
+}
+
+enum ContactType {
+  VOTER
+  FAMILY_FRIEND
+  STAFF
+  CONTRACTOR
+  OTHER
+}
+
+enum BroadcastStatus {
+  QUEUED
+  SENDING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
 }
 
 enum ConversationStatus {

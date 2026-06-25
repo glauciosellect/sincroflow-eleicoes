@@ -4,6 +4,13 @@ import * as qrcode from 'qrcode'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  VOTER: 'Eleitor',
+  FAMILY_FRIEND: 'Família/Amigo',
+  STAFF: 'Equipe',
+  CONTRACTOR: 'Terceirizado',
+  OTHER: 'Outro',
+}
 
 export async function contactRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
@@ -19,9 +26,9 @@ export async function contactRoutes(app: FastifyInstance) {
       take: 10000,
     })
 
-    const headers = ['Nome', 'Canal', 'Telefone', 'E-mail', 'Primeiro contato', 'Total de interações']
+    const headers = ['Nome', 'Tipo', 'Canal', 'Telefone', 'E-mail', 'Primeiro contato', 'Total de interações']
     const rows = contacts.map((c) => [
-      c.name || '', c.channel.type, c.phone || '', c.email || '',
+      c.name || '', CONTACT_TYPE_LABELS[c.contactType], c.channel.type, c.phone || '', c.email || '',
       c.firstContactAt.toISOString(), c.totalInteractions,
     ])
     const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -48,11 +55,12 @@ export async function contactRoutes(app: FastifyInstance) {
   app.get('/contacts', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { search, channelType, page = '1', limit = '20' } = req.query as Record<string, string>
+    const { search, channelType, contactType, page = '1', limit = '20' } = req.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
     const where: any = { candidateId }
-    if (channelType) where.channelType = channelType
+    if (channelType) where.channel = { type: channelType }
+    if (contactType) where.contactType = contactType
     if (search) where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
       { phone: { contains: search } },
@@ -90,6 +98,7 @@ export async function contactRoutes(app: FastifyInstance) {
       phone: z.string().optional().nullable(),
       email: z.string().email().optional().nullable(),
       notes: z.string().optional().nullable(),
+      contactType: z.enum(['VOTER', 'FAMILY_FRIEND', 'STAFF', 'CONTRACTOR', 'OTHER']).optional(),
     }).parse(req.body)
 
     const updated = await prisma.contact.updateMany({ where: { id, candidateId }, data })

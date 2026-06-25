@@ -1,5 +1,5 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
@@ -10,16 +10,32 @@ import { formatDate, channelLabel } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelIcon } from '@/components/channel-icon'
 
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  VOTER: 'Eleitor',
+  FAMILY_FRIEND: 'Família/Amigo',
+  STAFF: 'Equipe',
+  CONTRACTOR: 'Terceirizado',
+  OTHER: 'Outro',
+}
+
 export default function ContactsPage() {
   const { toast } = useToast()
+  const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [contactType, setContactType] = useState('')
   const [page, setPage] = useState(1)
   const [qrOpen, setQrOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['contacts', search, page],
-    queryFn: () => api.get('/contacts', { params: { search: search || undefined, page, limit: 20 } }).then(r => r.data),
+    queryKey: ['contacts', search, contactType, page],
+    queryFn: () => api.get('/contacts', { params: { search: search || undefined, contactType: contactType || undefined, page, limit: 20 } }).then(r => r.data),
+  })
+
+  const updateTypeMutation = useMutation({
+    mutationFn: ({ id, contactType }: { id: string; contactType: string }) => api.patch(`/contacts/${id}`, { contactType }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+    onError: () => toast({ title: 'Erro ao reclassificar contato', variant: 'destructive' }),
   })
 
   const { data: qr, isLoading: loadingQr } = useQuery({
@@ -62,9 +78,21 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input placeholder="Buscar por nome, telefone ou email..." className="pl-10" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Buscar por nome, telefone ou email..." className="pl-10" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+        </div>
+        <select
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+          value={contactType}
+          onChange={(e) => { setContactType(e.target.value); setPage(1) }}
+        >
+          <option value="">Todos os tipos</option>
+          {Object.entries(CONTACT_TYPE_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {isLoading ? (
@@ -82,6 +110,7 @@ export default function ContactsPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Eleitor</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Tipo</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Canal</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Telefone</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">E-mail</th>
@@ -99,6 +128,17 @@ export default function ContactsPage() {
                         </div>
                         <div className="text-sm font-medium text-gray-900">{contact.name || 'Sem nome'}</div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        className="text-xs border border-gray-200 rounded-full px-2 py-1"
+                        value={contact.contactType}
+                        onChange={(e) => updateTypeMutation.mutate({ id: contact.id, contactType: e.target.value })}
+                      >
+                        {Object.entries(CONTACT_TYPE_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-xs text-gray-600">

@@ -52,32 +52,38 @@ export async function emailChannelRoutes(app: FastifyInstance) {
       const tokens = await exchangeCodeForTokens(code, redirectUri)
       const { email } = await getGoogleUserInfo(tokens.access_token)
 
-      await prisma.channel.upsert({
-        where: { candidateId_type: { candidateId, type: 'EMAIL' } },
-        update: {
-          name: email,
-          config: {
-            provider: 'gmail',
-            email,
-            accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token ?? undefined,
-            tokenExpiry: new Date(tokens.expiry_date).toISOString(),
+      const existingEmail = await prisma.channel.findFirst({ where: { candidateId, type: 'EMAIL' } })
+      if (existingEmail) {
+        await prisma.channel.update({
+          where: { id: existingEmail.id },
+          data: {
+            name: email,
+            config: {
+              provider: 'gmail',
+              email,
+              accessToken: tokens.access_token,
+              refreshToken: tokens.refresh_token ?? undefined,
+              tokenExpiry: new Date(tokens.expiry_date).toISOString(),
+            },
           },
-        },
-        create: {
-          candidateId,
-          type: 'EMAIL',
-          name: email,
-          config: {
-            provider: 'gmail',
-            email,
-            accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token ?? null,
-            tokenExpiry: new Date(tokens.expiry_date).toISOString(),
-            allowedSenders: [],
+        })
+      } else {
+        await prisma.channel.create({
+          data: {
+            candidateId,
+            type: 'EMAIL',
+            name: email,
+            config: {
+              provider: 'gmail',
+              email,
+              accessToken: tokens.access_token,
+              refreshToken: tokens.refresh_token ?? null,
+              tokenExpiry: new Date(tokens.expiry_date).toISOString(),
+              allowedSenders: [],
+            },
           },
-        },
-      })
+        })
+      }
 
       return reply.redirect(`${redirectBase}&email=success`)
     } catch (err) {

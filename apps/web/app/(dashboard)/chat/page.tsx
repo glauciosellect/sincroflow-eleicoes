@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Search, MessageSquare, UserCheck, Bot, Send, Loader2,
   X, RotateCcw, ChevronRight, ChevronLeft, StickyNote,
-  Phone, Mail, Clock, Pencil, FileText, AlertTriangle,
+  Phone, Mail, Clock, Pencil, FileText, AlertTriangle, Paperclip, Image as ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDateTime, channelLabel } from '@/lib/utils'
@@ -29,6 +29,14 @@ function playNotificationSound() {
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + 0.3)
   } catch {}
+}
+
+const CONTACT_TYPE_LABELS: Record<string, string> = {
+  VOTER: 'Eleitor',
+  FAMILY_FRIEND: 'Família/Amigo',
+  STAFF: 'Equipe',
+  CONTRACTOR: 'Terceirizado',
+  OTHER: 'Outro',
 }
 
 const statusColors: Record<string, string> = {
@@ -86,6 +94,17 @@ function ContactPanel({ contactId }: { contactId: string }) {
           {(contact.name || contact.phone || '?')[0].toUpperCase()}
         </div>
         <div className="font-semibold text-gray-900 text-sm">{contact.name || 'Sem nome'}</div>
+        <div className="mt-1.5">
+          <select
+            className="text-xs border border-gray-200 rounded-full px-2 py-0.5 text-gray-600"
+            value={contact.contactType}
+            onChange={(e) => updateMutation.mutate({ contactType: e.target.value })}
+          >
+            {Object.entries(CONTACT_TYPE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
         {contact.phone && <div className="flex items-center justify-center gap-1 mt-0.5 text-xs text-gray-400"><Phone className="w-3 h-3" />{contact.phone}</div>}
         {contact.email && <div className="flex items-center justify-center gap-1 mt-0.5 text-xs text-gray-400"><Mail className="w-3 h-3" />{contact.email}</div>}
         <div className="text-xs text-gray-400 mt-1">{contact.totalInteractions} interações</div>
@@ -191,6 +210,12 @@ export default function ChatPage() {
   const [search, setSearch] = useState('')
   const [channelFilter, setChannelFilter] = useState('all')
   const [message, setMessage] = useState('')
+  const [showCreativePicker, setShowCreativePicker] = useState(false)
+
+  const { data: creatives } = useQuery({
+    queryKey: ['creatives'],
+    queryFn: () => api.get('/creatives').then(r => r.data),
+  })
   const [showProfile, setShowProfile] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -272,9 +297,15 @@ export default function ChatPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['conversations'] }); setSelected(null) },
   })
   const sendMutation = useMutation({
-    mutationFn: ({ id, content }: { id: string; content: string }) => api.post(`/conversations/${id}/messages`, { content }),
+    mutationFn: ({ id, content, mediaUrl, mediaType }: { id: string; content: string; mediaUrl?: string; mediaType?: string }) =>
+      api.post(`/conversations/${id}/messages`, { content, mediaUrl, mediaType }),
     onSuccess: () => setMessage(''),
   })
+
+  const sendCreative = (creative: any) => {
+    sendMutation.mutate({ id: selected.id, content: creative.title, mediaUrl: creative.fileUrl, mediaType: creative.fileType })
+    setShowCreativePicker(false)
+  }
 
   const tabs = [
     { key: 'all', label: 'Todos' },
@@ -404,12 +435,39 @@ export default function ChatPage() {
           </div>
 
           {isAssignedToMe && (
-            <div className="p-4 border-t border-gray-100 flex gap-2">
-              <Input value={message} onChange={e => setMessage(e.target.value)} placeholder="Digite sua mensagem..."
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && message.trim()) { e.preventDefault(); sendMutation.mutate({ id: selected.id, content: message }) } }} />
-              <Button onClick={() => sendMutation.mutate({ id: selected.id, content: message })} disabled={!message.trim() || sendMutation.isPending} className="bg-[#002776] hover:bg-[#002776]/90">
-                {sendMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
+            <div className="p-4 border-t border-gray-100 relative">
+              {showCreativePicker && (
+                <div className="absolute bottom-full left-4 mb-2 w-72 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg p-2 space-y-1 z-10">
+                  {!creatives?.length ? (
+                    <p className="text-xs text-gray-400 p-3 text-center">Nenhum criativo cadastrado. Adicione em Agente → Criativos.</p>
+                  ) : (
+                    creatives.map((c: any) => (
+                      <button
+                        key={c.id}
+                        onClick={() => sendCreative(c)}
+                        className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 text-left"
+                      >
+                        {c.fileType === 'image' ? (
+                          <img src={c.fileUrl} alt={c.title} className="w-10 h-10 object-cover rounded" />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center"><ImageIcon className="w-4 h-4 text-gray-300" /></div>
+                        )}
+                        <span className="text-sm text-gray-700 truncate">{c.title}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" onClick={() => setShowCreativePicker(!showCreativePicker)} title="Anexar criativo">
+                  <Paperclip className="w-4 h-4" />
+                </Button>
+                <Input value={message} onChange={e => setMessage(e.target.value)} placeholder="Digite sua mensagem..."
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && message.trim()) { e.preventDefault(); sendMutation.mutate({ id: selected.id, content: message }) } }} />
+                <Button onClick={() => sendMutation.mutate({ id: selected.id, content: message })} disabled={!message.trim() || sendMutation.isPending} className="bg-[#002776] hover:bg-[#002776]/90">
+                  {sendMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </div>
             </div>
           )}
         </div>

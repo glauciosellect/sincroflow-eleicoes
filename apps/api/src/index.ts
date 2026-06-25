@@ -5,6 +5,7 @@ import helmet from '@fastify/helmet'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import rawBody from 'fastify-raw-body'
+import multipart from '@fastify/multipart'
 import { redis } from './lib/redis'
 import { logger } from './lib/logger'
 
@@ -29,6 +30,9 @@ import { statusRoutes } from './modules/status/status.routes'
 import { complianceRoutes } from './modules/compliance/compliance.routes'
 import { requestRoutes } from './modules/requests/requests.routes'
 import { eventRoutes } from './modules/events/events.routes'
+import { creativeRoutes } from './modules/creatives/creatives.routes'
+import { broadcastRoutes } from './modules/broadcasts/broadcasts.routes'
+import { startBroadcastWorker } from './modules/broadcasts/broadcast.worker'
 import { alertRoutes } from './modules/alerts/alerts.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
@@ -53,7 +57,15 @@ declare module 'fastify' {
 }
 
 async function bootstrap() {
-  await redis.connect().catch(() => {})
+  // Em dev sem Redis real configurado, não usa o store Redis no rate-limit —
+  // evita que o plugin trave requisições esperando comandos que nunca respondem
+  // (ioredis com maxRetriesPerRequest: null enfileira indefinidamente).
+  const hasRealRedis = !process.env.REDIS_URL?.includes('localhost') && !process.env.REDIS_URL?.includes('127.0.0.1')
+  if (hasRealRedis) {
+    await redis.connect().catch(() => {})
+  } else {
+    logger.warn('[REDIS] REDIS_URL aponta para localhost — rate-limit usará armazenamento em memória e filas (BullMQ) não funcionarão até configurar um Redis real')
+  }
 
   await app.register(cors, {
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000', process.env.FRONTEND_URL || ''].filter(Boolean),
@@ -75,13 +87,14 @@ async function bootstrap() {
   // para validar assinaturas HMAC (Stripe, Meta) sobre os bytes exatos recebidos,
   // já que o JSON re-serializado pode não ser idêntico ao original.
   await app.register(rawBody, { field: 'rawBody', global: false, runFirst: true })
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } })
 
   // Rate limit global: 200 req/min por IP
   await app.register(rateLimit, {
     global: true,
     max: 200,
     timeWindow: '1 minute',
-    redis,
+    ...(hasRealRedis ? { redis } : {}),
     keyGenerator: (req) => req.ip,
     errorResponseBuilder: () => ({ error: 'Muitas requisições. Tente novamente em instantes.' }),
   })
@@ -116,6 +129,8 @@ async function bootstrap() {
   await app.register(contactRoutes)
   await app.register(requestRoutes)
   await app.register(eventRoutes)
+  await app.register(creativeRoutes)
+  await app.register(broadcastRoutes)
   await app.register(alertRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
@@ -141,6 +156,7 @@ async function bootstrap() {
   startComplianceWorker()
   startAlertsWorker()
   startCalendarSyncWorker()
+  startBroadcastWorker()
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })
