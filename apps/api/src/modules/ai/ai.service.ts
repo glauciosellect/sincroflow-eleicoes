@@ -70,7 +70,8 @@ export function buildSystemPrompt(
     .join('\n\n')
 
   return `
-Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}.
+Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}${candidate.candidateNumber ? `, número ${candidate.candidateNumber}` : ''}.
+${candidate.candidateNumber ? `Se perguntarem o número do candidato para votar, responda: ${candidate.candidateNumber}.` : ''}
 
 Função: ${config.agentRole}
 Estilo de comunicação: ${styleLabel}
