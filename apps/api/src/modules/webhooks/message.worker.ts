@@ -33,7 +33,7 @@ function isBotMessage(text: string): boolean {
 function isFarewellMessage(text: string): boolean {
   const t = text.trim()
   const farewellPatterns = [
-    /^(tchau|xau|tchauzinho|xauzinho|até\s*mais|até\s*logo|até\s*breve|até\s*amanhã|falou|flw|fui|valeu\s*falou|abraços?|bjs?|bjão|bjoca)[\s!.]*$/i,
+    /^(tchau|xau|tchauzinho|xauzinho|até\s*mais|até\s*logo|até\s*breve|até\s*amanhã|falou|flw|fui|valeu\s*falou|abraços?|bjs?|bjão|bjoca|obrigad[oa]s?|valeu)[\s!.]*$/i,
     /^(bye|cya|see\s*you|goodbye|hasta\s*luego)[\s!.]*$/i,
     /\b(tchau|xau|até\s*mais|até\s*logo|até\s*breve|até\s*a\s*próxima)\s*[\W]*$/i,
   ]
