@@ -6,7 +6,10 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { getPendingRegistration, activatePendingRegistration } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+// apiVersion forçada explicitamente: o SDK não atualiza isso automaticamente,
+// e branding_settings (nome customizado por sessão de checkout) só funciona em
+// versões de API a partir de 2025-09-30 — sem isso o campo é ignorado silenciosamente.
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-09-30.clover' as any })
 
 // TODO: substituir pelos Price IDs reais criados no Stripe do SyncroFlowEleições
 const PLAN_PRICE_IDS: Record<'CAMPAIGN' | 'MANDATE', string | undefined> = {
