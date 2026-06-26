@@ -23,17 +23,32 @@ export async function creativeRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
-    const data = await req.file()
-    if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado' })
+    // req.file() só popula data.fields com os campos que já foram lidos do stream
+    // ANTES do arquivo — como a ordem de campos no FormData não é garantida, iteramos
+    // todos os parts manualmente para capturar título/tema independente da ordem de envio.
+    let fileBuffer: Buffer | null = null
+    let filename = ''
+    let mimetype = ''
+    let title = ''
+    let topicKey: string | null = null
 
-    const fields = data.fields as Record<string, any>
-    const title = fields.title?.value
-    const topicKey = fields.topicKey?.value || null
+    for await (const part of req.parts()) {
+      if (part.type === 'file') {
+        fileBuffer = await part.toBuffer()
+        filename = part.filename
+        mimetype = part.mimetype
+      } else if (part.fieldname === 'title') {
+        title = part.value as string
+      } else if (part.fieldname === 'topicKey') {
+        topicKey = (part.value as string) || null
+      }
+    }
+
+    if (!fileBuffer) return reply.status(400).send({ error: 'Nenhum arquivo enviado' })
     if (!title) return reply.status(400).send({ error: 'Título é obrigatório' })
 
-    const buffer = await data.toBuffer()
-    const fileUrl = await uploadCreative(candidateId, buffer, data.filename, data.mimetype)
-    const fileType = detectMediaType(data.filename)
+    const fileUrl = await uploadCreative(candidateId, fileBuffer, filename, mimetype)
+    const fileType = detectMediaType(filename)
 
     const creative = await prisma.creative.create({
       data: { candidateId, title, topicKey, fileUrl, fileType },
