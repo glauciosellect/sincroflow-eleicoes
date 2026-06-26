@@ -11,6 +11,15 @@ import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 // versões de API a partir de 2025-09-30 — sem isso o campo é ignorado silenciosamente.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-09-30.clover' as any })
 
+// Identidade visual do checkout — mesma logo e cores usadas na landing page.
+const CHECKOUT_BRANDING = {
+  display_name: 'SyncroFlowEleições',
+  button_color: '#009C3B',
+  border_style: 'rounded',
+  icon: { type: 'url', url: 'https://syncrofloweleicoes.com.br/logo.png' },
+  logo: { type: 'url', url: 'https://syncrofloweleicoes.com.br/logo.png' },
+} as const
+
 // TODO: substituir pelos Price IDs reais criados no Stripe do SyncroFlowEleições
 const PLAN_PRICE_IDS: Record<'CAMPAIGN' | 'MANDATE', string | undefined> = {
   CAMPAIGN: process.env.STRIPE_PRICE_CAMPAIGN,
@@ -66,7 +75,7 @@ export async function stripeRoutes(app: FastifyInstance) {
       subscription_data: { metadata: { type: 'registration', pendingId, plan } },
       success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
-      branding_settings: { display_name: 'SyncroFlowEleições' } as any,
+      branding_settings: CHECKOUT_BRANDING as any,
     })
 
     return reply.send({ url: session.url })
@@ -86,7 +95,7 @@ export async function stripeRoutes(app: FastifyInstance) {
       metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount) },
       success_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=cancelled`,
-      branding_settings: { display_name: 'SyncroFlowEleições' } as any,
+      branding_settings: CHECKOUT_BRANDING as any,
     })
 
     return reply.send({ url: session.url })

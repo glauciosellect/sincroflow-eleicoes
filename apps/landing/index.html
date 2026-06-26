@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SyncroFlowEleições — Seu eleitor merece atenção 24 horas por dia</title>
+  <link rel="icon" type="image/png" href="/logo.png" />
   <meta name="description" content="O assistente virtual inteligente para candidatos que levam a campanha a sério. Atenda eleitores 24/7 no WhatsApp e outros canais, em conformidade com a Resolução TSE nº 23.755/2026." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -90,8 +91,8 @@
       border-bottom: 1px solid var(--gray-200);
     }
     .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
-    .logo { font-weight: 800; font-size: 20px; color: var(--azul); }
-    .logo span { color: var(--verde); }
+    .logo { display: flex; align-items: center; }
+    .logo img { height: 40px; display: block; }
     nav { display: flex; align-items: center; gap: 32px; }
     nav a { color: var(--gray-600); text-decoration: none; font-weight: 500; font-size: 15px; }
     nav a:hover { color: var(--azul); }
@@ -300,7 +301,7 @@
 
   <header>
     <div class="header-inner">
-      <div class="logo">SyncroFlow<span>Eleições</span></div>
+      <div class="logo"><img src="/logo.png" alt="SyncroFlowEleições" /></div>
       <nav class="nav-links">
         <a href="#como-funciona">Como Funciona</a>
         <a href="#recursos">Recursos</a>
