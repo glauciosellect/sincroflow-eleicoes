@@ -27,13 +27,15 @@ function isBotMessage(text: string): boolean {
   return botPatterns.some((pattern) => pattern.test(text))
 }
 
-// Detecta se a mensagem é uma despedida do eleitor
+// Detecta se a mensagem é uma despedida do eleitor. "Bom dia"/"boa tarde"/"boa noite"
+// sozinhos NÃO contam — são saudações de abertura comuns em português, não despedida
+// (esse era um bug real: uma primeira mensagem "Boa noite" silenciava a conversa por 2h).
 function isFarewellMessage(text: string): boolean {
   const t = text.trim()
   const farewellPatterns = [
     /^(tchau|xau|tchauzinho|xauzinho|até\s*mais|até\s*logo|até\s*breve|até\s*amanhã|falou|flw|fui|valeu\s*falou|abraços?|bjs?|bjão|bjoca)[\s!.]*$/i,
     /^(bye|cya|see\s*you|goodbye|hasta\s*luego)[\s!.]*$/i,
-    /\b(tchau|xau|até\s*mais|até\s*logo|até\s*breve|até\s*a\s*próxima|boa\s*noite|boa\s*tarde|bom\s*dia)\s*[\W]*$/i,
+    /\b(tchau|xau|até\s*mais|até\s*logo|até\s*breve|até\s*a\s*próxima)\s*[\W]*$/i,
   ]
   return t.length <= 60 && farewellPatterns.some((p) => p.test(t))
 }
