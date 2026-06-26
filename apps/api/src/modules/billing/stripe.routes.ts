@@ -63,6 +63,7 @@ export async function stripeRoutes(app: FastifyInstance) {
       subscription_data: { metadata: { type: 'registration', pendingId, plan } },
       success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
+      branding_settings: { display_name: 'SyncroFlowEleições' } as any,
     })
 
     return reply.send({ url: session.url })
@@ -82,6 +83,7 @@ export async function stripeRoutes(app: FastifyInstance) {
       metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount) },
       success_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=cancelled`,
+      branding_settings: { display_name: 'SyncroFlowEleições' } as any,
     })
 
     return reply.send({ url: session.url })
