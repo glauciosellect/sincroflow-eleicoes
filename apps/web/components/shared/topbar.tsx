@@ -22,6 +22,20 @@ const ALERT_ICONS: Record<Alert['type'], typeof AlertTriangle> = {
   content_gap: FileWarning,
 }
 
+// Para onde cada tipo de alerta leva ao ser clicado — sem isso, com volume alto de
+// alertas, a equipe não consegue localizar manualmente a conversa/tema na lista.
+function alertHref(alert: Alert): string {
+  switch (alert.type) {
+    case 'urgent':
+      return alert.data?.conversationId ? `/chat?conversationId=${alert.data.conversationId}` : '/chat'
+    case 'peak':
+    case 'content_gap':
+      return '/relatorios'
+    case 'tse_deactivation':
+      return '/settings?tab=compliance'
+  }
+}
+
 function NotificationBell() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -84,10 +98,15 @@ function NotificationBell() {
                 const Icon = ALERT_ICONS[alert.type]
                 const isCritical = alert.type === 'urgent' || alert.type === 'tse_deactivation'
                 return (
-                  <div key={i} className={cn('flex items-start gap-3 px-4 py-3', isCritical ? 'bg-red-500/5' : 'hover:bg-[hsl(var(--accent))]')}>
+                  <Link
+                    key={i}
+                    href={alertHref(alert)}
+                    onClick={() => setOpen(false)}
+                    className={cn('flex items-start gap-3 px-4 py-3 transition-colors', isCritical ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-[hsl(var(--accent))]')}
+                  >
                     <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', isCritical ? 'text-red-500' : 'text-[hsl(var(--primary))]')} />
                     <div className="flex-1 min-w-0 text-sm text-[hsl(var(--card-foreground))]">{alert.message}</div>
-                  </div>
+                  </Link>
                 )
               })}
             </div>
