@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import Link from 'next/link'
 import api from '@/lib/api'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Users, MessageSquare, FileWarning, Activity, Construction, MessageCircleQuestion, HelpCircle, Clock3 } from 'lucide-react'
+import { Loader2, Users, MessageSquare, FileWarning, Activity, Construction, MessageCircleQuestion, HelpCircle, Clock3, Download } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ const PENDING_REPORTS = [
 
 export default function RelatoriosPage() {
   const [period, setPeriod] = useState(7)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const end = new Date().toISOString()
   const start = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
   const prevEnd = start
@@ -77,6 +79,23 @@ export default function RelatoriosPage() {
     queryFn: () => api.get('/analytics/peak-hours', { params: { start, end } }).then(r => r.data),
   })
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true)
+    try {
+      const res = await api.get('/analytics/export-pdf', { params: { start, end }, responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'relatorio-campanha.pdf'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -84,12 +103,18 @@ export default function RelatoriosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
           <p className="text-gray-500 text-sm mt-1">Use estes dados para definir sua agenda de rua — vá onde os eleitores estão pedindo.</p>
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {periodOptions.map((o) => (
-            <button key={o.days} onClick={() => setPeriod(o.days)} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all', period === o.days ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-              {o.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {periodOptions.map((o) => (
+              <button key={o.days} onClick={() => setPeriod(o.days)} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all', period === o.days ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+            {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            Baixar PDF
+          </Button>
         </div>
       </div>
 

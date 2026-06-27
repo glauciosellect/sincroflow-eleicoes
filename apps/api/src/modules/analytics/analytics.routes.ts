@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
+import { generateReportPdf } from './report-pdf'
 
 // Relatórios implementados (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md):
 // 1. Visão Geral da Semana, 2. Temas Mais Perguntados, 4. Volume por Canal,
@@ -195,6 +196,20 @@ export async function analyticsRoutes(app: FastifyInstance) {
     }
 
     return reply.send(byHour)
+  })
+
+  // Exporta o relatório do período em PDF (visão geral, status, temas, gaps, top eleitores)
+  app.get('/analytics/export-pdf', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+
+    const pdfBuffer = await generateReportPdf(candidateId, start, end)
+
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', 'attachment; filename="relatorio-campanha.pdf"')
+      .send(pdfBuffer)
   })
 
   // Painel "ao vivo" do dashboard principal (seção 4.2 da spec)
