@@ -1,6 +1,6 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -33,8 +33,13 @@ export default function RelatoriosPage() {
   const [showCustomRange, setShowCustomRange] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<{ key: string; name: string } | null>(null)
 
-  const end = customRange ? new Date(customRange.end).toISOString() : new Date().toISOString()
-  const start = customRange ? new Date(customRange.start).toISOString() : new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
+  // Calculado uma vez por mudança de período/customRange (useMemo), não a cada
+  // render — sem isso, "new Date()" mudava a cada milissegundo e a queryKey do
+  // React Query nunca se estabilizava, gerando uma chamada nova infinitamente.
+  const { start, end } = useMemo(() => ({
+    end: customRange ? new Date(customRange.end).toISOString() : new Date().toISOString(),
+    start: customRange ? new Date(customRange.start).toISOString() : new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString(),
+  }), [period, customRange])
 
   // Um único endpoint consolidado no backend (Promise.all lá dentro) em vez de ~9
   // requisições HTTP separadas — cada uma era rápida isoladamente, mas a soma das
