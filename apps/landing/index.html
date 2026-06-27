@@ -238,8 +238,64 @@
     .chat-vantagens li div span { font-size: 14px; color: var(--gray-600); }
     @media (max-width: 900px) { .chat-demo-wrap { grid-template-columns: 1fr; } }
 
+    /* ── SANTINHO DIGITAL ── */
+    .santinho-section {
+      padding: 80px 24px;
+      background: linear-gradient(160deg, var(--verde), var(--verde-escuro));
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    .santinho-section::before {
+      content: '';
+      position: absolute; top: -80px; right: -80px;
+      width: 280px; height: 280px;
+      background: var(--amarelo);
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      opacity: 0.12;
+      animation: float 6s ease-in-out infinite;
+    }
+    .santinho-section::after {
+      content: '';
+      position: absolute; bottom: -60px; left: -60px;
+      width: 200px; height: 200px;
+      background: var(--azul-claro);
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      opacity: 0.15;
+      animation: float 7s ease-in-out infinite reverse;
+    }
+    .santinho-content { max-width: 1000px; margin: 0 auto; text-align: center; position: relative; z-index: 1; }
+    .santinho-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,223,0,0.2); color: var(--amarelo);
+      border: 1px solid rgba(255,223,0,0.35); border-radius: 50px;
+      padding: 6px 16px; font-size: 13px; font-weight: 700; margin-bottom: 16px;
+    }
+    .santinho-section h2 { font-size: 32px; font-weight: 800; margin-bottom: 16px; }
+    .santinho-subhead { font-size: 17px; opacity: 0.92; max-width: 640px; margin: 0 auto 48px; }
+    .santinho-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .santinho-card {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px; padding: 28px; text-align: left;
+      transition: transform 0.25s ease, background 0.25s ease;
+    }
+    .santinho-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.13); }
+    .santinho-card.highlight {
+      background: rgba(255,223,0,0.14); border: 1px solid rgba(255,223,0,0.4);
+      box-shadow: 0 8px 24px rgba(255,223,0,0.15);
+    }
+    .santinho-icon { font-size: 28px; margin-bottom: 12px; }
+    .santinho-card h3 { font-size: 17px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .santinho-card p { font-size: 14px; opacity: 0.88; line-height: 1.5; }
+    .santinho-tag {
+      display: inline-block; background: var(--amarelo); color: var(--azul);
+      font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 50px;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    @media (max-width: 800px) { .santinho-grid { grid-template-columns: 1fr; } }
+
     /* ── RECURSOS ── */
-    .features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1100px; margin: 0 auto; }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1100px; margin: 0 auto; }
     .feature-card {
       background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 16px;
       padding: 28px; text-align: left; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
@@ -403,7 +459,37 @@
           <li><div class="check">✓</div><div><strong>Conteúdo sob seu controle</strong><span>Responde só sobre o que você cadastrou — sem inventar nada.</span></div></li>
           <li><div class="check">✓</div><div><strong>Memória de conversa</strong><span>Reconhece eleitores que já conversaram antes e retoma o contexto.</span></div></li>
           <li><div class="check">✓</div><div><strong>Protocolo automático</strong><span>Pedidos e reclamações geram protocolo e vão direto para sua equipe.</span></div></li>
+          <li style="background: rgba(255,223,0,0.15); border: 1px solid rgba(255,223,0,0.4); border-radius: 12px; padding: 10px 12px; margin: 4px 0;"><div class="check" style="background: linear-gradient(135deg, #FFDF00, #009C3B); color: #002776;">🎙️</div><div><strong>Responde por áudio</strong><span>Se o eleitor manda áudio, o assistente responde em áudio — espelhando o jeito que a pessoa prefere conversar.</span></div></li>
+          <li><div class="check">✓</div><div><strong>Agenda sempre à mão</strong><span>O eleitor pergunta sobre os próximos eventos e o assistente já informa data, local e horário cadastrados.</span></div></li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="santinho-section">
+    <div class="santinho-content">
+      <span class="santinho-badge reveal">📩 Novo</span>
+      <h2 class="reveal">Seu Santinho Digital, direto na mão do eleitor</h2>
+      <p class="santinho-subhead reveal reveal-delay-1">
+        Envie suas propostas, peças de campanha e materiais de divulgação para quem já conversou com você —
+        automaticamente pelo WhatsApp e por e-mail, sem precisar imprimir, sem precisar sair de casa.
+      </p>
+      <div class="santinho-grid">
+        <div class="santinho-card reveal reveal-delay-1">
+          <div class="santinho-icon">💬</div>
+          <h3>Anexo automático por tema</h3>
+          <p>O eleitor pergunta sobre saúde, seu assistente já manda a peça certa sobre saúde — sem a equipe precisar fazer nada.</p>
+        </div>
+        <div class="santinho-card reveal reveal-delay-2">
+          <div class="santinho-icon">📧</div>
+          <h3>WhatsApp e e-mail, no mesmo lugar</h3>
+          <p>O mesmo material chega por WhatsApp e por e-mail, sempre dentro do limite de envio seguro da sua campanha.</p>
+        </div>
+        <div class="santinho-card highlight reveal reveal-delay-3">
+          <div class="santinho-icon">🎯</div>
+          <h3>Disparo segmentado <span class="santinho-tag">Controlado</span></h3>
+          <p>Selecione um grupo de eleitores que já falaram com sua campanha e envie o material de uma vez — com limites de segurança para proteger seu número.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -420,7 +506,7 @@
       <div class="feature-card reveal reveal-delay-1">
         <div class="feature-icon">📊</div>
         <h3>Painel de Inteligência</h3>
-        <p>Relatórios sobre temas mais perguntados, engajamento e solicitações da sua base.</p>
+        <p>Relatórios completos: temas mais perguntados, engajamento por canal, evolução dos atendimentos e status de cada solicitação — tudo em gráficos fáceis de entender.</p>
       </div>
       <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">⚖️</div>
@@ -431,6 +517,26 @@
         <div class="feature-icon">💬</div>
         <h3>Múltiplos Canais</h3>
         <p>WhatsApp, Instagram, Facebook, Telegram e e-mail, tudo integrado.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🚨</div>
+        <h3>Alertas e Urgências</h3>
+        <p>Sua equipe é avisada automaticamente quando um tema dispara, quando falta conteúdo cadastrado, ou quando uma conversa precisa de atenção humana imediata.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">👥</div>
+        <h3>Equipe de Trabalho</h3>
+        <p>Convide toda sua equipe — cada pessoa com seu próprio acesso e nível de permissão (atendimento, conteúdo, relatórios ou administração).</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">📱</div>
+        <h3>Vários números de WhatsApp</h3>
+        <p>Campanha grande? Conecte quantos números de WhatsApp precisar, todos atendidos pelo mesmo assistente treinado.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon">🗂️</div>
+        <h3>Contatos organizados</h3>
+        <p>Classifique automaticamente quem é eleitor, família, equipe ou parceiro — sua base sempre limpa e fácil de filtrar.</p>
       </div>
     </div>
   </section>
