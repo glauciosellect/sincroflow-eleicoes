@@ -1,6 +1,8 @@
+import axios from 'axios'
 import { refreshAccessToken } from './google'
 
 const GMAIL_API = 'https://www.googleapis.com/gmail/v1/users/me'
+const GMAIL_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024 // limite da própria Gmail API
 
 export interface GmailMessage {
   messageId: string
@@ -167,6 +169,85 @@ export async function sendReply(accessToken: string, params: {
     const data = await res.json().catch(() => ({}))
     console.error('[GMAIL] sendReply erro:', JSON.stringify(data))
     throw new Error('Falha ao enviar resposta por e-mail')
+  }
+}
+
+function detectMimeType(url: string): string {
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || ''
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    mp4: 'video/mp4', mov: 'video/quicktime',
+    pdf: 'application/pdf',
+  }
+  return map[ext] || 'application/octet-stream'
+}
+
+// Quebra base64 em linhas de 76 caracteres — padrão MIME (RFC 2045).
+function wrapBase64(base64: string): string {
+  return base64.replace(/(.{76})/g, '$1\r\n')
+}
+
+// Mesmo fluxo de sendReply, mas anexando um arquivo (ex: criativo/"Santinho") via
+// multipart/mixed. Se o anexo exceder o limite de 25MB da Gmail API, envia só o
+// texto em vez de falhar — nunca bloqueia a resposta por causa do anexo.
+export async function sendReplyWithAttachment(accessToken: string, params: {
+  threadId: string
+  messageId: string
+  references?: string
+  to: string
+  subject: string
+  body: string
+  attachmentUrl: string
+  attachmentName: string
+}): Promise<void> {
+  const { threadId, messageId, references, to, subject, body, attachmentUrl, attachmentName } = params
+
+  let attachmentBuffer: Buffer | null = null
+  try {
+    const res = await axios.get(attachmentUrl, { responseType: 'arraybuffer', timeout: 30000 })
+    attachmentBuffer = Buffer.from(res.data)
+  } catch (err: any) {
+    console.error('[GMAIL] Falha ao baixar anexo, enviando só texto:', err?.message)
+  }
+
+  if (!attachmentBuffer || attachmentBuffer.byteLength > GMAIL_MAX_ATTACHMENT_BYTES) {
+    if (attachmentBuffer) console.error(`[GMAIL] Anexo excede 25MB (${attachmentBuffer.byteLength} bytes), enviando só texto`)
+    return sendReply(accessToken, { threadId, messageId, references, to, subject, body })
+  }
+
+  const boundary = `boundary_${Date.now()}`
+  const mimeType = detectMimeType(attachmentName)
+  const raw = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `In-Reply-To: ${messageId}`,
+    `References: ${references || messageId}`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    body,
+    '',
+    `--${boundary}`,
+    `Content-Type: ${mimeType}`,
+    `Content-Disposition: attachment; filename="${attachmentName}"`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    wrapBase64(attachmentBuffer.toString('base64')),
+    '',
+    `--${boundary}--`,
+  ].join('\r\n')
+
+  const res = await fetch(`${GMAIL_API}/messages/send`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: encodeBase64Url(raw), threadId }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    console.error('[GMAIL] sendReplyWithAttachment erro:', JSON.stringify(data))
+    throw new Error('Falha ao enviar resposta com anexo por e-mail')
   }
 }
 

@@ -4,7 +4,7 @@ import { prisma } from '../../lib/prisma'
 import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { getWorkspaceId } from '../../lib/workspace'
-import { getValidGmailToken, sendReply } from '../../lib/gmail'
+import { getValidGmailToken, sendReply, sendReplyWithAttachment } from '../../lib/gmail'
 
 export async function conversationRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
@@ -140,14 +140,28 @@ export async function conversationRoutes(app: FastifyInstance) {
         if (meta?.threadId && meta?.messageId) {
           const accessToken = await getValidGmailToken(conv.channelId)
           if (accessToken) {
-            await sendReply(accessToken, {
-              threadId: meta.threadId,
-              messageId: meta.messageId,
-              references: meta.references,
-              to: conv.contact.externalId,
-              subject: meta.subject?.toLowerCase().startsWith('re:') ? meta.subject : `Re: ${meta.subject || ''}`,
-              body: content,
-            })
+            const subject = meta.subject?.toLowerCase().startsWith('re:') ? meta.subject : `Re: ${meta.subject || ''}`
+            if (mediaUrl) {
+              await sendReplyWithAttachment(accessToken, {
+                threadId: meta.threadId,
+                messageId: meta.messageId,
+                references: meta.references,
+                to: conv.contact.externalId,
+                subject,
+                body: content,
+                attachmentUrl: mediaUrl,
+                attachmentName: content,
+              })
+            } else {
+              await sendReply(accessToken, {
+                threadId: meta.threadId,
+                messageId: meta.messageId,
+                references: meta.references,
+                to: conv.contact.externalId,
+                subject,
+                body: content,
+              })
+            }
           }
         }
       }

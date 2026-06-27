@@ -6,7 +6,7 @@ import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { redis } from '../../lib/redis'
 import { getAgendaContextForPrompt } from '../calendar/calendar.service'
 import { generateSpeech } from '../tts/tts.service'
-import { getValidGmailToken, sendReply } from '../../lib/gmail'
+import { getValidGmailToken, sendReply, sendReplyWithAttachment } from '../../lib/gmail'
 import { createRequest, getRequestStatusMessage } from '../requests/requests.service'
 import axios from 'axios'
 
@@ -322,6 +322,16 @@ export function startMessageWorker() {
       })
       try { emitConversationUpdated(candidate.id, updatedConv) } catch {}
 
+      // Busca o criativo ("Santinho") do tema identificado, se houver um cadastrado —
+      // usado tanto no WhatsApp quanto no e-mail, sempre em resposta a uma pergunta
+      // do eleitor, nunca disparo em massa.
+      const topicCreative = classification.topicKey
+        ? await prisma.creative.findFirst({
+            where: { candidateId: candidate.id, topicKey: classification.topicKey },
+            orderBy: { createdAt: 'desc' },
+          })
+        : null
+
       if (channelType === 'WHATSAPP') {
         const provider = getWhatsAppProvider()
         if (audioPreference === 'audio') {
@@ -335,20 +345,12 @@ export function startMessageWorker() {
           await provider.sendText(channelId, from, responseText)
         }
 
-        // Anexa o criativo ("Santinho") do tema identificado, se houver um cadastrado —
-        // sempre em resposta a uma pergunta do eleitor, nunca disparo em massa.
-        if (classification.topicKey) {
-          const creative = await prisma.creative.findFirst({
-            where: { candidateId: candidate.id, topicKey: classification.topicKey },
-            orderBy: { createdAt: 'desc' },
+        if (topicCreative) {
+          await provider.sendMedia(channelId, from, topicCreative.fileUrl, topicCreative.title)
+          const creativeMsg = await prisma.message.create({
+            data: { conversationId: conversation.id, senderType: 'AGENT', content: topicCreative.title, mediaUrl: topicCreative.fileUrl, mediaType: topicCreative.fileType },
           })
-          if (creative) {
-            await provider.sendMedia(channelId, from, creative.fileUrl, creative.title)
-            const creativeMsg = await prisma.message.create({
-              data: { conversationId: conversation.id, senderType: 'AGENT', content: creative.title, mediaUrl: creative.fileUrl, mediaType: creative.fileType },
-            })
-            try { emitNewMessage(candidate.id, conversation.id, creativeMsg) } catch {}
-          }
+          try { emitNewMessage(candidate.id, conversation.id, creativeMsg) } catch {}
         }
       } else if (channelType === 'TELEGRAM') {
         const botToken = (channel.config as any).botToken
@@ -369,14 +371,32 @@ export function startMessageWorker() {
       } else if (channelType === 'EMAIL' && emailMetadata) {
         const accessToken = await getValidGmailToken(channelId)
         if (accessToken) {
-          await sendReply(accessToken, {
-            threadId: emailMetadata.threadId,
-            messageId: emailMetadata.messageId,
-            references: emailMetadata.references,
-            to: from,
-            subject: emailMetadata.subject.toLowerCase().startsWith('re:') ? emailMetadata.subject : `Re: ${emailMetadata.subject}`,
-            body: responseText,
-          })
+          const subject = emailMetadata.subject.toLowerCase().startsWith('re:') ? emailMetadata.subject : `Re: ${emailMetadata.subject}`
+          if (topicCreative) {
+            await sendReplyWithAttachment(accessToken, {
+              threadId: emailMetadata.threadId,
+              messageId: emailMetadata.messageId,
+              references: emailMetadata.references,
+              to: from,
+              subject,
+              body: responseText,
+              attachmentUrl: topicCreative.fileUrl,
+              attachmentName: topicCreative.title,
+            })
+            const creativeMsg = await prisma.message.create({
+              data: { conversationId: conversation.id, senderType: 'AGENT', content: topicCreative.title, mediaUrl: topicCreative.fileUrl, mediaType: topicCreative.fileType },
+            })
+            try { emitNewMessage(candidate.id, conversation.id, creativeMsg) } catch {}
+          } else {
+            await sendReply(accessToken, {
+              threadId: emailMetadata.threadId,
+              messageId: emailMetadata.messageId,
+              references: emailMetadata.references,
+              to: from,
+              subject,
+              body: responseText,
+            })
+          }
         } else {
           console.error('[EMAIL-SEND] Token inválido para canal', channelId)
         }
