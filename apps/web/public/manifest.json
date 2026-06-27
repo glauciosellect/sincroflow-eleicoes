@@ -1,11 +1,11 @@
 {
-  "name": "SyncroFlow",
-  "short_name": "SyncroFlow",
-  "description": "Atendimento Omnichannel com IA",
+  "name": "SyncroFlowEleições",
+  "short_name": "SyncroFlowEleições",
+  "description": "Assistente virtual de campanha eleitoral com IA",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1565C0",
+  "theme_color": "#002776",
   "orientation": "portrait-primary",
   "icons": [
     {

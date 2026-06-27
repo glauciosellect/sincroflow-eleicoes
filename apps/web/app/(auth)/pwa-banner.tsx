@@ -22,10 +22,10 @@ export function PwaInstallBanner() {
         const { outcome } = await prompt.userChoice
         if (outcome === 'accepted') setInstalled(true)
       }}
-      style={{ display:'flex', alignItems:'center', gap:'8px', width:'100%', marginTop:'16px', padding:'10px 16px', borderRadius:'12px', border:'1px solid #BFDBFE', background:'#EFF6FF', color:'#1565C0', fontSize:'14px', fontWeight:500, cursor:'pointer' }}
+      style={{ display:'flex', alignItems:'center', gap:'8px', width:'100%', marginTop:'16px', padding:'10px 16px', borderRadius:'12px', border:'1px solid #BFDBFE', background:'#EFF6FF', color:'#002776', fontSize:'14px', fontWeight:500, cursor:'pointer' }}
     >
       <Download style={{ width:16, height:16, flexShrink:0 }} />
-      <span>Instalar SyncroFlow no seu dispositivo</span>
+      <span>Instalar SyncroFlowEleições no seu dispositivo</span>
     </button>
   )
 }
