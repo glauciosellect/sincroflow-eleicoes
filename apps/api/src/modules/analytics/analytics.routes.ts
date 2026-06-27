@@ -13,6 +13,11 @@ import { generateReportPdf } from './report-pdf'
 // na mesma chamada de IA que já identifica tema/gap — sem custo extra),
 // 6. Perguntas Sem Resposta (Gaps de Conteúdo), 7. Horários de Pico,
 // 8. Eleitores Mais Engajados, 9. Evolução Semanal, 10. Status das Solicitações.
+//
+// Cada relatório também tem uma função pura abaixo (sem depender de req/reply),
+// reaproveitada pelo endpoint único /analytics/dashboard — evita que a tela de
+// Relatórios precise disparar ~11 requisições HTTP simultâneas (cada uma rápida
+// isoladamente, mas a soma gerava lentidão perceptível no carregamento).
 
 function dateRange(start?: string, end?: string) {
   const s = start ? new Date(start) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -20,31 +25,184 @@ function dateRange(start?: string, end?: string) {
   return { gte: s, lte: e }
 }
 
+async function getOverview(candidateId: string, range: { gte: Date; lte: Date }) {
+  const previousRange = { gte: new Date(range.gte.getTime() - (range.lte.getTime() - range.gte.getTime())), lte: range.gte }
+
+  const [conversations, newContacts, requests, resolvedRequests, prevConversations, prevNewContacts, prevRequests] = await prisma.$transaction([
+    prisma.conversation.count({ where: { candidateId, createdAt: range } }),
+    prisma.contact.count({ where: { candidateId, createdAt: range } }),
+    prisma.request.count({ where: { candidateId, createdAt: range } }),
+    prisma.request.count({ where: { candidateId, createdAt: range, status: 'RESOLVED' } }),
+    prisma.conversation.count({ where: { candidateId, createdAt: previousRange } }),
+    prisma.contact.count({ where: { candidateId, createdAt: previousRange } }),
+    prisma.request.count({ where: { candidateId, createdAt: previousRange } }),
+  ])
+
+  const resolutionRate = requests > 0 ? Math.round((resolvedRequests / requests) * 100) : 0
+  return {
+    current: { conversations, newContacts, requests, resolutionRate },
+    previous: { conversations: prevConversations, newContacts: prevNewContacts, requests: prevRequests },
+  }
+}
+
+async function getByChannel(candidateId: string, range: { gte: Date; lte: Date }) {
+  const conversations = await prisma.conversation.findMany({
+    where: { candidateId, createdAt: range },
+    include: { channel: { select: { type: true, name: true } } },
+  })
+  const grouped: Record<string, { channelId: string; type: string; name: string; count: number }> = {}
+  for (const c of conversations) {
+    const key = c.channelId
+    if (!grouped[key]) grouped[key] = { channelId: c.channelId, type: c.channel.type, name: c.channel.name, count: 0 }
+    grouped[key].count++
+  }
+  return Object.values(grouped).sort((a, b) => b.count - a.count)
+}
+
+async function getTopContacts(candidateId: string) {
+  return prisma.contact.findMany({
+    where: { candidateId },
+    orderBy: { totalInteractions: 'desc' },
+    take: 20,
+    select: { id: true, name: true, phone: true, totalInteractions: true, firstContactAt: true },
+  })
+}
+
+async function getTimeline(candidateId: string, range: { gte: Date; lte: Date }) {
+  const conversations = await prisma.conversation.findMany({
+    where: { candidateId, createdAt: range },
+    select: { createdAt: true },
+  })
+  const grouped: Record<string, number> = {}
+  for (const c of conversations) {
+    const day = c.createdAt.toISOString().split('T')[0]
+    grouped[day] = (grouped[day] || 0) + 1
+  }
+  return Object.entries(grouped).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+async function getRequestsStatus(candidateId: string) {
+  const byStatus = await prisma.request.groupBy({ by: ['status'], where: { candidateId }, _count: true })
+  return Object.fromEntries(byStatus.map((s) => [s.status, s._count]))
+}
+
+async function getTopTopics(candidateId: string, range: { gte: Date; lte: Date }) {
+  const grouped = await prisma.message.groupBy({
+    by: ['topicKey'],
+    where: { topicKey: { not: null }, createdAt: range, conversation: { candidateId } },
+    _count: true,
+    orderBy: { _count: { topicKey: 'desc' } },
+    take: 10,
+  })
+  return grouped.map((g) => ({
+    topicKey: g.topicKey,
+    topicName: PLATFORM_TOPICS.find((t) => t.key === g.topicKey)?.name ?? g.topicKey,
+    count: g._count,
+  }))
+}
+
+async function getContentGaps(candidateId: string, range: { gte: Date; lte: Date }) {
+  const [grouped, examples] = await Promise.all([
+    prisma.message.groupBy({
+      by: ['topicKey'],
+      where: { isContentGap: true, createdAt: range, conversation: { candidateId } },
+      _count: true,
+      orderBy: { _count: { topicKey: 'desc' } },
+      take: 10,
+    }),
+    prisma.message.findMany({
+      where: { isContentGap: true, createdAt: range, conversation: { candidateId } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, content: true, topicKey: true, conversationId: true, createdAt: true },
+    }),
+  ])
+  return {
+    byTopic: grouped.map((g) => ({
+      topicKey: g.topicKey,
+      topicName: g.topicKey ? (PLATFORM_TOPICS.find((t) => t.key === g.topicKey)?.name ?? g.topicKey) : 'Sem tema identificado',
+      count: g._count,
+    })),
+    examples,
+  }
+}
+
+async function getPeakHours(candidateId: string, range: { gte: Date; lte: Date }) {
+  // groupBy não suporta extrair "hora" de um DateTime no Prisma — agregamos por dia+hora
+  // truncado no próprio banco via $queryRaw seria ideal, mas o volume de mensagens de uma
+  // campanha é baixo o suficiente para o cálculo em memória ser desprezível (ms, não segundos).
+  const messages = await prisma.message.findMany({
+    where: { senderType: 'VOTER', createdAt: range, conversation: { candidateId } },
+    select: { createdAt: true },
+  })
+  const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }))
+  for (const m of messages) byHour[new Date(m.createdAt).getHours()].count++
+  return byHour
+}
+
+async function getSentiment(candidateId: string, range: { gte: Date; lte: Date }) {
+  const grouped = await prisma.message.groupBy({
+    by: ['sentiment'],
+    where: { senderType: 'VOTER', sentiment: { not: null }, createdAt: range, conversation: { candidateId } },
+    _count: true,
+  })
+  const result = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 } as Record<string, number>
+  for (const g of grouped) if (g.sentiment) result[g.sentiment] = g._count
+  return result
+}
+
+async function getByRegion(candidateId: string, range: { gte: Date; lte: Date }) {
+  const requests = await prisma.request.findMany({
+    where: { candidateId, createdAt: range },
+    select: { contact: { select: { neighborhood: true } } },
+  })
+  const grouped: Record<string, number> = {}
+  let withoutRegion = 0
+  for (const r of requests) {
+    const neighborhood = r.contact.neighborhood
+    if (!neighborhood) { withoutRegion++; continue }
+    grouped[neighborhood] = (grouped[neighborhood] || 0) + 1
+  }
+  return {
+    byRegion: Object.entries(grouped).map(([neighborhood, count]) => ({ neighborhood, count })).sort((a, b) => b.count - a.count),
+    withoutRegion,
+  }
+}
+
 export async function analyticsRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
+
+  // Endpoint único consolidando os 9 relatórios dependentes de período — a tela de
+  // Relatórios usa este em vez de disparar ~9 requisições HTTP separadas.
+  app.get('/analytics/dashboard', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const [overview, byChannel, topContacts, timeline, requestsStatus, topTopics, contentGaps, peakHours, sentiment, byRegion] = await Promise.all([
+      getOverview(candidateId, range),
+      getByChannel(candidateId, range),
+      getTopContacts(candidateId),
+      getTimeline(candidateId, range),
+      getRequestsStatus(candidateId),
+      getTopTopics(candidateId, range),
+      getContentGaps(candidateId, range),
+      getPeakHours(candidateId, range),
+      getSentiment(candidateId, range),
+      getByRegion(candidateId, range),
+    ])
+
+    return reply.send({ overview, byChannel, topContacts, timeline, requestsStatus, topTopics, contentGaps, peakHours, sentiment, byRegion })
+  })
 
   // Relatório 1: Visão Geral da Semana
   app.get('/analytics/overview', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-    const previousRange = { gte: new Date(range.gte.getTime() - (range.lte.getTime() - range.gte.getTime())), lte: range.gte }
-
-    const [conversations, newContacts, requests, resolvedRequests, prevConversations] = await prisma.$transaction([
-      prisma.conversation.count({ where: { candidateId, createdAt: range } }),
-      prisma.contact.count({ where: { candidateId, createdAt: range } }),
-      prisma.request.count({ where: { candidateId, createdAt: range } }),
-      prisma.request.count({ where: { candidateId, createdAt: range, status: 'RESOLVED' } }),
-      prisma.conversation.count({ where: { candidateId, createdAt: previousRange } }),
-    ])
-
-    const resolutionRate = requests > 0 ? Math.round((resolvedRequests / requests) * 100) : 0
-    const conversationsChangePercent = prevConversations > 0
-      ? Math.round(((conversations - prevConversations) / prevConversations) * 100)
-      : null
-
-    return reply.send({ conversations, newContacts, requests, resolutionRate, conversationsChangePercent })
+    const { current } = await getOverview(candidateId, dateRange(start, end))
+    return reply.send(current)
   })
 
   // Relatório 4: Volume por Canal
@@ -52,36 +210,14 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const conversations = await prisma.conversation.findMany({
-      where: { candidateId, createdAt: range },
-      include: { channel: { select: { type: true, name: true } } },
-    })
-
-    const grouped: Record<string, { channelId: string; type: string; name: string; count: number }> = {}
-    for (const c of conversations) {
-      const key = c.channelId
-      if (!grouped[key]) grouped[key] = { channelId: c.channelId, type: c.channel.type, name: c.channel.name, count: 0 }
-      grouped[key].count++
-    }
-
-    return reply.send(Object.values(grouped).sort((a, b) => b.count - a.count))
+    return reply.send(await getByChannel(candidateId, dateRange(start, end)))
   })
 
   // Relatório 8: Eleitores Mais Engajados (Top 20)
   app.get('/analytics/top-contacts', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-
-    const contacts = await prisma.contact.findMany({
-      where: { candidateId },
-      orderBy: { totalInteractions: 'desc' },
-      take: 20,
-      select: { id: true, name: true, phone: true, totalInteractions: true, firstContactAt: true },
-    })
-
-    return reply.send(contacts)
+    return reply.send(await getTopContacts(candidateId))
   })
 
   // Relatório 9: Evolução Semanal (volume de conversas ao longo do tempo)
@@ -89,34 +225,14 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const conversations = await prisma.conversation.findMany({
-      where: { candidateId, createdAt: range },
-      select: { createdAt: true },
-    })
-
-    const grouped: Record<string, number> = {}
-    for (const c of conversations) {
-      const day = c.createdAt.toISOString().split('T')[0]
-      grouped[day] = (grouped[day] || 0) + 1
-    }
-
-    return reply.send(Object.entries(grouped).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)))
+    return reply.send(await getTimeline(candidateId, dateRange(start, end)))
   })
 
   // Relatório 10: Status das Solicitações
   app.get('/analytics/requests-status', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-
-    const byStatus = await prisma.request.groupBy({
-      by: ['status'],
-      where: { candidateId },
-      _count: true,
-    })
-
-    return reply.send(Object.fromEntries(byStatus.map((s) => [s.status, s._count])))
+    return reply.send(await getRequestsStatus(candidateId))
   })
 
   // Relatório 2: Temas Mais Perguntados — agrega Message.topicKey já classificado
@@ -125,23 +241,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const grouped = await prisma.message.groupBy({
-      by: ['topicKey'],
-      where: { topicKey: { not: null }, createdAt: range, conversation: { candidateId } },
-      _count: true,
-      orderBy: { _count: { topicKey: 'desc' } },
-      take: 10,
-    })
-
-    return reply.send(
-      grouped.map((g) => ({
-        topicKey: g.topicKey,
-        topicName: PLATFORM_TOPICS.find((t) => t.key === g.topicKey)?.name ?? g.topicKey,
-        count: g._count,
-      }))
-    )
+    return reply.send(await getTopTopics(candidateId, dateRange(start, end)))
   })
 
   // Lista os contatos que perguntaram sobre um tema específico no período — usado
@@ -170,31 +270,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const grouped = await prisma.message.groupBy({
-      by: ['topicKey'],
-      where: { isContentGap: true, createdAt: range, conversation: { candidateId } },
-      _count: true,
-      orderBy: { _count: { topicKey: 'desc' } },
-      take: 10,
-    })
-
-    const examples = await prisma.message.findMany({
-      where: { isContentGap: true, createdAt: range, conversation: { candidateId } },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: { id: true, content: true, topicKey: true, conversationId: true, createdAt: true },
-    })
-
-    return reply.send({
-      byTopic: grouped.map((g) => ({
-        topicKey: g.topicKey,
-        topicName: g.topicKey ? (PLATFORM_TOPICS.find((t) => t.key === g.topicKey)?.name ?? g.topicKey) : 'Sem tema identificado',
-        count: g._count,
-      })),
-      examples,
-    })
+    return reply.send(await getContentGaps(candidateId, dateRange(start, end)))
   })
 
   // Relatório 7: Horários de Pico — volume de mensagens de eleitores por hora do dia
@@ -202,20 +278,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const messages = await prisma.message.findMany({
-      where: { senderType: 'VOTER', createdAt: range, conversation: { candidateId } },
-      select: { createdAt: true },
-    })
-
-    const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }))
-    for (const m of messages) {
-      const hour = new Date(m.createdAt).getHours()
-      byHour[hour].count++
-    }
-
-    return reply.send(byHour)
+    return reply.send(await getPeakHours(candidateId, dateRange(start, end)))
   })
 
   // Relatório 5: Sentimento dos Eleitores — Message.sentiment classificado pela IA
@@ -224,19 +287,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const grouped = await prisma.message.groupBy({
-      by: ['sentiment'],
-      where: { senderType: 'VOTER', sentiment: { not: null }, createdAt: range, conversation: { candidateId } },
-      _count: true,
-    })
-
-    const result = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 } as Record<string, number>
-    for (const g of grouped) {
-      if (g.sentiment) result[g.sentiment] = g._count
-    }
-    return reply.send(result)
+    return reply.send(await getSentiment(candidateId, dateRange(start, end)))
   })
 
   // Relatório 3: Solicitações por Região — agrega Contact.neighborhood (extraído pela
@@ -245,25 +296,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
-    const range = dateRange(start, end)
-
-    const requests = await prisma.request.findMany({
-      where: { candidateId, createdAt: range },
-      select: { contact: { select: { neighborhood: true } } },
-    })
-
-    const grouped: Record<string, number> = {}
-    let withoutRegion = 0
-    for (const r of requests) {
-      const neighborhood = r.contact.neighborhood
-      if (!neighborhood) { withoutRegion++; continue }
-      grouped[neighborhood] = (grouped[neighborhood] || 0) + 1
-    }
-
-    return reply.send({
-      byRegion: Object.entries(grouped).map(([neighborhood, count]) => ({ neighborhood, count })).sort((a, b) => b.count - a.count),
-      withoutRegion,
-    })
+    return reply.send(await getByRegion(candidateId, dateRange(start, end)))
   })
 
   // Exporta o relatório do período em PDF (visão geral, status, temas, gaps, top eleitores)

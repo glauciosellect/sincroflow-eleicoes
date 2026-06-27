@@ -35,69 +35,34 @@ export default function RelatoriosPage() {
 
   const end = customRange ? new Date(customRange.end).toISOString() : new Date().toISOString()
   const start = customRange ? new Date(customRange.start).toISOString() : new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
-  const rangeMs = new Date(end).getTime() - new Date(start).getTime()
-  const prevEnd = start
-  const prevStart = new Date(new Date(start).getTime() - rangeMs).toISOString()
 
-  const { data: overview, isLoading: l1 } = useQuery({
-    queryKey: ['report-overview', start, end],
-    queryFn: () => api.get('/analytics/overview', { params: { start, end } }).then(r => r.data),
+  // Um único endpoint consolidado no backend (Promise.all lá dentro) em vez de ~9
+  // requisições HTTP separadas — cada uma era rápida isoladamente, mas a soma das
+  // chamadas simultâneas deixava a tela perceptivelmente lenta para carregar.
+  const { data: dashboard, isLoading: loadingDashboard } = useQuery({
+    queryKey: ['report-dashboard', start, end],
+    queryFn: () => api.get('/analytics/dashboard', { params: { start, end } }).then(r => r.data),
   })
 
-  const { data: prevOverview } = useQuery({
-    queryKey: ['report-overview-prev', prevStart, prevEnd],
-    queryFn: () => api.get('/analytics/overview', { params: { start: prevStart, end: prevEnd } }).then(r => r.data),
-  })
-
-  const { data: byChannel, isLoading: l2 } = useQuery({
-    queryKey: ['report-by-channel', start, end],
-    queryFn: () => api.get('/analytics/by-channel', { params: { start, end } }).then(r => r.data),
-  })
-
-  const { data: topContacts, isLoading: l3 } = useQuery({
-    queryKey: ['report-top-contacts'],
-    queryFn: () => api.get('/analytics/top-contacts').then(r => r.data),
-  })
-
-  const { data: timeline, isLoading: l4 } = useQuery({
-    queryKey: ['report-timeline', start, end],
-    queryFn: () => api.get('/analytics/timeline', { params: { start, end } }).then(r => r.data),
-  })
-
-  const { data: requestsStatus, isLoading: l5 } = useQuery({
-    queryKey: ['report-requests-status'],
-    queryFn: () => api.get('/analytics/requests-status').then(r => r.data),
-  })
-
-  const { data: topTopics, isLoading: l6 } = useQuery({
-    queryKey: ['report-top-topics', start, end],
-    queryFn: () => api.get('/analytics/top-topics', { params: { start, end } }).then(r => r.data),
-  })
-
-  const { data: contentGaps, isLoading: l7 } = useQuery({
-    queryKey: ['report-content-gaps', start, end],
-    queryFn: () => api.get('/analytics/content-gaps', { params: { start, end } }).then(r => r.data),
-  })
-
-  const { data: peakHours, isLoading: l8 } = useQuery({
-    queryKey: ['report-peak-hours', start, end],
-    queryFn: () => api.get('/analytics/peak-hours', { params: { start, end } }).then(r => r.data),
-  })
-
-  const { data: sentiment, isLoading: l9 } = useQuery({
-    queryKey: ['report-sentiment', start, end],
-    queryFn: () => api.get('/analytics/sentiment', { params: { start, end } }).then(r => r.data),
-  })
+  const overview = dashboard?.overview?.current
+  const prevOverview = dashboard?.overview?.previous
+  const byChannel = dashboard?.byChannel
+  const topContacts = dashboard?.topContacts
+  const timeline = dashboard?.timeline
+  const requestsStatus = dashboard?.requestsStatus
+  const topTopics = dashboard?.topTopics
+  const contentGaps = dashboard?.contentGaps
+  const peakHours = dashboard?.peakHours
+  const sentiment = dashboard?.sentiment
+  const byRegion = dashboard?.byRegion
+  const l1 = loadingDashboard, l2 = loadingDashboard, l3 = loadingDashboard, l4 = loadingDashboard,
+    l5 = loadingDashboard, l6 = loadingDashboard, l7 = loadingDashboard, l8 = loadingDashboard,
+    l9 = loadingDashboard, l10 = loadingDashboard
 
   const { data: topicContacts, isLoading: l11 } = useQuery({
     queryKey: ['report-topic-contacts', selectedTopic?.key, start, end],
     queryFn: () => api.get(`/analytics/top-topics/${selectedTopic!.key}/contacts`, { params: { start, end } }).then(r => r.data),
     enabled: !!selectedTopic,
-  })
-
-  const { data: byRegion, isLoading: l10 } = useQuery({
-    queryKey: ['report-by-region', start, end],
-    queryFn: () => api.get('/analytics/by-region', { params: { start, end } }).then(r => r.data),
   })
 
   const handleDownloadPdf = async () => {
