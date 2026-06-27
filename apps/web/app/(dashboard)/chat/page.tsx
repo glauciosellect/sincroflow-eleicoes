@@ -82,13 +82,13 @@ function ContactPanel({ contactId }: { contactId: string }) {
   }
 
   if (!contact) return (
-    <div className="w-72 border-l border-gray-100 flex items-center justify-center">
+    <div className="w-96 border-l border-gray-100 flex items-center justify-center">
       <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
     </div>
   )
 
   return (
-    <div className="w-72 border-l border-gray-100 flex flex-col shrink-0 bg-white">
+    <div className="w-96 border-l border-gray-100 flex flex-col shrink-0 bg-white">
       <div className="p-4 border-b border-gray-100 text-center">
         <div className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-2" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
           {(contact.name || contact.phone || '?')[0].toUpperCase()}
@@ -320,7 +320,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-full flex -m-4 md:-m-6 bg-white rounded-lg overflow-hidden border border-gray-200">
-      <div className={cn('border-r border-gray-100 flex flex-col shrink-0 w-full md:w-72', selected ? 'hidden md:flex' : 'flex')}>
+      <div className={cn('border-r border-gray-100 flex flex-col shrink-0 w-full md:w-96', selected ? 'hidden md:flex' : 'flex')}>
         <div className="p-3 border-b border-gray-100">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

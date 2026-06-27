@@ -15,6 +15,21 @@ function isSenderBlocked(from: string, blockedSenders: string[]): boolean {
   })
 }
 
+// Remetentes de notificação automática conhecidos (segurança de conta, no-reply,
+// etc.) — nunca são eleitores reais, sempre ignorados independente de blockedSenders.
+// `from` aqui já vem normalizado só com o endereço (sem nome), ver lib/gmail.ts:120.
+const SYSTEM_SENDER_PATTERNS = [
+  /no-?reply@/i,
+  /@accounts\.google\.com$/i,
+  /naoresponda@/i,
+  /mailer-daemon@/i,
+  /postmaster@/i,
+]
+
+function isSystemSender(from: string): boolean {
+  return SYSTEM_SENDER_PATTERNS.some((pattern) => pattern.test(from))
+}
+
 export function startEmailPollingWorker() {
   // Agenda o job repetitivo (idempotente — BullMQ não duplica se já existir
   // um repeat job idêntico registrado).
@@ -42,7 +57,7 @@ export function startEmailPollingWorker() {
           const msg = await getMessage(accessToken, messageId)
           if (!msg) continue
 
-          if (isSenderBlocked(msg.from, blockedSenders)) {
+          if (isSystemSender(msg.from) || isSenderBlocked(msg.from, blockedSenders)) {
             await markAsRead(accessToken, messageId)
             continue
           }
