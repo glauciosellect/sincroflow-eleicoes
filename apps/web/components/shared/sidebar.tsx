@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -24,7 +24,10 @@ const navItems = [
     { href: '/contacts', label: 'Contatos', icon: Contact, module: 'contacts' },
     { href: '/solicitacoes', label: 'Solicitações', icon: FileWarning, module: 'chat' },
   ] },
-  { section: 'AGENDA', items: [{ href: '/agenda', label: 'Agenda', icon: CalendarDays, module: 'agenda' }] },
+  { section: 'AGENDA', items: [
+    { href: '/agenda', label: 'Agenda', icon: CalendarDays, module: 'agenda' },
+    { href: '/integrations', label: 'Integrações', icon: Plug, module: 'agenda' },
+  ] },
   { section: 'GESTÃO', items: [
     { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
     { href: '/team', label: 'Equipe', icon: Users, module: 'team' },
