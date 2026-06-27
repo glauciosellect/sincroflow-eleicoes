@@ -81,18 +81,20 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ url: session.url })
   })
 
-  // Recarga avulsa de mensagens ativas (candidato já com conta ativa)
+  // Recarga avulsa de mensagens ativas (candidato já com conta ativa) — quantity é o
+  // número de pacotes de 1.000 mensagens (cada pacote = 1 unidade do price no Stripe).
   app.post('/billing/checkout-active-msgs', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
+    const { quantity } = z.object({ quantity: z.number().int().min(1).max(20).default(1) }).parse(req.body || {})
 
     if (!ACTIVE_MSG_RECHARGE.priceId) return reply.status(500).send({ error: 'Recarga não configurada. Contate o suporte.' })
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
-      line_items: [{ price: ACTIVE_MSG_RECHARGE.priceId, quantity: 1 }],
-      metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount) },
+      line_items: [{ price: ACTIVE_MSG_RECHARGE.priceId, quantity }],
+      metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount * quantity) },
       success_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=cancelled`,
       branding_settings: CHECKOUT_BRANDING as any,

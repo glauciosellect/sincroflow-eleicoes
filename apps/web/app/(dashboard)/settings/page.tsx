@@ -673,6 +673,7 @@ function BillingTab() {
   const { toast } = useToast()
   const qc = useQueryClient()
   const [lineQty, setLineQty] = useState(1)
+  const [rechargeQty, setRechargeQty] = useState(1)
 
   const { data: billing, isLoading } = useQuery({
     queryKey: ['billing'],
@@ -691,7 +692,7 @@ function BillingTab() {
   })
 
   const rechargeMutation = useMutation({
-    mutationFn: () => api.post('/billing/checkout-active-msgs').then(r => r.data),
+    mutationFn: (quantity: number) => api.post('/billing/checkout-active-msgs', { quantity }).then(r => r.data),
     onSuccess: (data) => { if (data.url) window.location.href = data.url },
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
@@ -765,11 +766,17 @@ function BillingTab() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Recarga de mensagens ativas</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-gray-500">Se sua cota mensal de mensagens ativas se esgotar, compre um lote avulso de 1.000 mensagens.</p>
-          <Button variant="outline" onClick={() => rechargeMutation.mutate()} disabled={rechargeMutation.isPending}>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">Se sua cota mensal de mensagens ativas se esgotar, compre pacotes avulsos de 1.000 mensagens por <strong>R$ 97,00</strong> cada.</p>
+          <div className="flex items-center gap-3">
+            <Label className="text-sm text-gray-600 shrink-0">Pacotes (1.000 cada)</Label>
+            <Input type="number" min={1} max={20} value={rechargeQty}
+              onChange={(e) => setRechargeQty(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+              className="w-24" />
+          </div>
+          <Button variant="outline" onClick={() => rechargeMutation.mutate(rechargeQty)} disabled={rechargeMutation.isPending}>
             {rechargeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-            Comprar 1.000 mensagens ativas
+            Comprar {rechargeQty * 1000} mensagens — R$ {(rechargeQty * 97).toLocaleString('pt-BR')}
           </Button>
         </CardContent>
       </Card>
