@@ -77,6 +77,9 @@ export async function broadcastRoutes(app: FastifyInstance) {
       contactType: z.enum(['VOTER', 'FAMILY_FRIEND', 'STAFF', 'CONTRACTOR', 'OTHER']).optional(),
     }).parse(req.body)
 
+    const agentConfig = await prisma.agentConfig.findUnique({ where: { candidateId } })
+    if (!agentConfig?.isActive) return reply.status(400).send({ error: 'Assistente desativado — não é possível disparar criativos.' })
+
     const creative = await prisma.creative.findFirst({ where: { id: creativeId, candidateId } })
     if (!creative) return reply.status(404).send({ error: 'Criativo não encontrado' })
 

@@ -81,6 +81,11 @@ model Candidate {
   activeMsgsUsed       Int             @default(0)
   activeMsgsExtra      Int             @default(0)
   activeMsgsResetAt    DateTime?
+  // Preenchido quando o candidato solicita cancelamento pelo painel (seguem ativos
+  // até o fim do período já pago — Stripe cancel_at_period_end). status só muda
+  // para CANCELLED de fato quando o webhook customer.subscription.deleted chegar.
+  cancellationReason   String?
+  cancellationRequestedAt DateTime?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @default(now()) @updatedAt
 
