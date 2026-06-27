@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatDate } from '@/lib/utils'
 import {
   Plus, Trash2, Loader2, KeyRound,
-  User, Radio, Save, Copy, ShieldAlert, ShieldCheck, AlertTriangle,
+  User, Radio, Save, Copy, ShieldAlert, ShieldCheck, AlertTriangle, Wallet,
 } from 'lucide-react'
 import { channelLabel, cn } from '@/lib/utils'
 import { ChannelIcon } from '@/components/channel-icon'
@@ -575,9 +575,118 @@ function ComplianceTab() {
   )
 }
 
+// ─── ABA: FINANCEIRO (compra de linhas extra de WhatsApp e recarga de mensagens) ──
+function BillingTab() {
+  const { toast } = useToast()
+  const [lineQty, setLineQty] = useState(1)
+
+  const { data: billing, isLoading } = useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get('/billing').then(r => r.data),
+  })
+
+  const { data: invoices } = useQuery({
+    queryKey: ['billing-invoices'],
+    queryFn: () => api.get('/billing/invoices').then(r => r.data),
+  })
+
+  const buyLinesMutation = useMutation({
+    mutationFn: (quantity: number) => api.post('/billing/whatsapp-lines', { quantity }),
+    onSuccess: () => toast({ title: 'Linhas adicionadas!', description: 'O número de linhas disponíveis será atualizado após a confirmação do pagamento.' }),
+    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const rechargeMutation = useMutation({
+    mutationFn: () => api.post('/billing/checkout-active-msgs').then(r => r.data),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#002776]" /></div>
+
+  const whatsappLimit = billing?.whatsappLineLimit ?? 1
+  const msgsIncluded = billing?.activeMsgsIncluded ?? 0
+  const msgsUsed = billing?.activeMsgsUsed ?? 0
+  const msgsExtra = billing?.activeMsgsExtra ?? 0
+  const msgsPercent = msgsIncluded > 0 ? Math.min(100, Math.round((msgsUsed / msgsIncluded) * 100)) : 0
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <Card>
+        <CardHeader><CardTitle className="text-base">Resumo do plano</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Plano</span>
+            <Badge>{billing?.plan === 'MANDATE' ? 'Mandato' : 'Campanha'}</Badge>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Linhas de WhatsApp contratadas</span>
+            <span className="font-medium text-gray-900">{whatsappLimit}</span>
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="text-gray-500">Mensagens ativas usadas neste ciclo</span>
+              <span className="font-medium text-gray-900">{msgsUsed} / {msgsIncluded}{msgsExtra > 0 ? ` (+${msgsExtra} extras)` : ''}</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-[#009C3B] rounded-full transition-all" style={{ width: `${msgsPercent}%` }} />
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">Mensagens passivas (eleitor escreve primeiro) nunca são limitadas.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Comprar linhas de WhatsApp</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">Cada linha extra custa <strong>R$ 497,00/mês</strong> e é cobrada junto da sua assinatura. Escolha quantas linhas quer adicionar.</p>
+          <div className="flex items-center gap-3">
+            <Label className="text-sm text-gray-600 shrink-0">Quantidade</Label>
+            <Input type="number" min={1} max={30} value={lineQty}
+              onChange={(e) => setLineQty(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+              className="w-24" />
+            <Button onClick={() => buyLinesMutation.mutate(lineQty)} disabled={buyLinesMutation.isPending}>
+              {buyLinesMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Adicionar {lineQty} linha{lineQty > 1 ? 's' : ''} — R$ {(lineQty * 497).toLocaleString('pt-BR')}/mês
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Recarga de mensagens ativas</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-500">Se sua cota mensal de mensagens ativas se esgotar, compre um lote avulso de 1.000 mensagens.</p>
+          <Button variant="outline" onClick={() => rechargeMutation.mutate()} disabled={rechargeMutation.isPending}>
+            {rechargeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            Comprar 1.000 mensagens ativas
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Faturas</CardTitle></CardHeader>
+        <CardContent>
+          {(!invoices || invoices.length === 0) && <p className="text-sm text-gray-400 text-center py-6">Nenhuma fatura ainda</p>}
+          <div className="space-y-2">
+            {(invoices || []).map((inv: any) => (
+              <div key={inv.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg text-sm">
+                <span className="text-gray-600">{formatDate(inv.createdAt)}</span>
+                <span className="text-gray-900 font-medium">R$ {(inv.amount / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <Badge variant={inv.status === 'paid' ? 'default' : 'secondary'}>{inv.status === 'paid' ? 'Pago' : inv.status}</Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 const tabs = [
   { key: 'profile',    label: 'Perfil',         icon: User },
   { key: 'channels',   label: 'Canais',         icon: Radio },
+  { key: 'billing',    label: 'Financeiro',     icon: Wallet },
   { key: 'apikeys',    label: 'Chaves de API',  icon: KeyRound },
   { key: 'compliance', label: 'Compliance TSE', icon: ShieldCheck },
 ]
@@ -614,6 +723,7 @@ function SettingsContent() {
       <div>
         {active === 'profile'    && <ProfileTab />}
         {active === 'channels'   && <ChannelsTab />}
+        {active === 'billing'    && <BillingTab />}
         {active === 'apikeys'    && <ApiKeysTab />}
         {active === 'compliance' && <ComplianceTab />}
       </div>
