@@ -47,10 +47,10 @@ export async function googleRoutes(app: FastifyInstance) {
 
   app.get('/integrations/google/callback', async (req, reply) => {
     const { code, state: candidateId, error } = req.query as Record<string, string>
-    const redirectBase = `${FRONTEND_URL}/configuracoes?tab=agenda`
+    const redirectBase = `${FRONTEND_URL}/integrations`
 
     if (error || !code || !candidateId) {
-      return reply.redirect(`${redirectBase}&google=error`)
+      return reply.redirect(`${redirectBase}?google=error`)
     }
 
     try {
@@ -79,10 +79,10 @@ export async function googleRoutes(app: FastifyInstance) {
         },
       })
 
-      return reply.redirect(`${redirectBase}&google=success`)
+      return reply.redirect(`${redirectBase}?google=success`)
     } catch (err) {
       console.error('[Google Calendar Callback]', err)
-      return reply.redirect(`${redirectBase}&google=error`)
+      return reply.redirect(`${redirectBase}?google=error`)
     }
   })
 
