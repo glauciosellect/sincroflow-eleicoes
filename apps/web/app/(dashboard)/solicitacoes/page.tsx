@@ -1,12 +1,12 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, FileWarning, Loader2, Phone } from 'lucide-react'
+import { Search, FileWarning, Loader2, Phone, CalendarPlus } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -28,6 +28,7 @@ export default function SolicitacoesPage() {
 
 function SolicitacoesContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { toast } = useToast()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -87,6 +88,7 @@ function SolicitacoesContent() {
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Eleitor</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Data</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -108,6 +110,15 @@ function SolicitacoesContent() {
                           {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => router.push(`/agenda?openNew=1&title=${encodeURIComponent(`${req.subject} — ${req.contact?.name || req.contact?.phone || 'Eleitor'}`)}`)}
+                        className="flex items-center gap-1 text-xs font-medium text-[#002776] hover:underline"
+                        title="Agendar compromisso com este eleitor"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" />Agendar
+                      </button>
                     </td>
                   </tr>
                 ))}

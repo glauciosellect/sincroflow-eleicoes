@@ -1,6 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,11 +39,30 @@ interface EventForm {
 const emptyForm: EventForm = { title: '', description: '', eventType: 'PRESENCIAL', location: '', neighborhood: '', city: '', link: '', startsAt: '', endsAt: '', isPublic: true }
 
 export default function AgendaPage() {
+  return (
+    <Suspense>
+      <AgendaContent />
+    </Suspense>
+  )
+}
+
+function AgendaContent() {
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<EventForm>(emptyForm)
+
+  // Vindo de Solicitações ("Agendar"): abre o formulário já com o assunto preenchido
+  useEffect(() => {
+    if (searchParams.get('openNew') === '1') {
+      const title = searchParams.get('title') || ''
+      setForm({ ...emptyForm, title, isPublic: false })
+      setEditingId(null)
+      setShowForm(true)
+    }
+  }, [searchParams])
 
   const { data: events, isLoading } = useQuery({
     queryKey: ['events'],
