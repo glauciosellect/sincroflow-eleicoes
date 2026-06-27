@@ -152,7 +152,7 @@ export async function sendReply(accessToken: string, params: {
   const { threadId, messageId, references, to, subject, body } = params
   const raw = [
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeHeaderText(subject)}`,
     `In-Reply-To: ${messageId}`,
     `References: ${references || messageId}`,
     'Content-Type: text/plain; charset="UTF-8"',
@@ -172,8 +172,11 @@ export async function sendReply(accessToken: string, params: {
   }
 }
 
-function detectMimeType(url: string): string {
-  const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || ''
+function detectExtension(url: string): string {
+  return url.split('?')[0].split('.').pop()?.toLowerCase() || ''
+}
+
+function mimeTypeForExtension(ext: string): string {
   const map: Record<string, string> = {
     jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
     mp4: 'video/mp4', mov: 'video/quicktime',
@@ -185,6 +188,14 @@ function detectMimeType(url: string): string {
 // Quebra base64 em linhas de 76 caracteres — padrão MIME (RFC 2045).
 function wrapBase64(base64: string): string {
   return base64.replace(/(.{76})/g, '$1\r\n')
+}
+
+// Headers de e-mail (Subject, filename) só aceitam ASCII puro — texto com acentos
+// precisa ser codificado em "encoded-word" (RFC 2047), senão chega corrompido
+// (ex: "Educação" virando "EducaÃ§Ã£o" no cliente do destinatário).
+function encodeHeaderText(text: string): string {
+  if (/^[\x00-\x7F]*$/.test(text)) return text
+  return `=?UTF-8?B?${Buffer.from(text, 'utf-8').toString('base64')}?=`
 }
 
 // Mesmo fluxo de sendReply, mas anexando um arquivo (ex: criativo/"Santinho") via
@@ -216,10 +227,16 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
   }
 
   const boundary = `boundary_${Date.now()}`
-  const mimeType = detectMimeType(attachmentName)
+  // O nome do arquivo precisa ter a extensão real (vinda da URL) — attachmentName é o
+  // TÍTULO do criativo (ex: "lançamento"), sem extensão, então detectar o MIME type
+  // por ele faria cair sempre no fallback genérico e o cliente de e-mail trataria como
+  // arquivo desconhecido em vez de imagem.
+  const ext = detectExtension(attachmentUrl)
+  const mimeType = mimeTypeForExtension(ext)
+  const safeFilename = `${attachmentName.replace(/[^\w\s-]/g, '').trim() || 'arquivo'}${ext ? `.${ext}` : ''}`
   const raw = [
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeHeaderText(subject)}`,
     `In-Reply-To: ${messageId}`,
     `References: ${references || messageId}`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -231,7 +248,7 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
     '',
     `--${boundary}`,
     `Content-Type: ${mimeType}`,
-    `Content-Disposition: attachment; filename="${attachmentName}"`,
+    `Content-Disposition: attachment; filename="${safeFilename}"`,
     'Content-Transfer-Encoding: base64',
     '',
     wrapBase64(attachmentBuffer.toString('base64')),
