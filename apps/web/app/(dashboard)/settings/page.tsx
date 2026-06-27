@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuthStore } from '@/store/auth.store'
@@ -160,6 +161,8 @@ function ChannelsTab() {
   const [showTelegramForm, setShowTelegramForm] = useState(false)
   const [telegramName, setTelegramName] = useState('')
   const [telegramToken, setTelegramToken] = useState('')
+  const [blockSendersChannel, setBlockSendersChannel] = useState<any>(null)
+  const [blockSendersText, setBlockSendersText] = useState('')
   const searchParams = useSearchParams()
   const { token: authToken, refreshToken: authRefreshToken } = useAuthStore()
 
@@ -202,6 +205,16 @@ function ChannelsTab() {
     mutationFn: (id: string) => api.delete(`/channels/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['channels'] }); toast({ title: 'Canal desconectado' }) },
     onError: (err: any) => toast({ title: 'Erro ao desconectar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const blockSendersMutation = useMutation({
+    mutationFn: (blockedSenders: string[]) => api.patch(`/channels/${blockSendersChannel.id}/email-settings`, { blockedSenders }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['channels'] })
+      setBlockSendersChannel(null)
+      toast({ title: 'Lista de bloqueios atualizada' })
+    },
+    onError: (err: any) => toast({ title: 'Erro ao salvar', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
   const connectMeta = (type: 'instagram' | 'facebook') => {
@@ -359,7 +372,20 @@ function ChannelsTab() {
                 )}
 
                 {channel.type === 'EMAIL' && (
-                  <div className="mt-2 text-xs text-gray-500">Conectado: {channel.config?.email}</div>
+                  <>
+                    <div className="mt-2 text-xs text-gray-500">Conectado: {channel.config?.email}</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1 text-xs text-gray-500 hover:text-gray-700 w-full"
+                      onClick={() => {
+                        setBlockSendersChannel(channel)
+                        setBlockSendersText((channel.config?.blockedSenders || []).join('\n'))
+                      }}
+                    >
+                      Gerenciar bloqueios
+                    </Button>
+                  </>
                 )}
 
                 <div className="mt-3 pt-3 border-t border-gray-100">
@@ -373,6 +399,39 @@ function ChannelsTab() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!blockSendersChannel} onOpenChange={(open) => !open && setBlockSendersChannel(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerenciar bloqueios de e-mail</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">
+              Por padrão, o assistente responde e-mails de qualquer remetente. Liste abaixo (um por linha) e-mails ou domínios (ex: <code className="text-xs bg-gray-100 px-1 rounded">@dominio.com</code>) que nunca devem receber resposta automática. Deixe vazio para responder a todos.
+            </p>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono"
+              style={{ minHeight: 140 }}
+              placeholder={'spam@exemplo.com\n@dominio-indesejado.com'}
+              value={blockSendersText}
+              onChange={(e) => setBlockSendersText(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full"
+              disabled={blockSendersMutation.isPending}
+              onClick={() => {
+                const list = blockSendersText.split('\n').map((s) => s.trim()).filter(Boolean)
+                blockSendersMutation.mutate(list)
+              }}
+            >
+              {blockSendersMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

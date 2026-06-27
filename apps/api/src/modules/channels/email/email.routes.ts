@@ -79,7 +79,7 @@ export async function emailChannelRoutes(app: FastifyInstance) {
               accessToken: tokens.access_token,
               refreshToken: tokens.refresh_token ?? null,
               tokenExpiry: new Date(tokens.expiry_date).toISOString(),
-              allowedSenders: [],
+              blockedSenders: [],
             },
           },
         })
@@ -100,11 +100,11 @@ export async function emailChannelRoutes(app: FastifyInstance) {
     const channel = await prisma.channel.findFirst({ where: { id, candidateId, type: 'EMAIL' } })
     if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
 
-    const { allowedSenders } = z.object({ allowedSenders: z.array(z.string()) }).parse(req.body)
+    const { blockedSenders } = z.object({ blockedSenders: z.array(z.string()) }).parse(req.body)
 
     await prisma.channel.update({
       where: { id },
-      data: { config: { ...(channel.config as any), allowedSenders: allowedSenders.map(s => s.trim().toLowerCase()).filter(Boolean) } },
+      data: { config: { ...(channel.config as any), blockedSenders: blockedSenders.map(s => s.trim().toLowerCase()).filter(Boolean) } },
     })
 
     return reply.send({ ok: true })

@@ -4,12 +4,12 @@ import { getValidGmailToken, listNewMessages, getMessage, markAsRead } from '../
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000
 
-// Verifica se o remetente está na lista de permitidos do canal — sem isso, a
-// IA responderia spam, newsletters e e-mails internos da própria empresa.
-function isSenderAllowed(from: string, allowedSenders: string[]): boolean {
-  if (!allowedSenders?.length) return false
+// Por padrão processa e-mail de qualquer remetente (igual o WhatsApp processa
+// qualquer número) — blockedSenders é uma lista opcional de bloqueio, não de permissão.
+function isSenderBlocked(from: string, blockedSenders: string[]): boolean {
+  if (!blockedSenders?.length) return false
   const lower = from.toLowerCase()
-  return allowedSenders.some((rule) => {
+  return blockedSenders.some((rule) => {
     const r = rule.toLowerCase()
     return r.startsWith('@') ? lower.endsWith(r) : lower === r
   })
@@ -29,8 +29,7 @@ export function startEmailPollingWorker() {
 
       for (const channel of channels) {
         const cfg = channel.config as any
-        const allowedSenders: string[] = cfg?.allowedSenders || []
-        if (!allowedSenders.length) continue // sem lista configurada, não processa nada
+        const blockedSenders: string[] = cfg?.blockedSenders || []
 
         const accessToken = await getValidGmailToken(channel.id)
         if (!accessToken) {
@@ -43,7 +42,7 @@ export function startEmailPollingWorker() {
           const msg = await getMessage(accessToken, messageId)
           if (!msg) continue
 
-          if (!isSenderAllowed(msg.from, allowedSenders)) {
+          if (isSenderBlocked(msg.from, blockedSenders)) {
             await markAsRead(accessToken, messageId)
             continue
           }
