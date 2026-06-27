@@ -26,6 +26,7 @@ function ProfileTab() {
   const { user, candidate, setUser, setCandidate } = useAuthStore()
   const { toast } = useToast()
   const router = useRouter()
+  const qc = useQueryClient()
   const [name, setName] = useState(user?.name || '')
   const [form, setForm] = useState({
     name: candidate?.name || '',
@@ -37,6 +38,31 @@ function ProfileTab() {
     city: candidate?.city || '',
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+
+  const { data: billing } = useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get('/billing').then(r => r.data),
+  })
+  const cancellationPending = !!billing?.cancellationReason && billing?.status !== 'CANCELLED'
+  const isCancelled = billing?.status === 'CANCELLED'
+
+  const cancelMutation = useMutation({
+    mutationFn: (reason: string) => api.post('/billing/cancel', { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['billing'] })
+      setShowCancelDialog(false); setCancelReason('')
+      toast({ title: 'Cancelamento solicitado', description: 'Sua assinatura permanece ativa até o fim do período já pago. O assistente foi desativado.' })
+    },
+    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: () => api.post('/billing/reactivate'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['billing'] }); toast({ title: 'Cancelamento desfeito!', description: 'Seu assistente foi reativado.' }) },
+    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const userMutation = useMutation({
@@ -118,6 +144,73 @@ function ProfileTab() {
           </Button>
         </CardContent>
       </Card>
+
+      {cancellationPending && (
+        <Card className="border-amber-300">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">Cancelamento solicitado</p>
+              <p className="text-sm text-amber-700 mt-0.5">Sua assinatura permanece ativa até o fim do período já pago. O assistente de IA está desativado — não responde eleitores nem envia criativos. Você continua com acesso total ao painel e aos seus dados.</p>
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => reactivateMutation.mutate()} disabled={reactivateMutation.isPending}>
+                {reactivateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Desfazer cancelamento e reativar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isCancelled && (
+        <Card className="border-red-300">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">Assinatura encerrada</p>
+              <p className="text-sm text-red-700 mt-0.5">O assistente de IA está desativado. Você continua com acesso ao painel e aos seus dados, mas para reativar o assistente é necessário assinar novamente.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isCancelled && !cancellationPending && (
+        <Card className="border-red-100">
+          <CardHeader><CardTitle className="text-base">Cancelar assinatura</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-gray-500">Sua assinatura continua ativa até o fim do período já pago. O assistente de IA é desativado imediatamente, mas você mantém acesso ao painel e a todos os seus dados por tempo indeterminado.</p>
+            <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => setShowCancelDialog(true)}>
+              Solicitar cancelamento
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Solicitar cancelamento</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">Conte pra gente o motivo do cancelamento — isso nos ajuda a melhorar o sistema.</p>
+            <Label className="text-sm text-gray-600">Motivo</Label>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#002776]"
+              placeholder="Conte o motivo do cancelamento..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Voltar</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              disabled={!cancelReason.trim() || cancelMutation.isPending}
+              onClick={() => cancelMutation.mutate(cancelReason.trim())}
+            >
+              {cancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-red-200">
         <CardHeader>
@@ -580,8 +673,6 @@ function BillingTab() {
   const { toast } = useToast()
   const qc = useQueryClient()
   const [lineQty, setLineQty] = useState(1)
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
 
   const { data: billing, isLoading } = useQuery({
     queryKey: ['billing'],
@@ -611,22 +702,6 @@ function BillingTab() {
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
 
-  const cancelMutation = useMutation({
-    mutationFn: (reason: string) => api.post('/billing/cancel', { reason }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['billing'] })
-      setShowCancelDialog(false); setCancelReason('')
-      toast({ title: 'Cancelamento solicitado', description: 'Sua assinatura permanece ativa até o fim do período já pago. O assistente foi desativado.' })
-    },
-    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
-  })
-
-  const reactivateMutation = useMutation({
-    mutationFn: () => api.post('/billing/reactivate'),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['billing'] }); toast({ title: 'Cancelamento desfeito!', description: 'Seu assistente foi reativado.' }) },
-    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
-  })
-
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#002776]" /></div>
 
   const whatsappLimit = billing?.whatsappLineLimit ?? 1
@@ -634,39 +709,10 @@ function BillingTab() {
   const msgsUsed = billing?.activeMsgsUsed ?? 0
   const msgsExtra = billing?.activeMsgsExtra ?? 0
   const msgsPercent = msgsIncluded > 0 ? Math.min(100, Math.round((msgsUsed / msgsIncluded) * 100)) : 0
-  const cancellationPending = !!billing?.cancellationReason && billing?.status !== 'CANCELLED'
   const isCancelled = billing?.status === 'CANCELLED'
 
   return (
     <div className="space-y-5 max-w-2xl">
-      {cancellationPending && (
-        <Card className="border-amber-300">
-          <CardContent className="p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800">Cancelamento solicitado</p>
-              <p className="text-sm text-amber-700 mt-0.5">Sua assinatura permanece ativa até o fim do período já pago. O assistente de IA está desativado — não responde eleitores nem envia criativos. Você continua com acesso total ao painel e aos seus dados.</p>
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => reactivateMutation.mutate()} disabled={reactivateMutation.isPending}>
-                {reactivateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Desfazer cancelamento e reativar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isCancelled && (
-        <Card className="border-red-300">
-          <CardContent className="p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-800">Assinatura encerrada</p>
-              <p className="text-sm text-red-700 mt-0.5">O assistente de IA está desativado. Você continua com acesso ao painel e aos seus dados, mas para reativar o assistente é necessário assinar novamente.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader><CardTitle className="text-base">Resumo do plano</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -744,44 +790,9 @@ function BillingTab() {
         </CardContent>
       </Card>
 
-      {!isCancelled && !cancellationPending && (
-        <Card className="border-red-100">
-          <CardHeader><CardTitle className="text-base">Cancelar assinatura</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-gray-500">Sua assinatura continua ativa até o fim do período já pago. O assistente de IA é desativado imediatamente, mas você mantém acesso ao painel e a todos os seus dados por tempo indeterminado.</p>
-            <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => setShowCancelDialog(true)}>
-              Solicitar cancelamento
-            </Button>
-          </CardContent>
-        </Card>
+      {isCancelled && (
+        <p className="text-xs text-gray-400 text-center">Sua assinatura foi cancelada. Para reativar o assistente, assine novamente em Perfil.</p>
       )}
-
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Solicitar cancelamento</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-500">Conte pra gente o motivo do cancelamento — isso nos ajuda a melhorar o sistema.</p>
-            <Label className="text-sm text-gray-600">Motivo</Label>
-            <textarea
-              className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#002776]"
-              placeholder="Conte o motivo do cancelamento..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Voltar</Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700"
-              disabled={!cancelReason.trim() || cancelMutation.isPending}
-              onClick={() => cancelMutation.mutate(cancelReason.trim())}
-            >
-              {cancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Confirmar cancelamento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
