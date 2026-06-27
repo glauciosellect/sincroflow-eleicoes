@@ -299,6 +299,27 @@ export async function analyticsRoutes(app: FastifyInstance) {
     return reply.send(await getByRegion(candidateId, dateRange(start, end)))
   })
 
+  // Lista os eleitores que fizeram solicitação em um bairro específico no período —
+  // usado pelo link "ver eleitores" em Solicitações por Região.
+  app.get('/analytics/by-region/:neighborhood/contacts', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { neighborhood } = req.params as { neighborhood: string }
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const requests = await prisma.request.findMany({
+      where: { candidateId, createdAt: range, contact: { neighborhood } },
+      select: {
+        id: true, protocolNumber: true, subject: true, status: true, conversationId: true,
+        contact: { select: { id: true, name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return reply.send(requests)
+  })
+
   // Exporta o relatório do período em PDF (visão geral, status, temas, gaps, top eleitores)
   app.get('/analytics/export-pdf', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }

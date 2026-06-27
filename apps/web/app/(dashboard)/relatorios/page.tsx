@@ -32,6 +32,7 @@ export default function RelatoriosPage() {
   const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null)
   const [showCustomRange, setShowCustomRange] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<{ key: string; name: string } | null>(null)
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
 
   // Calculado uma vez por mudança de período/customRange (useMemo), não a cada
   // render — sem isso, "new Date()" mudava a cada milissegundo e a queryKey do
@@ -68,6 +69,12 @@ export default function RelatoriosPage() {
     queryKey: ['report-topic-contacts', selectedTopic?.key, start, end],
     queryFn: () => api.get(`/analytics/top-topics/${selectedTopic!.key}/contacts`, { params: { start, end } }).then(r => r.data),
     enabled: !!selectedTopic,
+  })
+
+  const { data: regionRequests, isLoading: l12 } = useQuery({
+    queryKey: ['report-region-requests', selectedRegion, start, end],
+    queryFn: () => api.get(`/analytics/by-region/${encodeURIComponent(selectedRegion!)}/contacts`, { params: { start, end } }).then(r => r.data),
+    enabled: !!selectedRegion,
   })
 
   const handleDownloadPdf = async () => {
@@ -358,7 +365,7 @@ export default function RelatoriosPage() {
             ) : (
               <div className="space-y-3">
                 {byRegion.byRegion.map((r: any) => (
-                  <div key={r.neighborhood}>
+                  <button key={r.neighborhood} onClick={() => setSelectedRegion(r.neighborhood)} className="w-full text-left hover:bg-gray-50 rounded-lg -mx-2 px-2 py-1 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-gray-700">{r.neighborhood}</span>
                       <span className="text-xs font-semibold text-gray-600">{r.count}</span>
@@ -366,7 +373,7 @@ export default function RelatoriosPage() {
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className="h-1.5 rounded-full bg-[#002776]" style={{ width: `${Math.max(4, (r.count / Math.max(1, ...byRegion.byRegion.map((x: any) => x.count))) * 100)}%` }} />
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {byRegion.withoutRegion > 0 && (
                   <p className="text-xs text-gray-400 pt-1">+{byRegion.withoutRegion} solicitação(ões) sem bairro identificado</p>
@@ -399,6 +406,36 @@ export default function RelatoriosPage() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">{c.name || c.phone || 'Sem nome'}</div>
                     {c.phone && <div className="text-xs text-gray-400">{c.phone}</div>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedRegion} onOpenChange={(open) => !open && setSelectedRegion(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Solicitações no bairro {selectedRegion}</DialogTitle></DialogHeader>
+          {l12 ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+          ) : !regionRequests || regionRequests.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Nenhuma solicitação encontrada</div>
+          ) : (
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {regionRequests.map((r: any) => (
+                <Link
+                  key={r.id}
+                  href={r.conversationId ? `/chat?conversationId=${r.conversationId}` : `/solicitacoes?status=${r.status}`}
+                  onClick={() => setSelectedRegion(null)}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
+                    {(r.contact?.name || r.contact?.phone || '?')[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{r.contact?.name || r.contact?.phone || 'Sem nome'}</div>
+                    <div className="text-xs text-gray-400 truncate">{r.subject} · {r.protocolNumber}</div>
                   </div>
                 </Link>
               ))}
