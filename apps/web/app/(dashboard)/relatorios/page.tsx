@@ -1,10 +1,11 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import Link from 'next/link'
 import api from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Users, MessageSquare, FileWarning, Activity, Construction } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Loader2, Users, MessageSquare, FileWarning, Activity, Construction, MessageCircleQuestion, HelpCircle, Clock3 } from 'lucide-react'
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 
 const periodOptions = [
@@ -16,14 +17,12 @@ const periodOptions = [
 const channelIcon: Record<string, string> = { WHATSAPP: '📱', INSTAGRAM: '📸', FACEBOOK: '📘', TELEGRAM: '✈️', EMAIL: '📧' }
 const REQUEST_STATUS_LABELS: Record<string, string> = { RECEIVED: 'Recebido', ANALYZING: 'Em análise', FORWARDED: 'Encaminhado', RESOLVED: 'Resolvido' }
 
-// Relatórios ainda não implementados (exigem infra adicional — NLP de temas,
-// geolocalização, análise de sentimento): seção 4.9 da spec, itens 2, 3, 5, 6, 7.
+// Relatórios ainda não implementados (exigem infra adicional — geolocalização dos
+// contatos, análise de sentimento por IA com custo extra por mensagem): seção 4.9
+// da spec, itens 3 e 5.
 const PENDING_REPORTS = [
-  'Temas Mais Perguntados',
   'Mapa de Solicitações por Região',
   'Sentimento dos Eleitores',
-  'Perguntas Sem Resposta (Gaps de Conteúdo)',
-  'Horários de Pico',
 ]
 
 export default function RelatoriosPage() {
@@ -61,6 +60,21 @@ export default function RelatoriosPage() {
   const { data: requestsStatus, isLoading: l5 } = useQuery({
     queryKey: ['report-requests-status'],
     queryFn: () => api.get('/analytics/requests-status').then(r => r.data),
+  })
+
+  const { data: topTopics, isLoading: l6 } = useQuery({
+    queryKey: ['report-top-topics', period],
+    queryFn: () => api.get('/analytics/top-topics', { params: { start, end } }).then(r => r.data),
+  })
+
+  const { data: contentGaps, isLoading: l7 } = useQuery({
+    queryKey: ['report-content-gaps', period],
+    queryFn: () => api.get('/analytics/content-gaps', { params: { start, end } }).then(r => r.data),
+  })
+
+  const { data: peakHours, isLoading: l8 } = useQuery({
+    queryKey: ['report-peak-hours', period],
+    queryFn: () => api.get('/analytics/peak-hours', { params: { start, end } }).then(r => r.data),
   })
 
   return (
@@ -137,7 +151,7 @@ export default function RelatoriosPage() {
             ) : (
               <div className="space-y-3">
                 {byChannel.map((c: any, i: number) => (
-                  <div key={i}>
+                  <Link key={i} href={`/chat?channelId=${c.channelId}`} className="block hover:bg-gray-50 rounded-lg -mx-2 px-2 py-1 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center gap-1.5 text-gray-700"><span>{channelIcon[c.type] || '📡'}</span>{c.name}</span>
                       <span className="text-xs font-semibold text-gray-600">{c.count} conv.</span>
@@ -145,7 +159,7 @@ export default function RelatoriosPage() {
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className="h-1.5 rounded-full bg-[#002776]" style={{ width: `${Math.max(4, (c.count / Math.max(1, ...byChannel.map((x: any) => x.count))) * 100)}%` }} />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -159,9 +173,55 @@ export default function RelatoriosPage() {
             {l5 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
               <div className="grid grid-cols-2 gap-3">
                 {Object.entries(REQUEST_STATUS_LABELS).map(([key, label]) => (
-                  <div key={key} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <Link key={key} href={`/solicitacoes?status=${key}`} className="bg-gray-50 rounded-xl p-3 text-center hover:bg-gray-100 transition-colors cursor-pointer">
                     <div className="text-2xl font-bold text-gray-900">{requestsStatus?.[key] ?? 0}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Relatório 2: Temas Mais Perguntados */}
+        <Card>
+          <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><MessageCircleQuestion className="w-4 h-4 text-[#002776]" />Temas Mais Perguntados</CardTitle></CardHeader>
+          <CardContent>
+            {l6 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!topTopics || topTopics.length === 0) ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Sem dados no período</div>
+            ) : (
+              <div className="space-y-3">
+                {topTopics.map((t: any) => (
+                  <div key={t.topicKey}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-700">{t.topicName}</span>
+                      <span className="text-xs font-semibold text-gray-600">{t.count}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full bg-[#009C3B]" style={{ width: `${Math.max(4, (t.count / Math.max(1, ...topTopics.map((x: any) => x.count))) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Relatório 6: Perguntas Sem Resposta (Gaps de Conteúdo) */}
+        <Card>
+          <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><HelpCircle className="w-4 h-4 text-amber-600" />Perguntas Sem Resposta</CardTitle></CardHeader>
+          <CardContent>
+            {l7 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!contentGaps?.byTopic || contentGaps.byTopic.length === 0) ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Nenhum gap de conteúdo no período 🎉</div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-400 mb-2">Eleitores perguntaram sobre temas que você ainda não cadastrou conteúdo:</p>
+                {contentGaps.byTopic.map((t: any) => (
+                  <div key={t.topicKey || 'sem-tema'} className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2 text-sm">
+                    <span className="text-amber-800">{t.topicName}</span>
+                    <span className="text-xs font-semibold text-amber-700">{t.count}x</span>
                   </div>
                 ))}
               </div>
@@ -169,6 +229,24 @@ export default function RelatoriosPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Relatório 7: Horários de Pico */}
+      <Card>
+        <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><Clock3 className="w-4 h-4 text-purple-600" />Horários de Pico</CardTitle></CardHeader>
+        <CardContent>
+          {l8 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={peakHours || []} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="hour" tick={{ fontSize: 10 }} tickFormatter={(h) => `${h}h`} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip formatter={(v: any) => [v, 'Mensagens']} labelFormatter={(h) => `${h}h às ${h + 1}h`} />
+                <Bar dataKey="count" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Relatório 8: Eleitores Mais Engajados */}
       <Card>
@@ -179,7 +257,7 @@ export default function RelatoriosPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {topContacts.map((c: any, i: number) => (
-                <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
+                <Link key={c.id} href={`/contacts?search=${encodeURIComponent(c.phone || c.name || '')}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                   <span className="text-xs font-bold text-gray-400 w-5">#{i + 1}</span>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
                     {(c.name || c.phone)?.[0]?.toUpperCase()}
@@ -188,7 +266,7 @@ export default function RelatoriosPage() {
                     <div className="text-sm font-medium text-gray-900 truncate">{c.name || c.phone}</div>
                     <div className="text-xs text-gray-400">{c.totalInteractions} interações</div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -1,6 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -19,9 +20,18 @@ const CONTACT_TYPE_LABELS: Record<string, string> = {
 }
 
 export default function ContactsPage() {
+  return (
+    <Suspense>
+      <ContactsContent />
+    </Suspense>
+  )
+}
+
+function ContactsContent() {
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const qc = useQueryClient()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('search') || '')
   const [contactType, setContactType] = useState('')
   const [page, setPage] = useState(1)
   const [qrOpen, setQrOpen] = useState(false)

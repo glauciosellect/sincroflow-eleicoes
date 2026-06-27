@@ -1,6 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -18,10 +19,19 @@ const STATUS_OPTIONS = [
 const STATUS_MAP = Object.fromEntries(STATUS_OPTIONS.map(s => [s.value, s]))
 
 export default function SolicitacoesPage() {
+  return (
+    <Suspense>
+      <SolicitacoesContent />
+    </Suspense>
+  )
+}
+
+function SolicitacoesContent() {
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all')
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({

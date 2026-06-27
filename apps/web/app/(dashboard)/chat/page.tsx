@@ -1,6 +1,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -204,11 +205,20 @@ function ContactPanel({ contactId }: { contactId: string }) {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatContent />
+    </Suspense>
+  )
+}
+
+function ChatContent() {
+  const searchParams = useSearchParams()
   const qc = useQueryClient()
   const [selected, setSelected] = useState<any>(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [channelFilter, setChannelFilter] = useState('all')
+  const [channelFilter, setChannelFilter] = useState(searchParams.get('channelId') || 'all')
   const [message, setMessage] = useState('')
   const [showCreativePicker, setShowCreativePicker] = useState(false)
 
