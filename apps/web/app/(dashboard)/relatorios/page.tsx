@@ -5,7 +5,9 @@ import Link from 'next/link'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Users, MessageSquare, FileWarning, Activity, Construction, MessageCircleQuestion, HelpCircle, Clock3, Download } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Loader2, Users, MessageSquare, FileWarning, Activity, MessageCircleQuestion, HelpCircle, Clock3, Download, CalendarRange, Smile, Meh, Frown, MapPin } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 
@@ -18,34 +20,37 @@ const periodOptions = [
 const channelIcon: Record<string, string> = { WHATSAPP: '📱', INSTAGRAM: '📸', FACEBOOK: '📘', TELEGRAM: '✈️', EMAIL: '📧' }
 const REQUEST_STATUS_LABELS: Record<string, string> = { RECEIVED: 'Recebido', ANALYZING: 'Em análise', FORWARDED: 'Encaminhado', RESOLVED: 'Resolvido' }
 
-// Relatórios ainda não implementados (exigem infra adicional — geolocalização dos
-// contatos, análise de sentimento por IA com custo extra por mensagem): seção 4.9
-// da spec, itens 3 e 5.
-const PENDING_REPORTS = [
-  'Mapa de Solicitações por Região',
-  'Sentimento dos Eleitores',
-]
+const SENTIMENT_CONFIG = {
+  POSITIVE: { label: 'Positivo', icon: Smile, color: 'text-green-600', bg: 'bg-green-50' },
+  NEUTRAL: { label: 'Neutro', icon: Meh, color: 'text-gray-500', bg: 'bg-gray-50' },
+  NEGATIVE: { label: 'Negativo', icon: Frown, color: 'text-red-600', bg: 'bg-red-50' },
+}
 
 export default function RelatoriosPage() {
   const [period, setPeriod] = useState(7)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const end = new Date().toISOString()
-  const start = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
+  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null)
+  const [showCustomRange, setShowCustomRange] = useState(false)
+  const [selectedTopic, setSelectedTopic] = useState<{ key: string; name: string } | null>(null)
+
+  const end = customRange ? new Date(customRange.end).toISOString() : new Date().toISOString()
+  const start = customRange ? new Date(customRange.start).toISOString() : new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
+  const rangeMs = new Date(end).getTime() - new Date(start).getTime()
   const prevEnd = start
-  const prevStart = new Date(Date.now() - 2 * period * 24 * 60 * 60 * 1000).toISOString()
+  const prevStart = new Date(new Date(start).getTime() - rangeMs).toISOString()
 
   const { data: overview, isLoading: l1 } = useQuery({
-    queryKey: ['report-overview', period],
+    queryKey: ['report-overview', start, end],
     queryFn: () => api.get('/analytics/overview', { params: { start, end } }).then(r => r.data),
   })
 
   const { data: prevOverview } = useQuery({
-    queryKey: ['report-overview-prev', period],
+    queryKey: ['report-overview-prev', prevStart, prevEnd],
     queryFn: () => api.get('/analytics/overview', { params: { start: prevStart, end: prevEnd } }).then(r => r.data),
   })
 
   const { data: byChannel, isLoading: l2 } = useQuery({
-    queryKey: ['report-by-channel', period],
+    queryKey: ['report-by-channel', start, end],
     queryFn: () => api.get('/analytics/by-channel', { params: { start, end } }).then(r => r.data),
   })
 
@@ -55,7 +60,7 @@ export default function RelatoriosPage() {
   })
 
   const { data: timeline, isLoading: l4 } = useQuery({
-    queryKey: ['report-timeline', period],
+    queryKey: ['report-timeline', start, end],
     queryFn: () => api.get('/analytics/timeline', { params: { start, end } }).then(r => r.data),
   })
 
@@ -65,18 +70,34 @@ export default function RelatoriosPage() {
   })
 
   const { data: topTopics, isLoading: l6 } = useQuery({
-    queryKey: ['report-top-topics', period],
+    queryKey: ['report-top-topics', start, end],
     queryFn: () => api.get('/analytics/top-topics', { params: { start, end } }).then(r => r.data),
   })
 
   const { data: contentGaps, isLoading: l7 } = useQuery({
-    queryKey: ['report-content-gaps', period],
+    queryKey: ['report-content-gaps', start, end],
     queryFn: () => api.get('/analytics/content-gaps', { params: { start, end } }).then(r => r.data),
   })
 
   const { data: peakHours, isLoading: l8 } = useQuery({
-    queryKey: ['report-peak-hours', period],
+    queryKey: ['report-peak-hours', start, end],
     queryFn: () => api.get('/analytics/peak-hours', { params: { start, end } }).then(r => r.data),
+  })
+
+  const { data: sentiment, isLoading: l9 } = useQuery({
+    queryKey: ['report-sentiment', start, end],
+    queryFn: () => api.get('/analytics/sentiment', { params: { start, end } }).then(r => r.data),
+  })
+
+  const { data: topicContacts, isLoading: l11 } = useQuery({
+    queryKey: ['report-topic-contacts', selectedTopic?.key, start, end],
+    queryFn: () => api.get(`/analytics/top-topics/${selectedTopic!.key}/contacts`, { params: { start, end } }).then(r => r.data),
+    enabled: !!selectedTopic,
+  })
+
+  const { data: byRegion, isLoading: l10 } = useQuery({
+    queryKey: ['report-by-region', start, end],
+    queryFn: () => api.get('/analytics/by-region', { params: { start, end } }).then(r => r.data),
   })
 
   const handleDownloadPdf = async () => {
@@ -103,13 +124,17 @@ export default function RelatoriosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
           <p className="text-gray-500 text-sm mt-1">Use estes dados para definir sua agenda de rua — vá onde os eleitores estão pedindo.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {periodOptions.map((o) => (
-              <button key={o.days} onClick={() => setPeriod(o.days)} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all', period === o.days ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+              <button key={o.days} onClick={() => { setPeriod(o.days); setCustomRange(null) }} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all', !customRange && period === o.days ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
                 {o.label}
               </button>
             ))}
+            <button onClick={() => setShowCustomRange(s => !s)} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1', customRange ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+              <CalendarRange className="w-3.5 h-3.5" />
+              {customRange ? `${new Date(customRange.start).toLocaleDateString('pt-BR')} – ${new Date(customRange.end).toLocaleDateString('pt-BR')}` : 'Período'}
+            </button>
           </div>
           <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf}>
             {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
@@ -117,6 +142,29 @@ export default function RelatoriosPage() {
           </Button>
         </div>
       </div>
+
+      {showCustomRange && (
+        <div className="flex items-end gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">De</label>
+            <Input type="date" className="h-8 text-sm" id="report-custom-start" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Até</label>
+            <Input type="date" className="h-8 text-sm" id="report-custom-end" />
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              const startVal = (document.getElementById('report-custom-start') as HTMLInputElement)?.value
+              const endVal = (document.getElementById('report-custom-end') as HTMLInputElement)?.value
+              if (startVal && endVal) { setCustomRange({ start: startVal, end: endVal }); setShowCustomRange(false) }
+            }}
+          >
+            Aplicar
+          </Button>
+        </div>
+      )}
 
       {/* Relatório 1: Visão Geral da Semana */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -219,7 +267,7 @@ export default function RelatoriosPage() {
             ) : (
               <div className="space-y-3">
                 {topTopics.map((t: any) => (
-                  <div key={t.topicKey}>
+                  <button key={t.topicKey} onClick={() => setSelectedTopic({ key: t.topicKey, name: t.topicName })} className="w-full text-left hover:bg-gray-50 rounded-lg -mx-2 px-2 py-1 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="text-gray-700">{t.topicName}</span>
                       <span className="text-xs font-semibold text-gray-600">{t.count}</span>
@@ -227,7 +275,7 @@ export default function RelatoriosPage() {
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className="h-1.5 rounded-full bg-[#009C3B]" style={{ width: `${Math.max(4, (t.count / Math.max(1, ...topTopics.map((x: any) => x.count))) * 100)}%` }} />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -249,6 +297,16 @@ export default function RelatoriosPage() {
                     <span className="text-xs font-semibold text-amber-700">{t.count}x</span>
                   </div>
                 ))}
+                {contentGaps.examples?.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 mb-1.5">Conversas recentes — clique para responder:</p>
+                    {contentGaps.examples.map((ex: any) => (
+                      <Link key={ex.id} href={`/chat?conversationId=${ex.conversationId}`} className="block text-xs text-[#002776] hover:underline truncate py-0.5">
+                        → {ex.content}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -298,20 +356,86 @@ export default function RelatoriosPage() {
         </CardContent>
       </Card>
 
-      {/* Relatórios pendentes — transparência sobre o que ainda falta */}
-      <Card className="border-dashed">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-2 text-gray-500">
-            <Construction className="w-4 h-4" />
-            <span className="text-sm font-semibold">Em desenvolvimento</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PENDING_REPORTS.map((r) => (
-              <span key={r} className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">{r}</span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Relatório 5: Sentimento dos Eleitores */}
+        <Card>
+          <CardHeader><CardTitle className="text-base font-semibold">Sentimento dos Eleitores</CardTitle></CardHeader>
+          <CardContent>
+            {l9 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
+              <div className="grid grid-cols-3 gap-3">
+                {Object.entries(SENTIMENT_CONFIG).map(([key, cfg]) => {
+                  const Icon = cfg.icon
+                  return (
+                    <div key={key} className={cn('rounded-xl p-3 text-center', cfg.bg)}>
+                      <Icon className={cn('w-6 h-6 mx-auto mb-1', cfg.color)} />
+                      <div className={cn('text-xl font-bold', cfg.color)}>{sentiment?.[key] ?? 0}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{cfg.label}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-3">Classificado automaticamente pela IA com base no tom das mensagens dos eleitores.</p>
+          </CardContent>
+        </Card>
+
+        {/* Relatório 3: Solicitações por Região */}
+        <Card>
+          <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-[#002776]" />Solicitações por Região</CardTitle></CardHeader>
+          <CardContent>
+            {l10 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!byRegion?.byRegion || byRegion.byRegion.length === 0) ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Nenhum bairro identificado ainda</div>
+            ) : (
+              <div className="space-y-3">
+                {byRegion.byRegion.map((r: any) => (
+                  <div key={r.neighborhood}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-700">{r.neighborhood}</span>
+                      <span className="text-xs font-semibold text-gray-600">{r.count}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full bg-[#002776]" style={{ width: `${Math.max(4, (r.count / Math.max(1, ...byRegion.byRegion.map((x: any) => x.count))) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+                {byRegion.withoutRegion > 0 && (
+                  <p className="text-xs text-gray-400 pt-1">+{byRegion.withoutRegion} solicitação(ões) sem bairro identificado</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={!!selectedTopic} onOpenChange={(open) => !open && setSelectedTopic(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Eleitores que perguntaram sobre {selectedTopic?.name}</DialogTitle></DialogHeader>
+          {l11 ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+          ) : !topicContacts || topicContacts.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Nenhum eleitor encontrado</div>
+          ) : (
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {topicContacts.map((c: any) => (
+                <Link
+                  key={c.conversationId}
+                  href={`/chat?conversationId=${c.conversationId}`}
+                  onClick={() => setSelectedTopic(null)}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
+                    {(c.name || c.phone || '?')[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{c.name || c.phone || 'Sem nome'}</div>
+                    {c.phone && <div className="text-xs text-gray-400">{c.phone}</div>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

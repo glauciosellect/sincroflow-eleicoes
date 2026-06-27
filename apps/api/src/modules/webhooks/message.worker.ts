@@ -213,7 +213,7 @@ export function startMessageWorker() {
       const classification = await classifyMessageForAlerts(text, topicsWithContent)
       await prisma.message.update({
         where: { id: userMsg.id },
-        data: { topicKey: classification.topicKey, isContentGap: classification.isContentGap },
+        data: { topicKey: classification.topicKey, isContentGap: classification.isContentGap, sentiment: classification.sentiment },
       })
       if (classification.isUrgent) {
         const urgentConv = await prisma.conversation.update({ where: { id: conversation.id }, data: { status: 'URGENT' } })
@@ -281,7 +281,10 @@ export function startMessageWorker() {
           subject: requestIntent.subject || text.slice(0, 100),
           description: text,
         })
-        requestContext = `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO ESTE TEXTO, MAS INFORME O PROTOCOLO NATURALMENTE NA SUA RESPOSTA: Esta mensagem foi identificada como uma solicitação e foi registrada com o protocolo ${request.protocolNumber}. Confirme o registro e informe este número de protocolo ao eleitor, e diga que a equipe entrará em contato em breve.]`
+        if (requestIntent.neighborhood && !contact.neighborhood) {
+          await prisma.contact.update({ where: { id: contact.id }, data: { neighborhood: requestIntent.neighborhood } })
+        }
+        requestContext = `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO ESTE TEXTO, MAS INFORME O PROTOCOLO NATURALMENTE NA SUA RESPOSTA: Esta mensagem foi identificada como uma solicitação e foi registrada com o protocolo ${request.protocolNumber}. Confirme o registro e informe este número de protocolo ao eleitor, e diga que a equipe entrará em contato em breve.${!requestIntent.neighborhood && !contact.neighborhood ? ' Se ainda não souber, pergunte educadamente em qual bairro o eleitor mora, para ajudar a equipe a entender melhor a demanda da região.' : ''}]`
       }
 
       // ── Resposta via IA, restrita ao conteúdo cadastrado (Minha História + Plataforma Eleitoral) ──

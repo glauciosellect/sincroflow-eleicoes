@@ -253,6 +253,10 @@ model Contact {
   totalInteractions Int            @default(0)
   notes             String?
   audioPreference   String?
+  // Bairro/região mencionado pelo eleitor (extraído pela IA ao registrar uma
+  // solicitação, ou preenchido manualmente pela equipe) — usado pelo relatório
+  // de Solicitações por Região.
+  neighborhood      String?
   // Classifica quem é o contato — todo contato nasce VOTER (a maioria de quem
   // escreve é eleitor mesmo); reclassificado manualmente pela equipe quando não é.
   contactType       ContactType    @default(VOTER)
@@ -303,6 +307,10 @@ model Message {
   // true quando a mensagem é uma pergunta sobre um tema que o candidato não cadastrou
   // conteúdo (gap de conteúdo, seção 4.13 da spec).
   isContentGap    Boolean           @default(false)
+  // Sentimento da mensagem do eleitor (POSITIVE/NEUTRAL/NEGATIVE), classificado pela
+  // IA na mesma chamada de classifyMessageForAlerts — usado pelo relatório de
+  // Sentimento dos Eleitores, sem custo extra de IA.
+  sentiment       String?
   createdAt       DateTime          @default(now())
   conversation    Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }

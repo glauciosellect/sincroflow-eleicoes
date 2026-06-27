@@ -5,14 +5,14 @@ import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 import { generateReportPdf } from './report-pdf'
 
-// Relatórios implementados (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md):
-// 1. Visão Geral da Semana, 2. Temas Mais Perguntados, 4. Volume por Canal,
+// Os 10 relatórios da spec (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md)
+// estão todos implementados:
+// 1. Visão Geral da Semana, 2. Temas Mais Perguntados, 3. Solicitações por Região
+// (Contact.neighborhood, extraído pela IA ou preenchido manualmente),
+// 4. Volume por Canal, 5. Sentimento dos Eleitores (Message.sentiment, classificado
+// na mesma chamada de IA que já identifica tema/gap — sem custo extra),
 // 6. Perguntas Sem Resposta (Gaps de Conteúdo), 7. Horários de Pico,
 // 8. Eleitores Mais Engajados, 9. Evolução Semanal, 10. Status das Solicitações.
-//
-// TODO — ainda não implementados (exigem mais infra: geolocalização dos contatos,
-// análise de sentimento por IA — custo extra por mensagem):
-// 3. Mapa de Solicitações por Região, 5. Sentimento dos Eleitores.
 
 function dateRange(start?: string, end?: string) {
   const s = start ? new Date(start) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -144,6 +144,26 @@ export async function analyticsRoutes(app: FastifyInstance) {
     )
   })
 
+  // Lista os contatos que perguntaram sobre um tema específico no período — usado
+  // pelo link "ver eleitores" em Temas Mais Perguntados.
+  app.get('/analytics/top-topics/:topicKey/contacts', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { topicKey } = req.params as { topicKey: string }
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const messages = await prisma.message.findMany({
+      where: { topicKey, createdAt: range, conversation: { candidateId } },
+      select: { conversation: { select: { id: true, contact: { select: { id: true, name: true, phone: true } } } } },
+      distinct: ['conversationId'],
+    })
+
+    return reply.send(
+      messages.map((m) => ({ conversationId: m.conversation.id, ...m.conversation.contact }))
+    )
+  })
+
   // Relatório 6: Perguntas Sem Resposta (gaps de conteúdo) — mensagens marcadas
   // isContentGap=true pela IA (mesmo campo usado pelos alertas de gap).
   app.get('/analytics/content-gaps', async (req, reply) => {
@@ -196,6 +216,54 @@ export async function analyticsRoutes(app: FastifyInstance) {
     }
 
     return reply.send(byHour)
+  })
+
+  // Relatório 5: Sentimento dos Eleitores — Message.sentiment classificado pela IA
+  // na mesma chamada que já identifica tema/gap/urgência (sem custo extra de IA).
+  app.get('/analytics/sentiment', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const grouped = await prisma.message.groupBy({
+      by: ['sentiment'],
+      where: { senderType: 'VOTER', sentiment: { not: null }, createdAt: range, conversation: { candidateId } },
+      _count: true,
+    })
+
+    const result = { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 } as Record<string, number>
+    for (const g of grouped) {
+      if (g.sentiment) result[g.sentiment] = g._count
+    }
+    return reply.send(result)
+  })
+
+  // Relatório 3: Solicitações por Região — agrega Contact.neighborhood (extraído pela
+  // IA ao registrar uma solicitação, ou preenchido manualmente pela equipe).
+  app.get('/analytics/by-region', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const requests = await prisma.request.findMany({
+      where: { candidateId, createdAt: range },
+      select: { contact: { select: { neighborhood: true } } },
+    })
+
+    const grouped: Record<string, number> = {}
+    let withoutRegion = 0
+    for (const r of requests) {
+      const neighborhood = r.contact.neighborhood
+      if (!neighborhood) { withoutRegion++; continue }
+      grouped[neighborhood] = (grouped[neighborhood] || 0) + 1
+    }
+
+    return reply.send({
+      byRegion: Object.entries(grouped).map(([neighborhood, count]) => ({ neighborhood, count })).sort((a, b) => b.count - a.count),
+      withoutRegion,
+    })
   })
 
   // Exporta o relatório do período em PDF (visão geral, status, temas, gaps, top eleitores)

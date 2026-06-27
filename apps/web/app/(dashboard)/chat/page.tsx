@@ -282,6 +282,15 @@ function ChatContent() {
     }).then(r => r.data),
   })
 
+  // Vindo de um link externo (ex: Relatórios → Perguntas Sem Resposta): abre direto
+  // a conversa específica, sem o usuário precisar procurar na lista.
+  useEffect(() => {
+    const conversationId = searchParams.get('conversationId')
+    if (conversationId && !selected) {
+      api.get(`/conversations/${conversationId}`).then((res) => setSelected(res.data)).catch(() => {})
+    }
+  }, [searchParams])
+
   const { data: msgs } = useQuery({
     queryKey: ['messages', selected?.id],
     queryFn: () => api.get(`/conversations/${selected.id}/messages`).then(r => r.data),

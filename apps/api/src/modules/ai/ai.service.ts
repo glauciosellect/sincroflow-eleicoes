@@ -95,18 +95,19 @@ Regras gerais de conversa:
 // Detecta se a mensagem é um pedido/reclamação que deve gerar protocolo de solicitação
 // (seção 4.12 da spec) — ex: "queria pedir para arrumar a iluminação da minha rua".
 // Não classifica perguntas simples sobre propostas como solicitação.
-export async function detectRequestIntent(message: string): Promise<{ isRequest: boolean; subject?: string }> {
+export async function detectRequestIntent(message: string): Promise<{ isRequest: boolean; subject?: string; neighborhood?: string }> {
   try {
     const res = await callLLM({
       model: DEFAULT_MODEL,
       system: `Você classifica mensagens de eleitores para uma campanha eleitoral. Determine se a mensagem é um PEDIDO ou RECLAMAÇÃO que deve ser registrado como solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre um serviço público, denúncia, pedido de ajuda).
 NÃO classifique como solicitação: perguntas sobre propostas do candidato, perguntas sobre agenda/eventos, cumprimentos, conversas gerais.
-Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do pedido em até 8 palavras"} (subject pode ser omitido se isRequest for false). Nenhum texto adicional.`,
+Se a mensagem mencionar um bairro, região ou localidade específica, extraia esse nome em "neighborhood" (ex: "Centro", "Jardim das Flores") — senão omita o campo.
+Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do pedido em até 8 palavras", "neighborhood": "<bairro mencionado ou omitir>"} (subject pode ser omitido se isRequest for false). Nenhum texto adicional.`,
       messages: [{ role: 'user', content: message }],
       maxTokens: 100,
     })
     const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
-    return { isRequest: !!parsed.isRequest, subject: parsed.subject }
+    return { isRequest: !!parsed.isRequest, subject: parsed.subject, neighborhood: parsed.neighborhood || undefined }
   } catch {
     return { isRequest: false }
   }
@@ -118,14 +119,15 @@ Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do p
 export async function classifyMessageForAlerts(
   message: string,
   topicsWithContent: Set<string>,
-): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean }> {
+): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean; sentiment: string }> {
   try {
     const topicList = PLATFORM_TOPICS.map(t => `${t.key}: ${t.name}`).join('\n')
     const res = await callLLM({
       model: DEFAULT_MODEL,
-      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false}.
+      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE"}.
 "topicKey": a chave do tema da lista se a mensagem for uma pergunta/comentário sobre esse tema, senão null.
 "isUrgent": true se a mensagem tiver tom agressivo, ameaça, xingamento, ou relatar situação sensível/grave que exige atenção humana imediata.
+"sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).
 Nenhum texto adicional.`,
       messages: [{ role: 'user', content: message }],
       maxTokens: 80,
@@ -133,9 +135,10 @@ Nenhum texto adicional.`,
     const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
     const topicKey = typeof parsed.topicKey === 'string' && PLATFORM_TOPICS.some(t => t.key === parsed.topicKey) ? parsed.topicKey : null
     const isContentGap = !!topicKey && !topicsWithContent.has(topicKey)
-    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent }
+    const sentiment = ['POSITIVE', 'NEUTRAL', 'NEGATIVE'].includes(parsed.sentiment) ? parsed.sentiment : 'NEUTRAL'
+    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent, sentiment }
   } catch {
-    return { topicKey: null, isContentGap: false, isUrgent: false }
+    return { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL' }
   }
 }
 
