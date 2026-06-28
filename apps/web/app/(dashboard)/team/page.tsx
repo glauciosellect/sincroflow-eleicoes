@@ -34,14 +34,15 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const qc = useQueryClient()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [role, setRole] = useState<string>('ATENDIMENTO')
   const [error, setError] = useState('')
 
   const invite = useMutation({
-    mutationFn: (data: { name: string; email: string; role: string }) => api.post('/candidates/me/team/invite', data),
+    mutationFn: (data: { name: string; email: string; whatsapp: string; role: string }) => api.post('/candidates/me/team/invite', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invites'] })
-      setName(''); setEmail(''); setRole('ATENDIMENTO'); setError(''); onClose()
+      setName(''); setEmail(''); setWhatsapp(''); setRole('ATENDIMENTO'); setError(''); onClose()
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Erro ao enviar convite'),
   })
@@ -50,7 +51,7 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Convidar colaborador</DialogTitle></DialogHeader>
-        <form onSubmit={e => { e.preventDefault(); if (!name || !email) return setError('Informe nome e e-mail'); invite.mutate({ name, email, role }) }} className="space-y-4 mt-2">
+        <form onSubmit={e => { e.preventDefault(); if (!name || !email || !whatsapp) return setError('Informe nome, e-mail e WhatsApp'); invite.mutate({ name, email, whatsapp, role }) }} className="space-y-4 mt-2">
           <div>
             <Label>Nome</Label>
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do colaborador" className="mt-1" />
@@ -58,6 +59,10 @@ function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <div>
             <Label>E-mail</Label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@email.com" className="mt-1" />
+          </div>
+          <div>
+            <Label>WhatsApp</Label>
+            <Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(32) 99999-9999" className="mt-1" />
           </div>
           <div>
             <Label>Função</Label>
@@ -192,6 +197,7 @@ export default function TeamPage() {
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{member.user?.name || member.name}</p>
                             <p className="text-xs text-gray-400 truncate">{member.user?.email || member.email}</p>
+                            {member.whatsapp && <p className="text-xs text-gray-400 truncate">{member.whatsapp}</p>}
                           </div>
                         </div>
 

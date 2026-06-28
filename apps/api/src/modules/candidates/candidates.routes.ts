@@ -106,9 +106,10 @@ export async function candidateRoutes(app: FastifyInstance) {
     const { candidate, role } = await getCandidateForUser(sub)
     if (!requireAdmin(role, reply)) return
 
-    const { name, email, role: inviteRole } = z.object({
+    const { name, email, whatsapp, role: inviteRole } = z.object({
       name: z.string().min(2).max(120),
       email: z.string().email(),
+      whatsapp: z.string().min(10).max(20),
       role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS', 'AGENTE_CAMPO']).default('ATENDIMENTO'),
     }).parse(req.body)
 
@@ -118,8 +119,8 @@ export async function candidateRoutes(app: FastifyInstance) {
 
     await prisma.teamMember.upsert({
       where: { candidateId_email: { candidateId: candidate.id, email } },
-      update: { name, role: inviteRole, inviteToken: token, status: 'PENDING', acceptedAt: null, invitedAt: new Date() },
-      create: { candidateId: candidate.id, name, email, role: inviteRole, inviteToken: token },
+      update: { name, whatsapp, role: inviteRole, inviteToken: token, status: 'PENDING', acceptedAt: null, invitedAt: new Date() },
+      create: { candidateId: candidate.id, name, email, whatsapp, role: inviteRole, inviteToken: token },
     })
 
     const acceptUrl = `${process.env.FRONTEND_URL}/accept-invite?token=${token}`

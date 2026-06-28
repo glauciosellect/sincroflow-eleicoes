@@ -112,6 +112,7 @@ model TeamMember {
   userId      String?
   name        String
   email       String
+  whatsapp    String?
   role        TeamRole         @default(ATENDIMENTO)
   invitedAt   DateTime         @default(now())
   acceptedAt  DateTime?
