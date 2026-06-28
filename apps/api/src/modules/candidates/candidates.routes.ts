@@ -68,7 +68,7 @@ export async function candidateRoutes(app: FastifyInstance) {
     if (!requireAdmin(role, reply)) return
     const { id } = req.params as { id: string }
     const { role: newRole } = z.object({
-      role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS']),
+      role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS', 'AGENTE_CAMPO']),
     }).parse(req.body)
     const updated = await prisma.teamMember.update({
       where: { id },
@@ -109,7 +109,7 @@ export async function candidateRoutes(app: FastifyInstance) {
     const { name, email, role: inviteRole } = z.object({
       name: z.string().min(2).max(120),
       email: z.string().email(),
-      role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS']).default('ATENDIMENTO'),
+      role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS', 'AGENTE_CAMPO']).default('ATENDIMENTO'),
     }).parse(req.body)
 
     const inviter = await prisma.user.findUnique({ where: { id: sub }, select: { name: true } })
