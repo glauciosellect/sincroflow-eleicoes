@@ -14,6 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const user = useAuthStore((s) => s.user)
   const candidate = useAuthStore((s) => s.candidate)
+  const role = useAuthStore((s) => s.role)
   const [hydrated, setHydrated] = useState(false)
 
   useSocketConnect()
@@ -25,6 +26,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (hydrated && !user) router.push('/login')
   }, [hydrated, user, router])
+
+  // Agente de Campo só acessa "Meu Desempenho" — qualquer outra rota redireciona
+  // para lá em vez de mostrar uma tela vazia/com erro de permissão.
+  useEffect(() => {
+    if (hydrated && role === 'AGENTE_CAMPO' && pathname !== '/meu-desempenho') {
+      router.replace('/meu-desempenho')
+    }
+  }, [hydrated, role, pathname, router])
 
   if (!hydrated || !user) return null
 
