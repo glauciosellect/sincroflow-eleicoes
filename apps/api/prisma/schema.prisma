@@ -77,6 +77,9 @@ model Candidate {
   // (Starter=1, Pro=3, Business=10, Enterprise=-1 "ilimitado"). Independente
   // de `plan`, que representa a FASE da campanha (CAMPAIGN/MANDATE), não o volume.
   whatsappLineLimit    Int             @default(1)
+  // Linhas extras aprovadas manualmente (Pix, painel /admin) — somadas à fórmula
+  // de syncWhatsAppLineLimit, que senão sobrescreveria isso a cada webhook do Stripe.
+  whatsappLinesManual  Int             @default(0)
   activeMsgsIncluded   Int             @default(1000)
   activeMsgsUsed       Int             @default(0)
   activeMsgsExtra      Int             @default(0)
@@ -113,6 +116,26 @@ model Candidate {
   invoices         Invoice[]
   creatives        Creative[]
   broadcasts       Broadcast[]
+}
+
+// Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
+// 30min (suficiente para cartão, que confirma em segundos). Pix/boleto manual pode
+// levar horas/dias até aprovação no painel /admin, por isso precisa ser persistente.
+model PendingRegistration {
+  id              String    @id @default(cuid())
+  name            String
+  cpf             String
+  candidateNumber String?
+  email           String
+  whatsapp        String
+  passwordHash    String
+  paymentMethod   String // 'pix' | 'boleto' | 'card'
+  plan            String    @default("CAMPAIGN")
+  status          String    @default("PENDING") // PENDING | APPROVED | EXPIRED
+  createdAt       DateTime  @default(now())
+  resolvedAt      DateTime?
+
+  @@index([status])
 }
 
 model TeamMember {

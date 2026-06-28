@@ -16,6 +16,10 @@ import { useToast } from '@/components/ui/use-toast'
 const ACTIVE_MSG_RECHARGE = { amount: 1000, priceLabel: 'A definir' }
 const WHATSAPP_LINE_PRICE = 497
 const WHATSAPP_LINE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
+// Fallback para Pix manual (linha de WhatsApp) — só usado por quem não tem cartão,
+// confirmação e liberação são feitas manualmente no painel /admin.
+const PIX_KEY = process.env.NEXT_PUBLIC_SUPPORT_PIX_KEY || 'A definir'
+const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || 'A definir'
 
 const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDATE: 'Plano Mandato' }
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Ativa', SUSPENDED: 'Suspensa', CANCELLED: 'Cancelada' }
@@ -266,6 +270,14 @@ export default function BillingPage() {
           >
             {whatsappLinesMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assine agora'}
           </Button>
+        </div>
+
+        <p className="text-sm text-gray-500 mt-4 mb-2">
+          Não tem cartão? Pague via Pix direto na nossa chave e mande o comprovante para liberarmos manualmente.
+        </p>
+        <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 max-w-xs text-sm space-y-1">
+          <div><span className="text-gray-500">Chave Pix (CNPJ):</span> <span className="font-medium text-gray-900">{PIX_KEY}</span></div>
+          <div><span className="text-gray-500">Comprovante via WhatsApp:</span> <span className="font-medium text-gray-900">{SUPPORT_WHATSAPP}</span></div>
         </div>
       </div>
 

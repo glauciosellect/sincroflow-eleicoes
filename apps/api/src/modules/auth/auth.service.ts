@@ -13,20 +13,11 @@ Estou aqui para responder suas dúvidas sobre as propostas, informar sobre event
 Como posso ajudar você hoje?
 `.trim()
 
-const PENDING_REGISTRATION_TTL = 30 * 60 // 30 minutos para concluir o pagamento
-
-export interface PendingRegistration {
-  name: string
-  cpf: string
-  candidateNumber?: string
-  email: string
-  whatsapp: string
-  passwordHash: string
-}
-
 // Passo 1 do registro (seção 4.1 da spec): valida e guarda os dados temporariamente.
-// A conta (User + Candidate) só é criada de fato após o pagamento ser aprovado
-// (ver stripe.routes.ts, evento checkout.session.completed).
+// A conta (User + Candidate) só é criada de fato após o pagamento ser aprovado —
+// automaticamente pelo webhook do Stripe (cartão) ou manualmente no painel /admin
+// (Pix/boleto, sem confirmação automática madura no Brasil ainda). Persistido em
+// tabela (não Redis com TTL) porque a aprovação manual pode levar horas/dias.
 export async function createPendingRegistration(input: RegisterInput): Promise<string> {
   const existing = await prisma.user.findUnique({ where: { email: input.email } })
   if (existing) throw new Error('Email já cadastrado')
@@ -35,31 +26,41 @@ export async function createPendingRegistration(input: RegisterInput): Promise<s
   if (existingCandidate) throw new Error('CPF já cadastrado')
 
   const passwordHash = await bcrypt.hash(input.password, 12)
-  const pendingId = crypto.randomBytes(24).toString('hex')
 
-  const pending: PendingRegistration = {
-    name: input.name,
-    cpf: input.cpf,
-    candidateNumber: input.candidateNumber,
-    email: input.email,
-    whatsapp: input.whatsapp,
-    passwordHash,
-  }
-  await redis.set(`pending_registration:${pendingId}`, JSON.stringify(pending), 'EX', PENDING_REGISTRATION_TTL)
+  // paymentMethod/plan só são conhecidos no passo 2 (escolha de plano e forma de
+  // pagamento) — aqui ainda é só o passo 1 (dados pessoais). Atualizados depois por
+  // updatePendingRegistrationPayment, chamado tanto pelo checkout Stripe quanto pelo
+  // fallback manual (Pix direto, sem Stripe, ver system-admin.routes.ts).
+  const pending = await prisma.pendingRegistration.create({
+    data: {
+      name: input.name,
+      cpf: input.cpf,
+      candidateNumber: input.candidateNumber,
+      email: input.email,
+      whatsapp: input.whatsapp,
+      passwordHash,
+      paymentMethod: 'card',
+    },
+  })
 
-  return pendingId
+  return pending.id
 }
 
-export async function getPendingRegistration(pendingId: string): Promise<PendingRegistration | null> {
-  const raw = await redis.get(`pending_registration:${pendingId}`)
-  return raw ? JSON.parse(raw) : null
+export async function updatePendingRegistrationPayment(pendingId: string, paymentMethod: 'card' | 'pix' | 'boleto', plan: 'CAMPAIGN' | 'MANDATE') {
+  await prisma.pendingRegistration.update({ where: { id: pendingId }, data: { paymentMethod, plan } })
 }
 
-// Passo 2: chamado pelo webhook do Stripe quando o pagamento é aprovado.
-// Cria a conta de fato — User, Candidate (status ACTIVE), TeamMember (Administrador) e AgentConfig.
+export async function getPendingRegistration(pendingId: string) {
+  return prisma.pendingRegistration.findUnique({ where: { id: pendingId, status: 'PENDING' } })
+}
+
+// Passo 2: chamado pelo webhook do Stripe (cartão/Pix/boleto via Checkout) quando o
+// pagamento é aprovado, OU manualmente pelo painel /admin (Pix/boleto sem checkout,
+// aprovação humana). Cria a conta de fato — User, Candidate (status ACTIVE),
+// TeamMember (Administrador) e AgentConfig.
 export async function activatePendingRegistration(
   pendingId: string,
-  stripeCustomerId: string,
+  stripeCustomerId: string | null,
   stripeSubscriptionId: string | null,
   campaignPayment?: { method: 'pix' | 'boleto'; paidUntil: Date },
 ): Promise<{ userId: string; candidateId: string } | null> {
@@ -109,7 +110,7 @@ export async function activatePendingRegistration(
     },
   })
 
-  await redis.del(`pending_registration:${pendingId}`)
+  await prisma.pendingRegistration.update({ where: { id: pendingId }, data: { status: 'APPROVED', resolvedAt: new Date() } })
 
   return { userId: user.id, candidateId: candidate.id }
 }

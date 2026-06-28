@@ -28,6 +28,7 @@ import { emailChannelRoutes } from './modules/channels/email/email.routes'
 import { rbacRoutes } from './modules/rbac/rbac.routes'
 import { statusRoutes } from './modules/status/status.routes'
 import { complianceRoutes } from './modules/compliance/compliance.routes'
+import { systemAdminRoutes } from './modules/system-admin/system-admin.routes'
 import { requestRoutes } from './modules/requests/requests.routes'
 import { eventRoutes } from './modules/events/events.routes'
 import { creativeRoutes } from './modules/creatives/creatives.routes'
@@ -151,6 +152,7 @@ async function bootstrap() {
 
   // Compliance TSE (desativação automática 72h antes de cada turno)
   await app.register(complianceRoutes)
+  await app.register(systemAdminRoutes)
 
   startMessageWorker()
   startReminderWorker()

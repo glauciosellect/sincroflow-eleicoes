@@ -14,6 +14,7 @@ Lista viva de pendências do projeto. Atualizada em 2026-06-28 após auditoria g
 - [ ] CPF não é editável na tela de Perfil (só no cadastro inicial)
 - [ ] Modo Mandato troca só a flag `plan` — não atualiza disclaimer/contexto do agente automaticamente
 - [ ] Pagamento via Pix e Boleto — implementado em 2026-06-28. Price `price_1TnOk0JI94CYVRhpKtbVmVwu` criado no Stripe. Falta: configurar `STRIPE_PRICE_CAMPAIGN_ONETIME=price_1TnOk0JI94CYVRhpKtbVmVwu` no EasyPanel e reimplantar
+- [ ] Painel administrativo manual (`/admin`) implementado em 2026-06-28 — plano B para Pix direto (sem Stripe) em cadastro/linha WhatsApp/créditos. Falta configurar no EasyPanel: `SYSTEM_ADMIN_KEY` (gerar valor novo forte), `NEXT_PUBLIC_SUPPORT_PIX_KEY` (chave Pix/CNPJ real) e `NEXT_PUBLIC_SUPPORT_WHATSAPP` (número de suporte) — sem essas 3 variáveis, a tela mostra "A definir" no lugar dos dados reais
 - [ ] Aba "Fluxos" do cadastro do agente sem interface de edição (lógica existe no código, equipe não consegue configurar)
 - [ ] Meta Pixel / Google Analytics na landing — decisão deliberada de deixar para depois, não é bug
 

@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
-import { getPendingRegistration, activatePendingRegistration } from '../auth/auth.service'
+import { getPendingRegistration, activatePendingRegistration, updatePendingRegistrationPayment } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 import { requireAdmin } from '../../lib/rbac'
 
@@ -51,7 +51,10 @@ async function syncWhatsAppLineLimit(subscriptionId: string) {
 
   const candidate = await prisma.candidate.findFirst({ where: { stripeSubscriptionId: subscriptionId } })
   if (!candidate) return
-  await prisma.candidate.update({ where: { id: candidate.id }, data: { whatsappLineLimit: 1 + extraLines } })
+  // + whatsappLinesManual: linhas aprovadas manualmente no painel /admin (Pix direto,
+  // fora do Stripe) — sem essa soma, esse webhook sobrescreveria e perderia essas
+  // linhas a cada renovação de cartão.
+  await prisma.candidate.update({ where: { id: candidate.id }, data: { whatsappLineLimit: 1 + extraLines + candidate.whatsappLinesManual } })
 }
 
 export async function stripeRoutes(app: FastifyInstance) {
@@ -80,6 +83,8 @@ export async function stripeRoutes(app: FastifyInstance) {
     if (paymentMethod !== 'card' && plan !== 'CAMPAIGN') {
       return reply.status(400).send({ error: 'Pix e boleto só estão disponíveis para o Plano Campanha.' })
     }
+
+    await updatePendingRegistrationPayment(pendingId, paymentMethod, plan)
 
     if (paymentMethod === 'card') {
       const priceId = PLAN_PRICE_IDS[plan]
