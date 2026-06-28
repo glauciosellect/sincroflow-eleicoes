@@ -121,12 +121,15 @@ export async function stripeRoutes(app: FastifyInstance) {
   app.post('/billing/checkout-active-msgs', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { quantity } = z.object({ quantity: z.number().int().min(1).max(20).default(1) }).parse(req.body || {})
+    const { quantity, paymentMethod } = z.object({
+      quantity: z.number().int().min(1).max(20).default(1),
+      paymentMethod: z.enum(['card', 'pix', 'boleto']).default('card'),
+    }).parse(req.body || {})
 
     if (!ACTIVE_MSG_RECHARGE.priceId) return reply.status(500).send({ error: 'Recarga não configurada. Contate o suporte.' })
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: [paymentMethod],
       mode: 'payment',
       line_items: [{ price: ACTIVE_MSG_RECHARGE.priceId, quantity }],
       metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount * quantity) },

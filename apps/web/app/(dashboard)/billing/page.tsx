@@ -31,6 +31,7 @@ export default function BillingPage() {
   const [agreed, setAgreed] = useState(false)
   const [whatsappLinesQty, setWhatsappLinesQty] = useState(1)
   const [renewMethod, setRenewMethod] = useState<'pix' | 'boleto'>('pix')
+  const [rechargeMethod, setRechargeMethod] = useState<'card' | 'pix' | 'boleto'>('card')
 
   const isSuspended = candidate?.status === 'SUSPENDED'
 
@@ -52,7 +53,7 @@ export default function BillingPage() {
 
   // Recarga avulsa de mensagens ativas
   const checkoutActiveMsgsMutation = useMutation({
-    mutationFn: () => api.post('/billing/checkout-active-msgs').then(r => r.data),
+    mutationFn: (paymentMethod: 'card' | 'pix' | 'boleto') => api.post('/billing/checkout-active-msgs', { paymentMethod }).then(r => r.data),
     onSuccess: (data) => { if (data.url) window.location.href = data.url },
     onError: (err: any) => toast({ title: 'Erro ao processar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
   })
@@ -207,14 +208,25 @@ export default function BillingPage() {
         <p className="text-sm text-gray-500 mb-4">
           Use quando esgotar a cota do ciclo. Mensagens passivas (respostas a eleitores que escrevem primeiro) nunca são afetadas — apenas envios iniciados pelo agente (disclaimer, lembretes) são bloqueados até a recarga.
         </p>
-        <div className="rounded-xl border-2 border-gray-200 p-4 max-w-xs">
-          <div className="font-bold text-gray-900 mb-1">+{ACTIVE_MSG_RECHARGE.amount.toLocaleString('pt-BR')} mensagens ativas</div>
-          <div className="text-xl font-bold text-gray-900 mb-3">{ACTIVE_MSG_RECHARGE.priceLabel}</div>
+        <div className="rounded-xl border-2 border-gray-200 p-4 max-w-xs space-y-3">
+          <div>
+            <div className="font-bold text-gray-900 mb-1">+{ACTIVE_MSG_RECHARGE.amount.toLocaleString('pt-BR')} mensagens ativas</div>
+            <div className="text-xl font-bold text-gray-900">{ACTIVE_MSG_RECHARGE.priceLabel}</div>
+          </div>
+          <select
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            value={rechargeMethod}
+            onChange={(e) => setRechargeMethod(e.target.value as 'card' | 'pix' | 'boleto')}
+          >
+            <option value="card">Cartão de crédito</option>
+            <option value="pix">Pix</option>
+            <option value="boleto">Boleto</option>
+          </select>
           <Button
             size="sm"
             className="w-full"
             disabled={checkoutActiveMsgsMutation.isPending}
-            onClick={() => checkoutActiveMsgsMutation.mutate()}
+            onClick={() => checkoutActiveMsgsMutation.mutate(rechargeMethod)}
           >
             {checkoutActiveMsgsMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar recarga'}
           </Button>
