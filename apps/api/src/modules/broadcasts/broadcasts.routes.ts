@@ -6,18 +6,29 @@ import { auditLog, requireModule } from '../../lib/rbac'
 import { broadcastQueue } from '../../lib/queue'
 
 const MAX_BROADCAST_TARGETS = 500
+// WhatsApp: limite por LINHA (cada número tem seu próprio teto, candidato pode ter
+// várias linhas). E-mail: canal único por candidato, sem conceito de "linha" — teto
+// fixo e conservador baseado no limite real do Gmail gratuito (500/dia), com margem
+// para outras respostas automáticas do dia também contarem.
 const MAX_24H_PER_LINE = 250
+const MAX_24H_EMAIL = 400
 const SEND_INTERVAL_MS = 3000
 
-async function resolveTargets(candidateId: string, contactType?: string) {
+type BroadcastChannelType = 'WHATSAPP' | 'EMAIL'
+
+function max24hLimitFor(channelType: BroadcastChannelType): number {
+  return channelType === 'EMAIL' ? MAX_24H_EMAIL : MAX_24H_PER_LINE
+}
+
+async function resolveTargets(candidateId: string, channelType: BroadcastChannelType, contactType?: string) {
   return prisma.contact.findMany({
-    where: { candidateId, ...(contactType ? { contactType: contactType as any } : {}), channel: { type: 'WHATSAPP' } },
+    where: { candidateId, ...(contactType ? { contactType: contactType as any } : {}), channel: { type: channelType } },
     select: { id: true, externalId: true },
   })
 }
 
-async function getActiveWhatsAppChannel(candidateId: string) {
-  return prisma.channel.findFirst({ where: { candidateId, type: 'WHATSAPP', isActive: true } })
+async function getActiveChannel(candidateId: string, channelType: BroadcastChannelType) {
+  return prisma.channel.findFirst({ where: { candidateId, type: channelType, isActive: true } })
 }
 
 export async function broadcastRoutes(app: FastifyInstance) {
@@ -38,15 +49,16 @@ export async function broadcastRoutes(app: FastifyInstance) {
   app.get('/broadcasts/preview', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { creativeId, contactType } = req.query as { creativeId: string; contactType?: string }
+    const { creativeId, contactType, channelType: rawChannelType } = req.query as { creativeId: string; contactType?: string; channelType?: string }
+    const channelType: BroadcastChannelType = rawChannelType === 'EMAIL' ? 'EMAIL' : 'WHATSAPP'
 
     const creative = await prisma.creative.findFirst({ where: { id: creativeId, candidateId } })
     if (!creative) return reply.status(404).send({ error: 'Criativo não encontrado' })
 
-    const channel = await getActiveWhatsAppChannel(candidateId)
-    if (!channel) return reply.status(400).send({ error: 'Nenhum WhatsApp ativo conectado' })
+    const channel = await getActiveChannel(candidateId, channelType)
+    if (!channel) return reply.status(400).send({ error: channelType === 'EMAIL' ? 'Nenhum e-mail ativo conectado' : 'Nenhum WhatsApp ativo conectado' })
 
-    const targets = await resolveTargets(candidateId, contactType)
+    const targets = await resolveTargets(candidateId, channelType, contactType)
     const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
     const activeMsgsRemaining = (candidate!.activeMsgsIncluded + candidate!.activeMsgsExtra) - candidate!.activeMsgsUsed
 
@@ -54,6 +66,7 @@ export async function broadcastRoutes(app: FastifyInstance) {
       where: { contactId: { in: targets.map((t) => t.id) }, broadcast: { creativeId } },
     })
 
+    const max24h = max24hLimitFor(channelType)
     const sentLast24h = await prisma.broadcastRecipient.count({
       where: { broadcast: { channelId: channel.id }, sentAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     })
@@ -64,17 +77,18 @@ export async function broadcastRoutes(app: FastifyInstance) {
       activeMsgsRemaining,
       alreadyReceivedCount,
       sentLast24h,
-      max24hPerLine: MAX_24H_PER_LINE,
-      remaining24hCapacity: Math.max(0, MAX_24H_PER_LINE - sentLast24h),
+      max24hPerLine: max24h,
+      remaining24hCapacity: Math.max(0, max24h - sentLast24h),
     })
   })
 
   app.post('/broadcasts', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { creativeId, contactType } = z.object({
+    const { creativeId, contactType, channelType } = z.object({
       creativeId: z.string(),
       contactType: z.enum(['VOTER', 'FAMILY_FRIEND', 'STAFF', 'CONTRACTOR', 'OTHER']).optional(),
+      channelType: z.enum(['WHATSAPP', 'EMAIL']).default('WHATSAPP'),
     }).parse(req.body)
 
     const agentConfig = await prisma.agentConfig.findUnique({ where: { candidateId } })
@@ -83,10 +97,10 @@ export async function broadcastRoutes(app: FastifyInstance) {
     const creative = await prisma.creative.findFirst({ where: { id: creativeId, candidateId } })
     if (!creative) return reply.status(404).send({ error: 'Criativo não encontrado' })
 
-    const channel = await getActiveWhatsAppChannel(candidateId)
-    if (!channel) return reply.status(400).send({ error: 'Nenhum WhatsApp ativo conectado' })
+    const channel = await getActiveChannel(candidateId, channelType)
+    if (!channel) return reply.status(400).send({ error: channelType === 'EMAIL' ? 'Nenhum e-mail ativo conectado' : 'Nenhum WhatsApp ativo conectado' })
 
-    const targets = await resolveTargets(candidateId, contactType)
+    const targets = await resolveTargets(candidateId, channelType, contactType)
     if (targets.length === 0) return reply.status(400).send({ error: 'Nenhum contato elegível encontrado para esse filtro' })
 
     if (targets.length > MAX_BROADCAST_TARGETS) {
@@ -99,12 +113,15 @@ export async function broadcastRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: `Mensagens ativas insuficientes: restam ${activeMsgsRemaining}, este disparo precisa de ${targets.length}. Compre uma recarga.` })
     }
 
+    const max24h = max24hLimitFor(channelType)
     const sentLast24h = await prisma.broadcastRecipient.count({
       where: { broadcast: { channelId: channel.id }, sentAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     })
-    if (sentLast24h + targets.length > MAX_24H_PER_LINE) {
+    if (sentLast24h + targets.length > max24h) {
       return reply.status(400).send({
-        error: `Limite de envios nas últimas 24h para esse número de WhatsApp seria excedido (${sentLast24h} já enviados, limite ${MAX_24H_PER_LINE}). Aguarde ou use outra linha.`,
+        error: channelType === 'EMAIL'
+          ? `Limite de envios por e-mail nas últimas 24h seria excedido (${sentLast24h} já enviados, limite ${max24h}). Aguarde para disparar novamente.`
+          : `Limite de envios nas últimas 24h para esse número de WhatsApp seria excedido (${sentLast24h} já enviados, limite ${max24h}). Aguarde ou use outra linha.`,
       })
     }
 
@@ -132,7 +149,7 @@ export async function broadcastRoutes(app: FastifyInstance) {
     await auditLog({
       candidateId,
       eventType: 'broadcast_created',
-      metadata: { broadcastId: broadcast.id, creativeId, totalTargets: targets.length, contactType },
+      metadata: { broadcastId: broadcast.id, creativeId, totalTargets: targets.length, contactType, channelType },
     })
 
     return reply.status(201).send(broadcast)

@@ -2,6 +2,7 @@ import type { Job } from 'bullmq'
 import { prisma } from '../../lib/prisma'
 import { createWorker } from '../../lib/queue'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
+import { getValidGmailToken, sendNewEmailWithAttachment } from '../../lib/gmail'
 import { emitNewMessage } from '../../lib/socket'
 
 export type BroadcastJobData = {
@@ -28,7 +29,7 @@ async function processBroadcastJob(job: Job<BroadcastJobData>) {
 
   const broadcast = await prisma.broadcast.findUnique({
     where: { id: broadcastId },
-    include: { creative: true },
+    include: { creative: true, channel: true },
   })
   if (!broadcast) return
 
@@ -44,8 +45,20 @@ async function processBroadcastJob(job: Job<BroadcastJobData>) {
   }
 
   try {
-    const provider = getWhatsAppProvider()
-    await provider.sendMedia(broadcast.channelId, contact.externalId, broadcast.creative.fileUrl, broadcast.creative.title)
+    if (broadcast.channel.type === 'EMAIL') {
+      const accessToken = await getValidGmailToken(broadcast.channelId)
+      if (!accessToken) throw new Error('Token do Gmail inválido ou expirado')
+      await sendNewEmailWithAttachment(accessToken, {
+        to: contact.externalId,
+        subject: broadcast.creative.title,
+        body: broadcast.creative.title,
+        attachmentUrl: broadcast.creative.fileUrl,
+        attachmentName: broadcast.creative.title,
+      })
+    } else {
+      const provider = getWhatsAppProvider()
+      await provider.sendMedia(broadcast.channelId, contact.externalId, broadcast.creative.fileUrl, broadcast.creative.title)
+    }
 
     let conversation = await prisma.conversation.findFirst({
       where: { channelId: broadcast.channelId, contactId: contact.id, status: { not: 'CLOSED' } },

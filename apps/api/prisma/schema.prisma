@@ -203,6 +203,7 @@ model Broadcast {
   completedAt  DateTime?
   candidate    Candidate            @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   creative     Creative             @relation(fields: [creativeId], references: [id])
+  channel      Channel              @relation(fields: [channelId], references: [id])
   recipients   BroadcastRecipient[]
 }
 
@@ -236,6 +237,7 @@ model Channel {
   candidate     Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   contacts      Contact[]
   conversations Conversation[]
+  broadcasts    Broadcast[]
 
   @@index([candidateId, type])
 }

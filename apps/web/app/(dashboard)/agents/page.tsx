@@ -367,10 +367,17 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
 
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null)
   const [broadcastContactType, setBroadcastContactType] = useState('VOTER')
+  const [broadcastChannelType, setBroadcastChannelType] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP')
+
+  const { data: channels } = useQuery<{ id: string; type: string; isActive: boolean }[]>({
+    queryKey: ['channels'],
+    queryFn: () => api.get('/channels').then(r => r.data),
+  })
+  const hasEmailChannel = !!channels?.some(c => c.type === 'EMAIL' && c.isActive)
 
   const { data: preview, isLoading: loadingPreview } = useQuery({
-    queryKey: ['broadcast-preview', selectedCreative?.id, broadcastContactType],
-    queryFn: () => api.get('/broadcasts/preview', { params: { creativeId: selectedCreative!.id, contactType: broadcastContactType } }).then(r => r.data),
+    queryKey: ['broadcast-preview', selectedCreative?.id, broadcastContactType, broadcastChannelType],
+    queryFn: () => api.get('/broadcasts/preview', { params: { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType } }).then(r => r.data),
     enabled: !!selectedCreative,
   })
 
@@ -380,11 +387,11 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
   })
 
   const broadcastMutation = useMutation({
-    mutationFn: () => api.post('/broadcasts', { creativeId: selectedCreative!.id, contactType: broadcastContactType }),
+    mutationFn: () => api.post('/broadcasts', { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['broadcasts'] })
       setSelectedCreative(null)
-      toast({ title: 'Disparo iniciado!', description: 'Os envios serão feitos gradualmente para evitar bloqueio do número.' })
+      toast({ title: 'Disparo iniciado!', description: 'Os envios serão feitos gradualmente para evitar bloqueio do número/conta.' })
     },
     onError: (err: any) => toast({ title: 'Erro ao disparar', description: err.response?.data?.error, variant: 'destructive' }),
   })
@@ -502,6 +509,21 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                     <p className="text-xs text-gray-400">{topics?.find(t => t.topicKey === selectedCreative.topicKey)?.topicName || 'Genérico'}</p>
                   </div>
 
+                  {hasEmailChannel && (
+                    <div>
+                      <Label htmlFor="broadcast-channel">Enviar por</Label>
+                      <select
+                        id="broadcast-channel"
+                        className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                        value={broadcastChannelType}
+                        onChange={(e) => setBroadcastChannelType(e.target.value as 'WHATSAPP' | 'EMAIL')}
+                      >
+                        <option value="WHATSAPP">WhatsApp</option>
+                        <option value="EMAIL">E-mail</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <Label htmlFor="broadcast-type">Enviar para</Label>
                     <select
@@ -541,7 +563,9 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                       )}
                       {exceeds24h && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
-                          Esse número já enviaria mais que o limite de 24h ({preview.max24hPerLine}). Aguarde ou use outro WhatsApp.
+                          {broadcastChannelType === 'EMAIL'
+                            ? `Esse disparo já excederia o limite de 24h por e-mail (${preview.max24hPerLine}). Aguarde para enviar novamente.`
+                            : `Esse número já enviaria mais que o limite de 24h (${preview.max24hPerLine}). Aguarde ou use outro WhatsApp.`}
                         </div>
                       )}
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">

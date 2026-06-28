@@ -198,34 +198,30 @@ function encodeHeaderText(text: string): string {
   return `=?UTF-8?B?${Buffer.from(text, 'utf-8').toString('base64')}?=`
 }
 
-// Mesmo fluxo de sendReply, mas anexando um arquivo (ex: criativo/"Santinho") via
-// multipart/mixed. Se o anexo exceder o limite de 25MB da Gmail API, envia só o
-// texto em vez de falhar — nunca bloqueia a resposta por causa do anexo.
-export async function sendReplyWithAttachment(accessToken: string, params: {
-  threadId: string
-  messageId: string
-  references?: string
-  to: string
-  subject: string
-  body: string
-  attachmentUrl: string
-  attachmentName: string
-}): Promise<void> {
-  const { threadId, messageId, references, to, subject, body, attachmentUrl, attachmentName } = params
-
+// Baixa o anexo e valida o limite de 25MB da Gmail API — usado tanto por respostas
+// em thread existente quanto por e-mails novos (broadcast). Retorna null se a
+// IO de download falhar ou o arquivo for grande demais, para o chamador decidir o
+// fallback (enviar só texto, ou pular o destinatário no caso de broadcast).
+async function downloadAttachmentForGmail(attachmentUrl: string): Promise<Buffer | null> {
   let attachmentBuffer: Buffer | null = null
   try {
     const res = await axios.get(attachmentUrl, { responseType: 'arraybuffer', timeout: 30000 })
     attachmentBuffer = Buffer.from(res.data)
   } catch (err: any) {
-    console.error('[GMAIL] Falha ao baixar anexo, enviando só texto:', err?.message)
+    console.error('[GMAIL] Falha ao baixar anexo:', err?.message)
+    return null
   }
-
-  if (!attachmentBuffer || attachmentBuffer.byteLength > GMAIL_MAX_ATTACHMENT_BYTES) {
-    if (attachmentBuffer) console.error(`[GMAIL] Anexo excede 25MB (${attachmentBuffer.byteLength} bytes), enviando só texto`)
-    return sendReply(accessToken, { threadId, messageId, references, to, subject, body })
+  if (attachmentBuffer.byteLength > GMAIL_MAX_ATTACHMENT_BYTES) {
+    console.error(`[GMAIL] Anexo excede 25MB (${attachmentBuffer.byteLength} bytes)`)
+    return null
   }
+  return attachmentBuffer
+}
 
+// Monta o bloco multipart/mixed (texto + anexo) reaproveitado tanto por respostas
+// em thread quanto por e-mails novos — só os headers de cabeçalho (To/Subject/
+// In-Reply-To/References) variam entre os dois casos.
+function buildMultipartBody(body: string, attachmentBuffer: Buffer, attachmentUrl: string, attachmentName: string): { boundary: string; mimePart: string } {
   const boundary = `boundary_${Date.now()}`
   // O nome do arquivo precisa ter a extensão real (vinda da URL) — attachmentName é o
   // TÍTULO do criativo (ex: "lançamento"), sem extensão, então detectar o MIME type
@@ -234,11 +230,7 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
   const ext = detectExtension(attachmentUrl)
   const mimeType = mimeTypeForExtension(ext)
   const safeFilename = `${attachmentName.replace(/[^\w\s-]/g, '').trim() || 'arquivo'}${ext ? `.${ext}` : ''}`
-  const raw = [
-    `To: ${to}`,
-    `Subject: ${encodeHeaderText(subject)}`,
-    `In-Reply-To: ${messageId}`,
-    `References: ${references || messageId}`,
+  const mimePart = [
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
     `--${boundary}`,
@@ -255,6 +247,37 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
     '',
     `--${boundary}--`,
   ].join('\r\n')
+  return { boundary, mimePart }
+}
+
+// Mesmo fluxo de sendReply, mas anexando um arquivo (ex: criativo/"Santinho") via
+// multipart/mixed. Se o anexo exceder o limite de 25MB da Gmail API, envia só o
+// texto em vez de falhar — nunca bloqueia a resposta por causa do anexo.
+export async function sendReplyWithAttachment(accessToken: string, params: {
+  threadId: string
+  messageId: string
+  references?: string
+  to: string
+  subject: string
+  body: string
+  attachmentUrl: string
+  attachmentName: string
+}): Promise<void> {
+  const { threadId, messageId, references, to, subject, body, attachmentUrl, attachmentName } = params
+
+  const attachmentBuffer = await downloadAttachmentForGmail(attachmentUrl)
+  if (!attachmentBuffer) {
+    return sendReply(accessToken, { threadId, messageId, references, to, subject, body })
+  }
+
+  const { mimePart } = buildMultipartBody(body, attachmentBuffer, attachmentUrl, attachmentName)
+  const raw = [
+    `To: ${to}`,
+    `Subject: ${encodeHeaderText(subject)}`,
+    `In-Reply-To: ${messageId}`,
+    `References: ${references || messageId}`,
+    mimePart,
+  ].join('\r\n')
 
   const res = await fetch(`${GMAIL_API}/messages/send`, {
     method: 'POST',
@@ -265,6 +288,43 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
     const data = await res.json().catch(() => ({}))
     console.error('[GMAIL] sendReplyWithAttachment erro:', JSON.stringify(data))
     throw new Error('Falha ao enviar resposta com anexo por e-mail')
+  }
+}
+
+// E-mail NOVO (não resposta a thread existente) com anexo — usado pelo disparo em
+// massa (broadcast) de criativo por e-mail. Mesma validação de 25MB; se o anexo
+// falhar, lança erro em vez de mandar só texto (no broadcast isso conta como falha
+// daquele destinatário, não um envio silencioso sem o criativo prometido).
+export async function sendNewEmailWithAttachment(accessToken: string, params: {
+  to: string
+  subject: string
+  body: string
+  attachmentUrl: string
+  attachmentName: string
+}): Promise<void> {
+  const { to, subject, body, attachmentUrl, attachmentName } = params
+
+  const attachmentBuffer = await downloadAttachmentForGmail(attachmentUrl)
+  if (!attachmentBuffer) {
+    throw new Error('Falha ao baixar o anexo do criativo — envio não realizado')
+  }
+
+  const { mimePart } = buildMultipartBody(body, attachmentBuffer, attachmentUrl, attachmentName)
+  const raw = [
+    `To: ${to}`,
+    `Subject: ${encodeHeaderText(subject)}`,
+    mimePart,
+  ].join('\r\n')
+
+  const res = await fetch(`${GMAIL_API}/messages/send`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: encodeBase64Url(raw) }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    console.error('[GMAIL] sendNewEmailWithAttachment erro:', JSON.stringify(data))
+    throw new Error('Falha ao enviar e-mail com anexo')
   }
 }
 
