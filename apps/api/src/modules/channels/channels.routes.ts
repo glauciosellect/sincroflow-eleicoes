@@ -3,11 +3,14 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getWhatsAppProvider } from './whatsapp/provider.factory'
+import { requireAdmin } from '../../lib/rbac'
 
 
 export async function channelRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
+  // Sem requireAdmin: leitura de metadados de canal (tipo/nome/ativo) é usada pelo
+  // Chat (filtro de canal) por qualquer role com acesso a 'chat', não só Admin.
   app.get('/channels', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
@@ -15,7 +18,7 @@ export async function channelRoutes(app: FastifyInstance) {
     return reply.send(channels)
   })
 
-  app.post('/channels/telegram', async (req, reply) => {
+  app.post('/channels/telegram', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, botToken } = z.object({ name: z.string(), botToken: z.string() }).parse(req.body)
@@ -29,7 +32,7 @@ export async function channelRoutes(app: FastifyInstance) {
     return reply.status(201).send(channel)
   })
 
-  app.post('/channels/instagram', async (req, reply) => {
+  app.post('/channels/instagram', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
@@ -40,7 +43,7 @@ export async function channelRoutes(app: FastifyInstance) {
     return reply.status(201).send(channel)
   })
 
-  app.post('/channels/facebook', async (req, reply) => {
+  app.post('/channels/facebook', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
@@ -51,7 +54,7 @@ export async function channelRoutes(app: FastifyInstance) {
     return reply.status(201).send(channel)
   })
 
-  app.delete('/channels/:id', async (req, reply) => {
+  app.delete('/channels/:id', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

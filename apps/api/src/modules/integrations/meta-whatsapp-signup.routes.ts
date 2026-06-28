@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { assertWhatsAppLimit, WhatsAppLimitExceededError } from '../../lib/whatsapp-limit'
 import { MetaCloudApiProvider } from '../channels/whatsapp/providers/meta-cloud.provider'
+import { requireAdmin } from '../../lib/rbac'
 
 const META_APP_ID = process.env.META_APP_ID!
 const META_APP_SECRET = process.env.META_APP_SECRET!
@@ -33,7 +34,7 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
 }
 
 export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
-  app.post('/channels/whatsapp-meta/signup', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post('/channels/whatsapp-meta/signup', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 

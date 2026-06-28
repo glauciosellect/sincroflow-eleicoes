@@ -3,11 +3,12 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { uploadCreative, deleteCreativeFile } from '../../lib/storage'
 import { detectMediaType } from '../channels/whatsapp/providers/meta-cloud.provider'
+import { requireModule } from '../../lib/rbac'
 
 export async function creativeRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/creatives', async (req, reply) => {
+  app.get('/creatives', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { topicKey } = req.query as { topicKey?: string }
@@ -19,7 +20,7 @@ export async function creativeRoutes(app: FastifyInstance) {
     return reply.send(creatives)
   })
 
-  app.post('/creatives', async (req, reply) => {
+  app.post('/creatives', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
@@ -56,7 +57,7 @@ export async function creativeRoutes(app: FastifyInstance) {
     return reply.status(201).send(creative)
   })
 
-  app.delete('/creatives/:id', async (req, reply) => {
+  app.delete('/creatives/:id', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

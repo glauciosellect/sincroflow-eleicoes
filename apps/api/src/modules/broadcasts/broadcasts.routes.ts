@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
-import { auditLog } from '../../lib/rbac'
+import { auditLog, requireModule } from '../../lib/rbac'
 import { broadcastQueue } from '../../lib/queue'
 
 const MAX_BROADCAST_TARGETS = 500
@@ -23,7 +23,7 @@ async function getActiveWhatsAppChannel(candidateId: string) {
 export async function broadcastRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/broadcasts', async (req, reply) => {
+  app.get('/broadcasts', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const broadcasts = await prisma.broadcast.findMany({
@@ -35,7 +35,7 @@ export async function broadcastRoutes(app: FastifyInstance) {
     return reply.send(broadcasts)
   })
 
-  app.get('/broadcasts/preview', async (req, reply) => {
+  app.get('/broadcasts/preview', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { creativeId, contactType } = req.query as { creativeId: string; contactType?: string }
@@ -69,7 +69,7 @@ export async function broadcastRoutes(app: FastifyInstance) {
     })
   })
 
-  app.post('/broadcasts', async (req, reply) => {
+  app.post('/broadcasts', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { creativeId, contactType } = z.object({

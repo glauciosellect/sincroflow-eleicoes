@@ -5,11 +5,12 @@ import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getValidGmailToken, sendReply, sendReplyWithAttachment } from '../../lib/gmail'
+import { requireModule } from '../../lib/rbac'
 
 export async function conversationRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/conversations', async (req, reply) => {
+  app.get('/conversations', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { status, channelId, page = '1', limit = '20', search, assignedToMe } = req.query as Record<string, string>
@@ -38,7 +39,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send({ data: conversations, total, page: Number(page), limit: Number(limit) })
   })
 
-  app.get('/conversations/:id', async (req, reply) => {
+  app.get('/conversations/:id', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -57,7 +58,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send(conversation)
   })
 
-  app.get('/conversations/:id/messages', async (req, reply) => {
+  app.get('/conversations/:id/messages', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -79,7 +80,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send({ data: messages, total })
   })
 
-  app.post('/conversations/:id/messages', async (req, reply) => {
+  app.post('/conversations/:id/messages', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -174,7 +175,7 @@ export async function conversationRoutes(app: FastifyInstance) {
   })
 
   // Equipe assume o atendimento — o agente para de responder
-  app.post('/conversations/:id/assume', async (req, reply) => {
+  app.post('/conversations/:id/assume', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -195,7 +196,7 @@ export async function conversationRoutes(app: FastifyInstance) {
   })
 
   // Devolve a conversa para o agente
-  app.post('/conversations/:id/release', async (req, reply) => {
+  app.post('/conversations/:id/release', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -212,7 +213,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send(updated)
   })
 
-  app.post('/conversations/:id/urgent', async (req, reply) => {
+  app.post('/conversations/:id/urgent', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -225,7 +226,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send(updated)
   })
 
-  app.post('/conversations/:id/close', async (req, reply) => {
+  app.post('/conversations/:id/close', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

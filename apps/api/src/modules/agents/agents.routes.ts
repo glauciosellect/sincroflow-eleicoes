@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
+import { requireModule } from '../../lib/rbac'
 
 const configSchema = z.object({
   agentName: z.string().min(1).max(100).optional(),
@@ -24,14 +25,14 @@ export async function agentRoutes(app: FastifyInstance) {
 
   // ── Minha História / Disclaimer / Configuração ──────────────────────────
 
-  app.get('/agent/config', async (req, reply) => {
+  app.get('/agent/config', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const config = await prisma.agentConfig.findUnique({ where: { candidateId } })
     return reply.send(config)
   })
 
-  app.patch('/agent/config', async (req, reply) => {
+  app.patch('/agent/config', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const data = configSchema.parse(req.body)
@@ -43,7 +44,7 @@ export async function agentRoutes(app: FastifyInstance) {
     return reply.send(config)
   })
 
-  app.patch('/agent/toggle', async (req, reply) => {
+  app.patch('/agent/toggle', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const config = await prisma.agentConfig.findUnique({ where: { candidateId } })
@@ -66,7 +67,7 @@ export async function agentRoutes(app: FastifyInstance) {
 
   // ── Plataforma Eleitoral (15 temas fixos) ────────────────────────────────
 
-  app.get('/agent/platform-topics', async (req, reply) => {
+  app.get('/agent/platform-topics', { onRequest: [requireModule('platform')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const saved = await prisma.platformTopic.findMany({ where: { candidateId } })
@@ -80,7 +81,7 @@ export async function agentRoutes(app: FastifyInstance) {
     return reply.send(topics)
   })
 
-  app.patch('/agent/platform-topics/:topicKey', async (req, reply) => {
+  app.patch('/agent/platform-topics/:topicKey', { onRequest: [requireModule('platform')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { topicKey } = req.params as { topicKey: string }
@@ -97,7 +98,7 @@ export async function agentRoutes(app: FastifyInstance) {
 
   // ── Testar agente ─────────────────────────────────────────────────────
 
-  app.post('/agent/test', async (req, reply) => {
+  app.post('/agent/test', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { message, history } = z.object({

@@ -3,12 +3,13 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { encrypt, decrypt } from '../../lib/crypto'
+import { requireAdmin } from '../../lib/rbac'
 
 
 export async function envVariableRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/env-variables', async (req, reply) => {
+  app.get('/env-variables', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const vars = await prisma.envVariable.findMany({
@@ -18,7 +19,7 @@ export async function envVariableRoutes(app: FastifyInstance) {
     return reply.send(vars)
   })
 
-  app.post('/env-variables', async (req, reply) => {
+  app.post('/env-variables', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { key, value, type } = z.object({ key: z.string().regex(/^[A-Z_][A-Z0-9_]*$/), value: z.string(), type: z.enum(['TEXT', 'NUMBER']).optional() }).parse(req.body)
@@ -31,7 +32,7 @@ export async function envVariableRoutes(app: FastifyInstance) {
     return reply.status(201).send({ id: variable.id, key: variable.key, type: variable.type })
   })
 
-  app.patch('/env-variables/:id', async (req, reply) => {
+  app.patch('/env-variables/:id', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -40,7 +41,7 @@ export async function envVariableRoutes(app: FastifyInstance) {
     return reply.send({ ok: true })
   })
 
-  app.delete('/env-variables/:id', async (req, reply) => {
+  app.delete('/env-variables/:id', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { requireModule } from '../../lib/rbac'
 
 const eventSchema = z.object({
   title: z.string().min(1).max(200),
@@ -21,7 +22,7 @@ const eventSchema = z.object({
 export async function eventRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/events', async (req, reply) => {
+  app.get('/events', { onRequest: [requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { from, to } = req.query as Record<string, string>
@@ -35,7 +36,7 @@ export async function eventRoutes(app: FastifyInstance) {
     return reply.send(events)
   })
 
-  app.post('/events', async (req, reply) => {
+  app.post('/events', { onRequest: [requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const data = eventSchema.parse(req.body)
@@ -50,7 +51,7 @@ export async function eventRoutes(app: FastifyInstance) {
     return reply.status(201).send(event)
   })
 
-  app.patch('/events/:id', async (req, reply) => {
+  app.patch('/events/:id', { onRequest: [requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -67,7 +68,7 @@ export async function eventRoutes(app: FastifyInstance) {
     return reply.send(await prisma.event.findUnique({ where: { id } }))
   })
 
-  app.delete('/events/:id', async (req, reply) => {
+  app.delete('/events/:id', { onRequest: [requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

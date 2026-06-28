@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import axios from 'axios'
 import { prisma } from '../../lib/prisma'
+import { requireAdmin } from '../../lib/rbac'
 
 const META_APP_ID = process.env.META_APP_ID!
 const META_APP_SECRET = process.env.META_APP_SECRET!
@@ -261,7 +262,7 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
 
   // Renova token de um canal Meta (chamado manualmente ou por cron)
   // POST /integrations/meta/refresh/:channelId
-  app.post('/integrations/meta/refresh/:channelId', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post('/integrations/meta/refresh/:channelId', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub } = req.user as { sub: string }
     const { channelId } = req.params as { channelId: string }
     const member = await prisma.teamMember.findFirst({ where: { userId: sub } })

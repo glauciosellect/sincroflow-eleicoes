@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { requireAdmin } from '../../lib/rbac'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-09-30.clover' as any })
 
@@ -42,7 +43,7 @@ export async function billingRoutes(app: FastifyInstance) {
   // Ativa o "Modo Mandato" — upgrade de plano após a eleição (seção 4.11 da spec).
   // Não cria nova assinatura: o candidato eleito simplesmente não cancela, e a campanha
   // muda de fase — todo o histórico/contatos/conversas são preservados.
-  app.post('/billing/upgrade-mandate', async (req, reply) => {
+  app.post('/billing/upgrade-mandate', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const updated = await prisma.candidate.update({ where: { id: candidateId }, data: { plan: 'MANDATE' } })
@@ -54,7 +55,7 @@ export async function billingRoutes(app: FastifyInstance) {
   // marca status=CANCELLED. O agente de IA é desativado imediatamente (não responde mais
   // eleitores nem dispara criativos), mas o candidato continua acessando o painel e os
   // dados por tempo indeterminado — só a função do agente para.
-  app.post('/billing/cancel', async (req, reply) => {
+  app.post('/billing/cancel', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body)
@@ -81,7 +82,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
   // Desfaz uma solicitação de cancelamento ainda não efetivada (a assinatura no Stripe
   // ainda existe, só estava marcada para não renovar) e reativa o agente.
-  app.post('/billing/reactivate', async (req, reply) => {
+  app.post('/billing/reactivate', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 

@@ -50,6 +50,35 @@ export function requireModule(module: Module) {
   }
 }
 
+// Restringe uma rota só ao Administrador — usado em ações sensíveis demais para
+// qualquer outro role (faturamento, credenciais, integrações).
+export function requireAdmin() {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    const user = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(user.sub, user.wid)
+    const role = await getUserRole(user.sub, candidateId)
+
+    if (role !== 'ADMINISTRADOR') {
+      return reply.status(403).send({ error: 'Apenas o Administrador pode realizar esta ação' })
+    }
+  }
+}
+
+// Bloqueia roles específicos de uma rota que, de outra forma, seria acessível a
+// qualquer membro autenticado — usado pelo Dashboard geral, que todos os roles
+// acessam exceto Agente de Campo (que só vê o próprio desempenho).
+export function requireNotRole(...blockedRoles: string[]) {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    const user = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(user.sub, user.wid)
+    const role = await getUserRole(user.sub, candidateId)
+
+    if (role && blockedRoles.includes(role)) {
+      return reply.status(403).send({ error: 'Sem permissão para acessar este módulo' })
+    }
+  }
+}
+
 // Registra uma entrada no audit log
 export async function auditLog(opts: {
   candidateId: string

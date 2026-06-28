@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { getWorkspaceId } from '../../../lib/workspace'
 import { getGmailOAuthUrl } from '../../../lib/gmail'
 import { exchangeCodeForTokens, getGoogleUserInfo } from '../../../lib/google'
+import { requireAdmin } from '../../../lib/rbac'
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 const API_URL = process.env.API_URL || 'http://localhost:3001'
@@ -92,7 +93,7 @@ export async function emailChannelRoutes(app: FastifyInstance) {
     }
   })
 
-  app.patch('/channels/:id/email-settings', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.patch('/channels/:id/email-settings', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

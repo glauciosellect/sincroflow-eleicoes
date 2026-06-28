@@ -4,6 +4,7 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 import { generateReportPdf } from './report-pdf'
+import { requireModule, requireAdmin, requireNotRole } from '../../lib/rbac'
 
 // Os 10 relatórios da spec (ver docs/spec-eleicoes/04-modulos/4.9-relatorios.md)
 // estão todos implementados:
@@ -202,7 +203,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Endpoint único consolidando os 9 relatórios dependentes de período — a tela de
   // Relatórios usa este em vez de disparar ~9 requisições HTTP separadas.
-  app.get('/analytics/dashboard', async (req, reply) => {
+  app.get('/analytics/dashboard', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -225,7 +226,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Relatório 1: Visão Geral da Semana
-  app.get('/analytics/overview', async (req, reply) => {
+  app.get('/analytics/overview', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -234,7 +235,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Relatório 4: Volume por Canal
-  app.get('/analytics/by-channel', async (req, reply) => {
+  app.get('/analytics/by-channel', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -242,14 +243,14 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Relatório 8: Eleitores Mais Engajados (Top 20)
-  app.get('/analytics/top-contacts', async (req, reply) => {
+  app.get('/analytics/top-contacts', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     return reply.send(await getTopContacts(candidateId))
   })
 
   // Relatório 9: Evolução Semanal (volume de conversas ao longo do tempo)
-  app.get('/analytics/timeline', async (req, reply) => {
+  app.get('/analytics/timeline', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -257,7 +258,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Relatório 10: Status das Solicitações
-  app.get('/analytics/requests-status', async (req, reply) => {
+  app.get('/analytics/requests-status', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     return reply.send(await getRequestsStatus(candidateId))
@@ -265,7 +266,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Relatório 2: Temas Mais Perguntados — agrega Message.topicKey já classificado
   // pela IA (mesmo campo usado pelos alertas de pico de tema).
-  app.get('/analytics/top-topics', async (req, reply) => {
+  app.get('/analytics/top-topics', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -274,7 +275,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Lista os contatos que perguntaram sobre um tema específico no período — usado
   // pelo link "ver eleitores" em Temas Mais Perguntados.
-  app.get('/analytics/top-topics/:topicKey/contacts', async (req, reply) => {
+  app.get('/analytics/top-topics/:topicKey/contacts', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { topicKey } = req.params as { topicKey: string }
@@ -294,7 +295,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Relatório 6: Perguntas Sem Resposta (gaps de conteúdo) — mensagens marcadas
   // isContentGap=true pela IA (mesmo campo usado pelos alertas de gap).
-  app.get('/analytics/content-gaps', async (req, reply) => {
+  app.get('/analytics/content-gaps', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -302,7 +303,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Relatório 7: Horários de Pico — volume de mensagens de eleitores por hora do dia
-  app.get('/analytics/peak-hours', async (req, reply) => {
+  app.get('/analytics/peak-hours', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -311,7 +312,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Relatório 5: Sentimento dos Eleitores — Message.sentiment classificado pela IA
   // na mesma chamada que já identifica tema/gap/urgência (sem custo extra de IA).
-  app.get('/analytics/sentiment', async (req, reply) => {
+  app.get('/analytics/sentiment', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -320,7 +321,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Relatório 3: Solicitações por Região — agrega Contact.neighborhood (extraído pela
   // IA ao registrar uma solicitação, ou preenchido manualmente pela equipe).
-  app.get('/analytics/by-region', async (req, reply) => {
+  app.get('/analytics/by-region', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -329,7 +330,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Lista os eleitores que fizeram solicitação em um bairro específico no período —
   // usado pelo link "ver eleitores" em Solicitações por Região.
-  app.get('/analytics/by-region/:neighborhood/contacts', async (req, reply) => {
+  app.get('/analytics/by-region/:neighborhood/contacts', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { neighborhood } = req.params as { neighborhood: string }
@@ -349,7 +350,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Exporta o relatório do período em PDF (visão geral, status, temas, gaps, top eleitores)
-  app.get('/analytics/export-pdf', async (req, reply) => {
+  app.get('/analytics/export-pdf', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -363,7 +364,9 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Painel "ao vivo" do dashboard principal (seção 4.2 da spec)
-  app.get('/analytics/realtime', async (req, reply) => {
+  // Painel "ao vivo" é acessível a qualquer role com algum módulo de gestão — só
+  // Agente de Campo é bloqueado (ele só vê o próprio desempenho).
+  app.get('/analytics/realtime', { onRequest: [requireNotRole('AGENTE_CAMPO')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -387,7 +390,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   })
 
   // Desempenho do próprio Agente de Campo logado — quantos eleitores ele captou.
-  app.get('/analytics/my-field-performance', async (req, reply) => {
+  app.get('/analytics/my-field-performance', { onRequest: [requireModule('field_agent')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>
@@ -403,7 +406,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
   // Ranking de todos os Agentes de Campo — visível só ao Administrador, para
   // decidir bonificação por desempenho.
-  app.get('/analytics/field-agent-ranking', async (req, reply) => {
+  app.get('/analytics/field-agent-ranking', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { start, end } = req.query as Record<string, string>

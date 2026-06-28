@@ -3,6 +3,7 @@ import { z } from 'zod'
 import * as qrcode from 'qrcode'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { requireModule } from '../../lib/rbac'
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   VOTER: 'Eleitor',
@@ -16,7 +17,7 @@ export async function contactRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
   // Exportar CSV — seção 4.6 da spec
-  app.get('/contacts/export', async (req, reply) => {
+  app.get('/contacts/export', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const contacts = await prisma.contact.findMany({
@@ -38,7 +39,7 @@ export async function contactRoutes(app: FastifyInstance) {
   })
 
   // QR Code do canal principal — seção 4.6 da spec
-  app.get('/contacts/qrcode', async (req, reply) => {
+  app.get('/contacts/qrcode', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const whatsapp = await prisma.channel.findFirst({ where: { candidateId, type: 'WHATSAPP', isActive: true } })
@@ -52,7 +53,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return reply.send({ link, dataUrl })
   })
 
-  app.get('/contacts', async (req, reply) => {
+  app.get('/contacts', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { search, channelType, contactType, page = '1', limit = '20' } = req.query as Record<string, string>
@@ -80,7 +81,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return reply.send({ data: contacts, total, page: Number(page), limit: Number(limit) })
   })
 
-  app.get('/contacts/:id', async (req, reply) => {
+  app.get('/contacts/:id', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -89,7 +90,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return reply.send(contact)
   })
 
-  app.patch('/contacts/:id', async (req, reply) => {
+  app.patch('/contacts/:id', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -106,7 +107,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return reply.send(await prisma.contact.findUnique({ where: { id } }))
   })
 
-  app.delete('/contacts/:id', async (req, reply) => {
+  app.delete('/contacts/:id', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -114,7 +115,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return reply.send({ ok: true })
   })
 
-  app.get('/contacts/:id/conversations', async (req, reply) => {
+  app.get('/contacts/:id/conversations', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }

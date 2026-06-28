@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { getPendingRegistration, activatePendingRegistration } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
+import { requireAdmin } from '../../lib/rbac'
 
 // apiVersion forçada explicitamente: o SDK não atualiza isso automaticamente,
 // e branding_settings (nome customizado por sessão de checkout) só funciona em
@@ -83,7 +84,7 @@ export async function stripeRoutes(app: FastifyInstance) {
 
   // Recarga avulsa de mensagens ativas (candidato já com conta ativa) — quantity é o
   // número de pacotes de 1.000 mensagens (cada pacote = 1 unidade do price no Stripe).
-  app.post('/billing/checkout-active-msgs', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post('/billing/checkout-active-msgs', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { quantity } = z.object({ quantity: z.number().int().min(1).max(20).default(1) }).parse(req.body || {})
@@ -105,7 +106,7 @@ export async function stripeRoutes(app: FastifyInstance) {
 
   // Adiciona N linhas extras de WhatsApp à assinatura já ativa do candidato (recorrente,
   // R$ 497/mês cada). O limite (whatsappLineLimit) só sobe quando o webhook confirmar.
-  app.post('/billing/whatsapp-lines', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post('/billing/whatsapp-lines', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 

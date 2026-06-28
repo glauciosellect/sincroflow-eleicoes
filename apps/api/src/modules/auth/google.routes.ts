@@ -7,6 +7,7 @@ import {
   listCalendars,
   getValidToken,
 } from '../../lib/google'
+import { requireModule } from '../../lib/rbac'
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 const API_URL = process.env.API_URL || 'http://localhost:3001'
@@ -87,7 +88,7 @@ export async function googleRoutes(app: FastifyInstance) {
   })
 
   // ── GOOGLE CALENDAR — status e disconnect ────────────────────────────────
-  app.get('/integrations/google', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get('/integrations/google', { onRequest: [app.authenticate, requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const member = await prisma.teamMember.findFirst({ where: wid ? { candidateId: wid, userId: sub } : { userId: sub }, orderBy: { acceptedAt: 'asc' } })
     if (!member) return reply.status(404).send({ error: 'Candidato não encontrado' })
@@ -112,7 +113,7 @@ export async function googleRoutes(app: FastifyInstance) {
     })
   })
 
-  app.delete('/integrations/google', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete('/integrations/google', { onRequest: [app.authenticate, requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const member = await prisma.teamMember.findFirst({ where: wid ? { candidateId: wid, userId: sub } : { userId: sub }, orderBy: { acceptedAt: 'asc' } })
     if (!member) return reply.status(404).send({ error: 'Candidato não encontrado' })
@@ -132,7 +133,7 @@ export async function googleRoutes(app: FastifyInstance) {
   })
 
   // ── GOOGLE CALENDAR — eventos (consulta direta; ver também calendar.service.ts) ──
-  app.get('/integrations/google/events', { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get('/integrations/google/events', { onRequest: [app.authenticate, requireModule('agenda')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const member = await prisma.teamMember.findFirst({ where: wid ? { candidateId: wid, userId: sub } : { userId: sub }, orderBy: { acceptedAt: 'asc' } })
     if (!member) return reply.status(404).send({ error: 'Candidato não encontrado' })

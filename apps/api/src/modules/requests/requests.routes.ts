@@ -2,11 +2,12 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
+import { requireModule } from '../../lib/rbac'
 
 export async function requestRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  app.get('/requests', async (req, reply) => {
+  app.get('/requests', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { status, search, contactId, page = '1', limit = '20' } = req.query as Record<string, string>
@@ -34,7 +35,7 @@ export async function requestRoutes(app: FastifyInstance) {
     return reply.send({ data: requests, total, page: Number(page), limit: Number(limit) })
   })
 
-  app.get('/requests/:id', async (req, reply) => {
+  app.get('/requests/:id', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -46,7 +47,7 @@ export async function requestRoutes(app: FastifyInstance) {
     return reply.send(request)
   })
 
-  app.patch('/requests/:id/status', async (req, reply) => {
+  app.patch('/requests/:id/status', { onRequest: [requireModule('contacts')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
