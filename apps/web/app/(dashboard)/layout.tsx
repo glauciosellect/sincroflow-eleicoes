@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        <MascoteHelper />
+        {role !== 'AGENTE_CAMPO' && <MascoteHelper />}
         <main className="flex-1 overflow-auto p-4 md:p-6">
           {isSuspended && !isBillingPage ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4">

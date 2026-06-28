@@ -92,7 +92,13 @@ export function Sidebar() {
       {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
         {navItems.map((group) => {
-          const visibleItems = group.items.filter((item) => !item.module || allowedModules.includes(item.module))
+          const visibleItems = group.items.filter((item) => {
+            // Dashboard (module: null) é visível a todos os roles, exceto Agente de
+            // Campo — que só acessa 'field_agent', mesmo o Dashboard geral não sendo
+            // um módulo "fechável" como os demais.
+            if (item.href === '/dashboard' && role === 'AGENTE_CAMPO') return false
+            return !item.module || allowedModules.includes(item.module)
+          })
           if (visibleItems.length === 0) return null
           return (
             <div key={group.section}>
