@@ -119,26 +119,32 @@ Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do p
 export async function classifyMessageForAlerts(
   message: string,
   topicsWithContent: Set<string>,
-): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean; sentiment: string }> {
+  fieldAgentNames: string[] = [],
+): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean; sentiment: string; mentionedAgentName: string | null }> {
   try {
     const topicList = PLATFORM_TOPICS.map(t => `${t.key}: ${t.name}`).join('\n')
+    const agentInstructions = fieldAgentNames.length > 0
+      ? `\n\nAgentes de campo cadastrados (eleitores podem mencionar ter sido abordados por um deles): ${fieldAgentNames.join(', ')}.
+"mentionedAgentName": se a mensagem citar claramente um desses nomes (ex: "conheci a Milena", "fui abordado pelo Roberto"), retorne o nome EXATO da lista acima. Se não houver menção, ou se o nome citado for ambíguo entre dois agentes da lista, retorne null — nunca adivinhe.`
+      : '\n\n"mentionedAgentName": sempre null (não há agentes de campo cadastrados).'
     const res = await callLLM({
       model: DEFAULT_MODEL,
-      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE"}.
+      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", "mentionedAgentName": "<nome ou null>"}.
 "topicKey": a chave do tema da lista se a mensagem for uma pergunta/comentário sobre esse tema, senão null.
 "isUrgent": true se a mensagem tiver tom agressivo, ameaça, xingamento, ou relatar situação sensível/grave que exige atenção humana imediata.
-"sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).
+"sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).${agentInstructions}
 Nenhum texto adicional.`,
       messages: [{ role: 'user', content: message }],
-      maxTokens: 80,
+      maxTokens: 100,
     })
     const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
     const topicKey = typeof parsed.topicKey === 'string' && PLATFORM_TOPICS.some(t => t.key === parsed.topicKey) ? parsed.topicKey : null
     const isContentGap = !!topicKey && !topicsWithContent.has(topicKey)
     const sentiment = ['POSITIVE', 'NEUTRAL', 'NEGATIVE'].includes(parsed.sentiment) ? parsed.sentiment : 'NEUTRAL'
-    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent, sentiment }
+    const mentionedAgentName = typeof parsed.mentionedAgentName === 'string' && fieldAgentNames.includes(parsed.mentionedAgentName) ? parsed.mentionedAgentName : null
+    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent, sentiment, mentionedAgentName }
   } catch {
-    return { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL' }
+    return { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL', mentionedAgentName: null }
   }
 }
 

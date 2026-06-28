@@ -18,6 +18,7 @@ const ROLES = [
   { value: 'ATENDIMENTO',   label: 'Atendimento',    desc: 'Chat, Contatos, Agenda',                                                                          color: 'bg-blue-100 text-blue-700' },
   { value: 'CONTEUDO',      label: 'Conteúdo',       desc: 'Minha História, Plataforma Eleitoral, Agenda',                                                    color: 'bg-indigo-100 text-indigo-700' },
   { value: 'RELATORIOS',    label: 'Relatórios',     desc: 'Contatos, Relatórios',                                                                             color: 'bg-amber-100 text-amber-700' },
+  { value: 'AGENTE_CAMPO',  label: 'Agente de Campo', desc: 'Meu Desempenho (captação de eleitores em campo)',                                                  color: 'bg-green-100 text-green-700' },
 ]
 
 const ROLE_MAP: Record<string, { label: string; color: string }> = Object.fromEntries(ROLES.map(r => [r.value, r]))

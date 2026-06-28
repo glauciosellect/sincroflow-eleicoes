@@ -169,6 +169,34 @@ async function getByRegion(candidateId: string, range: { gte: Date; lte: Date })
   }
 }
 
+// Ranking de Agentes de Campo (captação de eleitores na rua) — agrupa Contact por
+// referredByTeamMemberId. Usado tanto na tela "Meu Desempenho" do próprio agente
+// quanto no ranking completo visível ao Administrador.
+async function getFieldAgentRanking(candidateId: string, range: { gte: Date; lte: Date }) {
+  const agents = await prisma.teamMember.findMany({
+    where: { candidateId, role: 'AGENTE_CAMPO' },
+    select: { id: true, name: true, status: true },
+  })
+
+  const contacts = await prisma.contact.findMany({
+    where: { candidateId, createdAt: range, referredByTeamMemberId: { not: null } },
+    select: { referredByTeamMemberId: true, name: true, phone: true, createdAt: true },
+  })
+
+  const grouped: Record<string, { id: string; name: string; status: string; count: number; contacts: { name: string | null; phone: string | null; createdAt: Date }[] }> = {}
+  for (const agent of agents) {
+    grouped[agent.id] = { id: agent.id, name: agent.name, status: agent.status, count: 0, contacts: [] }
+  }
+  for (const c of contacts) {
+    const agentId = c.referredByTeamMemberId!
+    if (!grouped[agentId]) continue
+    grouped[agentId].count++
+    grouped[agentId].contacts.push({ name: c.name, phone: c.phone, createdAt: c.createdAt })
+  }
+
+  return Object.values(grouped).sort((a, b) => b.count - a.count)
+}
+
 export async function analyticsRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
@@ -356,5 +384,29 @@ export async function analyticsRoutes(app: FastifyInstance) {
     ])
 
     return reply.send({ openConversations, urgentConversations, channels, recentConversations, newContactsToday, openRequests, compliance })
+  })
+
+  // Desempenho do próprio Agente de Campo logado — quantos eleitores ele captou.
+  app.get('/analytics/my-field-performance', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+    const range = dateRange(start, end)
+
+    const member = await prisma.teamMember.findFirst({ where: { userId: sub, candidateId, role: 'AGENTE_CAMPO' } })
+    if (!member) return reply.status(403).send({ error: 'Apenas Agentes de Campo têm acesso a este relatório' })
+
+    const ranking = await getFieldAgentRanking(candidateId, range)
+    const mine = ranking.find((r) => r.id === member.id) ?? { id: member.id, name: member.name, status: member.status, count: 0, contacts: [] }
+    return reply.send(mine)
+  })
+
+  // Ranking de todos os Agentes de Campo — visível só ao Administrador, para
+  // decidir bonificação por desempenho.
+  app.get('/analytics/field-agent-ranking', async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { start, end } = req.query as Record<string, string>
+    return reply.send(await getFieldAgentRanking(candidateId, dateRange(start, end)))
   })
 }

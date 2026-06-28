@@ -12,14 +12,18 @@ export type Module =
   | 'reports' // Relatórios
   | 'settings' // Configurações
   | 'team' // Equipe
+  | 'field_agent' // Meu Desempenho (Agente de Campo)
 
 // Tabela fixa de acesso por role (seção 4.10 da spec) — Administrador tem acesso
 // total; os demais roles têm um conjunto fixo e não-configurável de módulos.
+// AGENTE_CAMPO só acessa a própria tela de desempenho — não atende chat, não vê
+// contatos completos, não configura nada.
 const ROLE_MODULES: Record<string, Module[]> = {
-  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team'],
+  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent'],
   ATENDIMENTO: ['chat', 'contacts', 'agenda'],
   CONTEUDO: ['story', 'platform', 'agenda'],
   RELATORIOS: ['contacts', 'reports'],
+  AGENTE_CAMPO: ['field_agent'],
 }
 
 export function hasModuleAccess(role: string, module: Module): boolean {

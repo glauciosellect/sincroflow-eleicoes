@@ -119,6 +119,7 @@ model TeamMember {
   inviteToken String?          @unique
   candidate   Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  referredContacts Contact[]
 
   @@unique([candidateId, email])
 }
@@ -260,6 +261,11 @@ model Contact {
   // Classifica quem é o contato — todo contato nasce VOTER (a maioria de quem
   // escreve é eleitor mesmo); reclassificado manualmente pela equipe quando não é.
   contactType       ContactType    @default(VOTER)
+  // Agente de Campo que captou este eleitor — detectado pela IA quando o eleitor
+  // menciona o nome do agente na primeira mensagem (ex: "conheci a Milena"). Nunca
+  // preenchido manualmente, sempre a mensagem espontânea do próprio eleitor.
+  referredByTeamMemberId String?
+  referredByTeamMember   TeamMember?  @relation(fields: [referredByTeamMemberId], references: [id], onDelete: SetNull)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @default(now()) @updatedAt
   candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
@@ -270,6 +276,7 @@ model Contact {
   @@unique([candidateId, channelId, externalId])
   @@index([candidateId, createdAt])
   @@index([candidateId, phone])
+  @@index([candidateId, referredByTeamMemberId])
 }
 
 model Conversation {
@@ -434,6 +441,7 @@ enum TeamRole {
   ATENDIMENTO
   CONTEUDO
   RELATORIOS
+  AGENTE_CAMPO
 }
 
 enum TeamMemberStatus {

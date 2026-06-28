@@ -31,7 +31,7 @@ interface Candidate {
   activeMsgsExtra: number
 }
 
-type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS'
+type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO'
 
 interface AuthState {
   user: User | null

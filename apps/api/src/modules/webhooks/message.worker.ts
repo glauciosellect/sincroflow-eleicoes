@@ -210,7 +210,15 @@ export function startMessageWorker() {
       // ── Classificação para alertas automáticos (tema, gap de conteúdo, urgência) ──
       const topicsForAlerts = await prisma.platformTopic.findMany({ where: { candidateId: candidate.id } })
       const topicsWithContent = new Set(topicsForAlerts.filter(t => t.content && t.content.trim().length > 0).map(t => t.topicKey))
-      const classification = await classifyMessageForAlerts(text, topicsWithContent)
+
+      // Agentes de Campo cadastrados — passados para a mesma chamada de classificação
+      // para detectar menção (ex: "conheci a Milena") sem custo extra de IA. Só busca
+      // quando é contato novo, já que a atribuição só acontece na primeira mensagem.
+      const fieldAgents = isNewContact
+        ? await prisma.teamMember.findMany({ where: { candidateId: candidate.id, role: 'AGENTE_CAMPO', status: 'ACTIVE' }, select: { id: true, name: true } })
+        : []
+
+      const classification = await classifyMessageForAlerts(text, topicsWithContent, fieldAgents.map(a => a.name))
       await prisma.message.update({
         where: { id: userMsg.id },
         data: { topicKey: classification.topicKey, isContentGap: classification.isContentGap, sentiment: classification.sentiment },
@@ -219,6 +227,15 @@ export function startMessageWorker() {
         const urgentConv = await prisma.conversation.update({ where: { id: conversation.id }, data: { status: 'URGENT' } })
         try { emitConversationUpdated(candidate.id, urgentConv) } catch {}
         console.log(`[WORKER] Conversa ${conversation.id} marcada como urgente automaticamente`)
+      }
+
+      // ── Atribuição de eleitor a Agente de Campo (captação em rua) ──────────
+      if (isNewContact && classification.mentionedAgentName) {
+        const matchedAgent = fieldAgents.find(a => a.name === classification.mentionedAgentName)
+        if (matchedAgent) {
+          await prisma.contact.update({ where: { id: contact.id }, data: { referredByTeamMemberId: matchedAgent.id } })
+          console.log(`[WORKER] Contato ${contact.id} atribuído ao Agente de Campo ${matchedAgent.name}`)
+        }
       }
 
       // Relê o status no banco para evitar responder quando a equipe assumiu a conversa
