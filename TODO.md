@@ -9,11 +9,11 @@ Lista viva de pendências do projeto. Atualizada em 2026-06-28 após auditoria g
 
 ## Pendências da auditoria geral (2026-06-28)
 
-- [ ] Briefing semanal por e-mail (toda segunda de manhã, resumo da semana anterior) — spec pede, não implementado
+- [x] Briefing semanal por e-mail (toda segunda de manhã, resumo da semana anterior) — implementado em 2026-06-28, toggle em Configurações
 - [ ] Validade de 48h no convite de equipe — token de convite hoje nunca expira
 - [ ] CPF não é editável na tela de Perfil (só no cadastro inicial)
 - [ ] Modo Mandato troca só a flag `plan` — não atualiza disclaimer/contexto do agente automaticamente
-- [ ] Pagamento via PIX — hoje só cartão (Stripe Elements)
+- [x] Pagamento via Pix e Boleto — implementado em 2026-06-28 (pagamento único mensal, só em Plano Campanha; Mandato exige cartão). Falta: criar produto avulso no Stripe e configurar `STRIPE_PRICE_CAMPAIGN_ONETIME` no EasyPanel (mesmo valor da mensalidade CAMPAIGN, modo pagamento único)
 - [ ] Aba "Fluxos" do cadastro do agente sem interface de edição (lógica existe no código, equipe não consegue configurar)
 - [ ] Meta Pixel / Google Analytics na landing — decisão deliberada de deixar para depois, não é bug
 

@@ -89,6 +89,12 @@ model Candidate {
   // Resumo automático da semana anterior (volume, temas em alta, solicitações
   // pendentes, gaps de conteúdo) — seção 4.9 da spec. Ativado por padrão.
   weeklyBriefingEnabled Boolean        @default(true)
+  // Pix/boleto: pagamento único mensal manual, só permitido em plan=CAMPAIGN
+  // (Mandato exige cartão/Subscription recorrente). null para quem sempre
+  // pagou via cartão. Vencido sem renovação → campaign-payment.worker.ts
+  // suspende automaticamente (ver compliance.worker.ts, mesmo padrão).
+  campaignPaymentMethod String?
+  campaignPaidUntil    DateTime?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @default(now()) @updatedAt
 

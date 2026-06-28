@@ -60,7 +60,8 @@ export async function getPendingRegistration(pendingId: string): Promise<Pending
 export async function activatePendingRegistration(
   pendingId: string,
   stripeCustomerId: string,
-  stripeSubscriptionId: string,
+  stripeSubscriptionId: string | null,
+  campaignPayment?: { method: 'pix' | 'boleto'; paidUntil: Date },
 ): Promise<{ userId: string; candidateId: string } | null> {
   const pending = await getPendingRegistration(pendingId)
   if (!pending) return null
@@ -79,6 +80,7 @@ export async function activatePendingRegistration(
       stripeSubscriptionId,
       status: 'ACTIVE',
       plan: 'CAMPAIGN',
+      ...(campaignPayment ? { campaignPaymentMethod: campaignPayment.method, campaignPaidUntil: campaignPayment.paidUntil } : {}),
       agentConfig: {
         create: {
           disclaimer: DEFAULT_DISCLAIMER(pending.name),

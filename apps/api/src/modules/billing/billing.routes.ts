@@ -27,6 +27,9 @@ export async function billingRoutes(app: FastifyInstance) {
       activeMsgsResetAt: candidate.activeMsgsResetAt,
       cancellationReason: candidate.cancellationReason,
       cancellationRequestedAt: candidate.cancellationRequestedAt,
+      campaignPaymentMethod: candidate.campaignPaymentMethod,
+      campaignPaidUntil: candidate.campaignPaidUntil,
+      hasCardSubscription: !!candidate.stripeSubscriptionId,
     })
   })
 
@@ -46,6 +49,16 @@ export async function billingRoutes(app: FastifyInstance) {
   app.post('/billing/upgrade-mandate', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
+
+    // Mandato exige recorrência automática (cartão/Subscription) — Pix/boleto avulso só
+    // é permitido durante CAMPAIGN, já que nenhum dos dois suporta recorrência madura
+    // no Brasil ainda. Quem só pagou via Pix/boleto até agora precisa cadastrar um
+    // cartão (assinatura) antes de migrar.
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
+    if (!candidate?.stripeSubscriptionId) {
+      return reply.status(400).send({ error: 'O Modo Mandato exige cartão de crédito. Cadastre um cartão antes de migrar.' })
+    }
+
     const updated = await prisma.candidate.update({ where: { id: candidateId }, data: { plan: 'MANDATE' } })
     return reply.send(updated)
   })

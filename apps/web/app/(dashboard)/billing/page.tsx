@@ -30,6 +30,7 @@ export default function BillingPage() {
   const [termsOpen, setTermsOpen] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [whatsappLinesQty, setWhatsappLinesQty] = useState(1)
+  const [renewMethod, setRenewMethod] = useState<'pix' | 'boleto'>('pix')
 
   const isSuspended = candidate?.status === 'SUSPENDED'
 
@@ -72,6 +73,13 @@ export default function BillingPage() {
     mutationFn: () => api.post('/billing/upgrade-mandate').then(r => r.data),
     onSuccess: (data) => { setCandidate({ plan: data.plan }); qc.invalidateQueries({ queryKey: ['billing'] }); toast({ title: 'Modo Mandato ativado!' }) },
     onError: (err: any) => toast({ title: 'Erro ao ativar Modo Mandato', description: err.response?.data?.error, variant: 'destructive' }),
+  })
+
+  // Renovação manual mensal via Pix/boleto (só Plano Campanha)
+  const renewCampaignMutation = useMutation({
+    mutationFn: () => api.post('/billing/checkout-campaign-payment', { paymentMethod: renewMethod }).then(r => r.data),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onError: (err: any) => toast({ title: 'Erro ao gerar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
   const acceptTermsMutation = useMutation({
@@ -159,6 +167,37 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
+      {/* Pagamento avulso via Pix/boleto (Plano Campanha) */}
+      {billing?.campaignPaidUntil && (
+        <div className="rounded-xl border-2 border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="w-5 h-5 text-[#002776]" />
+            <h2 className="text-lg font-semibold text-gray-900">Pagamento via {billing.campaignPaymentMethod === 'pix' ? 'Pix' : 'Boleto'}</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Seu pagamento é válido até <strong>{formatDate(billing.campaignPaidUntil)}</strong>. Renove antes do vencimento para não ter o assistente suspenso automaticamente.
+          </p>
+          <div className="flex items-center gap-3 max-w-md">
+            <select
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={renewMethod}
+              onChange={(e) => setRenewMethod(e.target.value as 'pix' | 'boleto')}
+            >
+              <option value="pix">Pix</option>
+              <option value="boleto">Boleto</option>
+            </select>
+            <Button
+              size="sm"
+              disabled={renewCampaignMutation.isPending}
+              onClick={() => renewCampaignMutation.mutate()}
+            >
+              {renewCampaignMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+              Renovar agora
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Recarga de mensagens ativas */}
       <div>
         <div className="flex items-center gap-2 mb-2">
@@ -228,6 +267,11 @@ export default function BillingPage() {
           <p className="text-sm text-amber-700 mb-4">
             Após a eleição, transforme seu assistente em ouvidoria do mandato — novo disclaimer, novo contexto, mesma plataforma.
           </p>
+          {!billing?.hasCardSubscription && (
+            <p className="text-sm text-amber-800 bg-amber-100 rounded-lg p-3 mb-4">
+              O Modo Mandato exige cartão de crédito (cobrança recorrente automática) — Pix e boleto não são aceitos neste plano. Gerencie sua assinatura para cadastrar um cartão antes de migrar.
+            </p>
+          )}
           <Button
             disabled={upgradeMandateMutation.isPending}
             onClick={() => upgradeMandateMutation.mutate()}

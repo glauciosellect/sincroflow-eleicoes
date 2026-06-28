@@ -37,11 +37,20 @@ const PLANS = [
   { value: 'MANDATE' as const, label: 'Plano Mandato', desc: 'Para após a eleição (ouvidoria)' },
 ]
 
+// Pix/boleto: pagamento único mensal manual, só disponível no Plano Campanha — o
+// Mandato exige cartão (assinatura recorrente automática).
+const PAYMENT_METHODS = [
+  { value: 'card' as const, label: 'Cartão de crédito', desc: 'Cobrança automática mensal' },
+  { value: 'pix' as const, label: 'Pix', desc: 'Pagamento manual, válido por 30 dias' },
+  { value: 'boleto' as const, label: 'Boleto', desc: 'Pagamento manual, válido por 30 dias' },
+]
+
 export default function RegisterPage() {
   const { toast } = useToast()
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
   const [plan, setPlan] = useState<'CAMPAIGN' | 'MANDATE'>('CAMPAIGN')
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix' | 'boleto'>('card')
   const [pendingId, setPendingId] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, control, formState: { errors, isValid } } = useForm<AccountData>({
@@ -80,7 +89,7 @@ export default function RegisterPage() {
     }
     setLoading(true)
     try {
-      const res = await api.post('/auth/register/checkout', { pendingId, plan })
+      const res = await api.post('/auth/register/checkout', { pendingId, plan, paymentMethod })
       window.location.href = res.data.url
     } catch (err: any) {
       toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
@@ -224,7 +233,7 @@ export default function RegisterPage() {
             {PLANS.map((p) => (
               <button
                 key={p.value}
-                onClick={() => setPlan(p.value)}
+                onClick={() => { setPlan(p.value); if (p.value === 'MANDATE') setPaymentMethod('card') }}
                 className={cn(
                   'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
                   plan === p.value ? 'border-[#002776] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
@@ -234,6 +243,26 @@ export default function RegisterPage() {
                 <div className="text-xs text-gray-400 mt-0.5">{p.desc}</div>
               </button>
             ))}
+          </div>
+
+          <Label className="text-sm font-medium text-gray-700">Forma de pagamento</Label>
+          <div className="space-y-2 mt-2 mb-6">
+            {PAYMENT_METHODS.filter((m) => plan === 'CAMPAIGN' || m.value === 'card').map((m) => (
+              <button
+                key={m.value}
+                onClick={() => setPaymentMethod(m.value)}
+                className={cn(
+                  'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
+                  paymentMethod === m.value ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <div className={cn('text-sm font-semibold', paymentMethod === m.value ? 'text-[#009C3B]' : 'text-gray-800')}>{m.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{m.desc}</div>
+              </button>
+            ))}
+            {plan === 'MANDATE' && (
+              <p className="text-xs text-gray-400 mt-1">O Plano Mandato exige cartão de crédito (cobrança recorrente automática).</p>
+            )}
           </div>
 
           <Button

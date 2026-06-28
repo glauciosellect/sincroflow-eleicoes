@@ -30,6 +30,12 @@ const PLAN_PRICE_IDS: Record<'CAMPAIGN' | 'MANDATE', string | undefined> = {
 // Recarga avulsa de mensagens ativas — comprada quando o limite do plano se esgota
 export const ACTIVE_MSG_RECHARGE = { amount: 1000, priceId: process.env.STRIPE_PRICE_RECHARGE_1000 }
 
+// Pix/boleto: mesmo valor da mensalidade CAMPAIGN, mas como produto avulso (mode:
+// 'payment'), já que nenhum dos dois suporta recorrência automática madura no Brasil
+// ainda — o candidato paga manualmente todo mês enquanto estiver em CAMPAIGN.
+const CAMPAIGN_ONETIME_PRICE_ID = process.env.STRIPE_PRICE_CAMPAIGN_ONETIME
+const CAMPAIGN_PAYMENT_VALIDITY_DAYS = 30
+
 // Linha extra de WhatsApp — assinatura recorrente, adicionada como item na subscription
 // principal do candidato (não é um checkout novo, é quantity num price já existente).
 const WHATSAPP_LINE_PRICE_ID = process.env.STRIPE_PRICE_WHATSAPP_LINE
@@ -60,20 +66,48 @@ export async function stripeRoutes(app: FastifyInstance) {
   // Este endpoint cria a sessão de pagamento; a conta só é criada de fato
   // quando o webhook confirmar o pagamento (checkout.session.completed).
   app.post('/auth/register/checkout', async (req, reply) => {
-    const { pendingId, plan = 'CAMPAIGN' } = req.body as { pendingId: string; plan?: 'CAMPAIGN' | 'MANDATE' }
+    const { pendingId, plan = 'CAMPAIGN', paymentMethod = 'card' } = req.body as {
+      pendingId: string
+      plan?: 'CAMPAIGN' | 'MANDATE'
+      paymentMethod?: 'card' | 'pix' | 'boleto'
+    }
     const pending = await getPendingRegistration(pendingId)
     if (!pending) return reply.status(400).send({ error: 'Cadastro expirado ou inválido. Recomece o registro.' })
 
-    const priceId = PLAN_PRICE_IDS[plan]
-    if (!priceId) return reply.status(500).send({ error: 'Plano não configurado. Contate o suporte.' })
+    // Pix/boleto só fazem sentido como pagamento avulso mensal durante CAMPAIGN —
+    // Mandato exige recorrência automática (cartão), nenhum dos dois suporta isso
+    // de forma madura no Brasil ainda.
+    if (paymentMethod !== 'card' && plan !== 'CAMPAIGN') {
+      return reply.status(400).send({ error: 'Pix e boleto só estão disponíveis para o Plano Campanha.' })
+    }
+
+    if (paymentMethod === 'card') {
+      const priceId = PLAN_PRICE_IDS[plan]
+      if (!priceId) return reply.status(500).send({ error: 'Plano não configurado. Contate o suporte.' })
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        customer_email: pending.email,
+        line_items: [{ price: priceId, quantity: 1 }],
+        metadata: { type: 'registration', pendingId, plan },
+        subscription_data: { metadata: { type: 'registration', pendingId, plan } },
+        success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
+        cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
+        branding_settings: CHECKOUT_BRANDING as any,
+      })
+
+      return reply.send({ url: session.url })
+    }
+
+    if (!CAMPAIGN_ONETIME_PRICE_ID) return reply.status(500).send({ error: 'Pix/boleto não configurado. Contate o suporte.' })
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'subscription',
+      payment_method_types: [paymentMethod],
+      mode: 'payment',
       customer_email: pending.email,
-      line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { type: 'registration', pendingId, plan },
-      subscription_data: { metadata: { type: 'registration', pendingId, plan } },
+      line_items: [{ price: CAMPAIGN_ONETIME_PRICE_ID, quantity: 1 }],
+      metadata: { type: 'registration_onetime', pendingId, plan, paymentMethod },
       success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
       branding_settings: CHECKOUT_BRANDING as any,
@@ -98,6 +132,33 @@ export async function stripeRoutes(app: FastifyInstance) {
       metadata: { type: 'active_msgs', candidateId, amount: String(ACTIVE_MSG_RECHARGE.amount * quantity) },
       success_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=success`,
       cancel_url: `${process.env.FRONTEND_URL}/configuracoes?tab=billing&payment=cancelled`,
+      branding_settings: CHECKOUT_BRANDING as any,
+    })
+
+    return reply.send({ url: session.url })
+  })
+
+  // Renovação manual mensal via Pix/boleto (candidato já com conta ativa, em CAMPAIGN).
+  // Quem está em MANDATE não pode usar — exige cartão (Subscription) nesse plano.
+  app.post('/billing/checkout-campaign-payment', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { paymentMethod } = z.object({ paymentMethod: z.enum(['pix', 'boleto']) }).parse(req.body)
+
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
+    if (candidate?.plan !== 'CAMPAIGN') {
+      return reply.status(400).send({ error: 'Pix e boleto só estão disponíveis para o Plano Campanha. No Mandato, o pagamento é por cartão.' })
+    }
+
+    if (!CAMPAIGN_ONETIME_PRICE_ID) return reply.status(500).send({ error: 'Pix/boleto não configurado. Contate o suporte.' })
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: [paymentMethod],
+      mode: 'payment',
+      line_items: [{ price: CAMPAIGN_ONETIME_PRICE_ID, quantity: 1 }],
+      metadata: { type: 'campaign_subscription_payment', candidateId, paymentMethod },
+      success_url: `${process.env.FRONTEND_URL}/billing?payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL}/billing?payment=cancelled`,
       branding_settings: CHECKOUT_BRANDING as any,
     })
 
@@ -213,6 +274,37 @@ export async function stripeRoutes(app: FastifyInstance) {
           await prisma.candidate.update({
             where: { id: meta.candidateId },
             data: { activeMsgsExtra: { increment: parseInt(meta.amount) } },
+          })
+          await prisma.invoice.create({
+            data: { candidateId: meta.candidateId, amount: session.amount_total || 0, status: 'paid', externalId: session.id },
+          })
+        }
+
+        // Pagamento avulso do registro inicial via Pix/boleto aprovado → cria a conta
+        if (meta.type === 'registration_onetime' && meta.pendingId) {
+          const paidUntil = new Date(Date.now() + CAMPAIGN_PAYMENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
+          const result = await activatePendingRegistration(
+            meta.pendingId,
+            session.customer as string,
+            null,
+            { method: meta.paymentMethod, paidUntil },
+          )
+          if (!result) console.error('[STRIPE] Falha ao ativar registro pendente (Pix/boleto):', meta.pendingId)
+          break
+        }
+
+        // Renovação manual mensal via Pix/boleto aprovada — reativa o candidato e o
+        // agente, caso tenham sido suspensos por vencimento anterior
+        // (CAMPAIGN_PAYMENT_EXPIRED, ver campaign-payment.worker.ts).
+        if (meta.type === 'campaign_subscription_payment' && meta.candidateId) {
+          const paidUntil = new Date(Date.now() + CAMPAIGN_PAYMENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
+          await prisma.candidate.update({
+            where: { id: meta.candidateId },
+            data: { status: 'ACTIVE', campaignPaymentMethod: meta.paymentMethod, campaignPaidUntil: paidUntil },
+          })
+          await prisma.agentConfig.updateMany({
+            where: { candidateId: meta.candidateId, deactivationReason: 'CAMPAIGN_PAYMENT_EXPIRED' },
+            data: { isActive: true, deactivationReason: null },
           })
           await prisma.invoice.create({
             data: { candidateId: meta.candidateId, amount: session.amount_total || 0, status: 'paid', externalId: session.id },

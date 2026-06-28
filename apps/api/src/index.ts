@@ -41,6 +41,7 @@ import { startEmailPollingWorker } from './modules/channels/email/email-poll.wor
 import { startComplianceWorker } from './modules/compliance/compliance.worker'
 import { startCalendarSyncWorker } from './modules/calendar/calendar-sync.worker'
 import { startBriefingWorker } from './modules/analytics/briefing.worker'
+import { startCampaignPaymentWorker } from './modules/billing/campaign-payment.worker'
 import { initSocket } from './lib/socket'
 
 const app = Fastify({ logger: process.env.NODE_ENV === 'development' })
@@ -159,6 +160,7 @@ async function bootstrap() {
   startCalendarSyncWorker()
   startBroadcastWorker()
   startBriefingWorker()
+  startCampaignPaymentWorker()
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })

@@ -30,6 +30,8 @@ interface Candidate {
   activeMsgsUsed: number
   activeMsgsExtra: number
   weeklyBriefingEnabled: boolean
+  campaignPaymentMethod: 'card' | 'pix' | 'boleto' | null
+  campaignPaidUntil: string | null
 }
 
 type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO'
