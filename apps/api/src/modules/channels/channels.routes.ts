@@ -26,9 +26,17 @@ export async function channelRoutes(app: FastifyInstance) {
     const channel = existing
       ? await prisma.channel.update({ where: { id: existing.id }, data: { name, config: { botToken } } })
       : await prisma.channel.create({ data: { candidateId, type: 'TELEGRAM', name, config: { botToken } } })
+    // O canal já está salvo nesse ponto — uma falha ao registrar o webhook no
+    // Telegram (token inválido, instabilidade da API) não deve derrubar a resposta
+    // com 500, já que isso engana o usuário (o canal foi criado com sucesso).
     const webhookUrl = `${process.env.API_URL}/webhooks/telegram/${channel.id}`
-    const axios = (await import('axios')).default
-    await axios.post(`https://api.telegram.org/bot${botToken}/setWebhook`, { url: webhookUrl })
+    try {
+      const axios = (await import('axios')).default
+      await axios.post(`https://api.telegram.org/bot${botToken}/setWebhook`, { url: webhookUrl })
+    } catch (err: any) {
+      console.error('[TELEGRAM] Falha ao registrar webhook:', err?.response?.data || err?.message)
+      return reply.status(201).send({ ...channel, webhookWarning: 'Canal salvo, mas não foi possível confirmar o webhook com o Telegram. Verifique se o token do bot está correto.' })
+    }
     return reply.status(201).send(channel)
   })
 
