@@ -44,6 +44,7 @@ export async function candidateRoutes(app: FastifyInstance) {
       city: z.string().max(120).optional(),
       photoUrl: z.string().url().optional(),
       whatsapp: z.string().min(8).optional(),
+      weeklyBriefingEnabled: z.boolean().optional(),
     }).parse(req.body)
     const updated = await prisma.candidate.update({ where: { id: candidate.id }, data })
     return reply.send(updated)

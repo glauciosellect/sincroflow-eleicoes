@@ -29,6 +29,7 @@ interface Candidate {
   activeMsgsIncluded: number
   activeMsgsUsed: number
   activeMsgsExtra: number
+  weeklyBriefingEnabled: boolean
 }
 
 type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO'

@@ -26,7 +26,7 @@ function dateRange(start?: string, end?: string) {
   return { gte: s, lte: e }
 }
 
-async function getOverview(candidateId: string, range: { gte: Date; lte: Date }) {
+export async function getOverview(candidateId: string, range: { gte: Date; lte: Date }) {
   const previousRange = { gte: new Date(range.gte.getTime() - (range.lte.getTime() - range.gte.getTime())), lte: range.gte }
 
   const [conversations, newContacts, requests, resolvedRequests, prevConversations, prevNewContacts, prevRequests] = await prisma.$transaction([
@@ -82,12 +82,12 @@ async function getTimeline(candidateId: string, range: { gte: Date; lte: Date })
   return Object.entries(grouped).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date))
 }
 
-async function getRequestsStatus(candidateId: string) {
+export async function getRequestsStatus(candidateId: string) {
   const byStatus = await prisma.request.groupBy({ by: ['status'], where: { candidateId }, _count: true })
   return Object.fromEntries(byStatus.map((s) => [s.status, s._count]))
 }
 
-async function getTopTopics(candidateId: string, range: { gte: Date; lte: Date }) {
+export async function getTopTopics(candidateId: string, range: { gte: Date; lte: Date }) {
   const grouped = await prisma.message.groupBy({
     by: ['topicKey'],
     where: { topicKey: { not: null }, createdAt: range, conversation: { candidateId } },
@@ -102,7 +102,7 @@ async function getTopTopics(candidateId: string, range: { gte: Date; lte: Date }
   }))
 }
 
-async function getContentGaps(candidateId: string, range: { gte: Date; lte: Date }) {
+export async function getContentGaps(candidateId: string, range: { gte: Date; lte: Date }) {
   const [grouped, examples] = await Promise.all([
     prisma.message.groupBy({
       by: ['topicKey'],

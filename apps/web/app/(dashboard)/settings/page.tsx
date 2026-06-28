@@ -37,6 +37,13 @@ function ProfileTab() {
     state: candidate?.state || '',
     city: candidate?.city || '',
   })
+  const [weeklyBriefingEnabled, setWeeklyBriefingEnabled] = useState(candidate?.weeklyBriefingEnabled ?? true)
+
+  const briefingMutation = useMutation({
+    mutationFn: (enabled: boolean) => api.patch('/candidates/me', { weeklyBriefingEnabled: enabled }),
+    onSuccess: (res) => { setCandidate(res.data); toast({ title: 'Preferência atualizada!' }) },
+    onError: () => toast({ title: 'Erro ao atualizar preferência', variant: 'destructive' }),
+  })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -142,6 +149,26 @@ function ProfileTab() {
             {candidateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Salvar
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Briefing semanal</CardTitle></CardHeader>
+        <CardContent>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={weeklyBriefingEnabled}
+              onChange={(e) => {
+                setWeeklyBriefingEnabled(e.target.checked)
+                briefingMutation.mutate(e.target.checked)
+              }}
+            />
+            <span className="text-sm text-gray-600">
+              Receber por e-mail, toda segunda de manhã, um resumo da semana anterior (volume de conversas, temas em alta, solicitações pendentes e alertas de gaps de conteúdo).
+            </span>
+          </label>
         </CardContent>
       </Card>
 

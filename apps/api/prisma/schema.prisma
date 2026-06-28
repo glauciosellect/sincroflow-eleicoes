@@ -86,6 +86,9 @@ model Candidate {
   // para CANCELLED de fato quando o webhook customer.subscription.deleted chegar.
   cancellationReason   String?
   cancellationRequestedAt DateTime?
+  // Resumo automático da semana anterior (volume, temas em alta, solicitações
+  // pendentes, gaps de conteúdo) — seção 4.9 da spec. Ativado por padrão.
+  weeklyBriefingEnabled Boolean        @default(true)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @default(now()) @updatedAt
 

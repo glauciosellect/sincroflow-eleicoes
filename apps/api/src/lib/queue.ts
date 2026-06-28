@@ -26,6 +26,7 @@ export const emailPollQueue = new Queue('email-poll', { connection })
 export const complianceQueue = new Queue('compliance-tse', { connection })
 export const alertsQueue = new Queue('alerts-email', { connection })
 export const broadcastQueue = new Queue('broadcast', { connection })
+export const briefingQueue = new Queue('weekly-briefing', { connection })
 
 export type MessageJobData = {
   channelId: string
