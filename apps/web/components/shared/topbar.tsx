@@ -130,9 +130,15 @@ function ThemeToggle() {
   )
 }
 
+// Espelha apps/api/src/lib/rbac.ts — Agente de Campo não tem acesso a
+// Configurações nem Chaves de API (admin-only), mesma regra usada no sidebar.
+const SETTINGS_ROLES = ['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS']
+
 export function Topbar() {
-  const { user, candidate, logout, refreshToken, setCandidate } = useAuthStore()
+  const { user, candidate, role, logout, refreshToken, setCandidate } = useAuthStore()
   const router = useRouter()
+  const canSeeSettings = role ? SETTINGS_ROLES.includes(role) : false
+  const isAdmin = role === 'ADMINISTRADOR'
   const qc = useQueryClient()
 
   // Atualiza o uso de mensagens ativas a cada 2 minutos
@@ -208,15 +214,19 @@ export function Topbar() {
           </button>
           <div className="absolute right-0 top-full mt-1 w-48 bg-[hsl(var(--card))] rounded-xl shadow-xl border border-[hsl(var(--border))] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
             <div className="p-1.5">
-              <Link href="/api-keys" className="flex items-center gap-2.5 px-3 py-2 text-sm text-[hsl(var(--card-foreground))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors">
-                <Key className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                Chaves de API
-              </Link>
-              <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2 text-sm text-[hsl(var(--card-foreground))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors">
-                <Settings className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                Configurações
-              </Link>
-              <hr className="my-1 border-[hsl(var(--border))]" />
+              {isAdmin && (
+                <Link href="/api-keys" className="flex items-center gap-2.5 px-3 py-2 text-sm text-[hsl(var(--card-foreground))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors">
+                  <Key className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                  Chaves de API
+                </Link>
+              )}
+              {canSeeSettings && (
+                <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2 text-sm text-[hsl(var(--card-foreground))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors">
+                  <Settings className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                  Configurações
+                </Link>
+              )}
+              {(isAdmin || canSeeSettings) && <hr className="my-1 border-[hsl(var(--border))]" />}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 rounded-lg hover:bg-red-500/10 w-full transition-colors"
