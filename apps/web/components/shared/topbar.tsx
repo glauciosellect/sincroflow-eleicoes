@@ -175,7 +175,8 @@ export function Topbar() {
       <div />
 
       <div className="flex items-center gap-1.5">
-        {/* Mensagens ativas restantes */}
+        {/* Mensagens ativas restantes — não é relevante para o trabalho do Agente de Campo */}
+        {role !== 'AGENTE_CAMPO' && (
         <div className="flex items-center gap-1.5 mr-1">
           {isEmpty ? (
             <Link href="/billing" className="flex items-center gap-1.5 text-xs bg-red-500/10 border border-red-500/20 text-red-500 px-3 py-1.5 rounded-lg font-medium hover:bg-red-500/20 transition-colors">
@@ -196,9 +197,10 @@ export function Topbar() {
             </div>
           )}
         </div>
+        )}
 
         <ThemeToggle />
-        <NotificationBell />
+        {role !== 'AGENTE_CAMPO' && <NotificationBell />}
 
         <div className="relative group ml-1">
           <button className="flex items-center gap-2 hover:bg-[hsl(var(--accent))] rounded-lg px-2 py-1.5 transition-colors">
