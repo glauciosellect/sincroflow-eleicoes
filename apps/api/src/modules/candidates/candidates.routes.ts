@@ -55,7 +55,7 @@ export async function candidateRoutes(app: FastifyInstance) {
     const { sub } = req.user as { sub: string }
     const { candidate } = await getCandidateForUser(sub)
     const members = await prisma.teamMember.findMany({
-      where: { candidateId: candidate.id },
+      where: { candidateId: candidate.id, status: { not: 'REMOVED' } },
       include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
       orderBy: { invitedAt: 'asc' },
     })
