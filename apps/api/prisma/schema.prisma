@@ -117,6 +117,7 @@ model Candidate {
   creatives        Creative[]
   broadcasts       Broadcast[]
   voteSurveys      VoteSurveyResponse[]
+  factChecks       FactCheck[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -155,6 +156,7 @@ model TeamMember {
   user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   referredContacts Contact[]
   voteSurveys  VoteSurveyResponse[]
+  factChecks   FactCheck[]
 
   @@unique([candidateId, email])
 }
@@ -556,6 +558,27 @@ enum VoteIntention {
   APOIADOR   // vai votar com certeza
   INDECISO   // ainda não decidiu
   CRITICO    // não vai votar / crítico
+}
+
+// Consulta de fatos — agente cola boato/dúvida, IA analisa e responde com fontes
+model FactCheck {
+  id            String   @id @default(cuid())
+  candidateId   String
+  checkedById   String?
+  query         String   // texto da dúvida/boato enviado pelo agente
+  verdict       String   // VERDADEIRO | FALSO | PARCIALMENTE_VERDADEIRO | INCONCLUSIVO
+  analysis      String   // análise em texto
+  suggestedReply String  // rascunho de resposta para o agente usar
+  sources       String[] // fontes citadas
+  savedToLibrary Boolean @default(false)
+  tags          String[]
+  createdAt     DateTime @default(now())
+
+  candidate   Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  checkedBy   TeamMember? @relation(fields: [checkedById], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, createdAt])
+  @@index([candidateId, verdict])
 }
 
 // Pesquisa de intenção de voto coletada pelos agentes de campo

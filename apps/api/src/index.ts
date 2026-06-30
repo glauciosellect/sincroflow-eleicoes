@@ -37,6 +37,7 @@ import { broadcastRoutes } from './modules/broadcasts/broadcasts.routes'
 import { startBroadcastWorker } from './modules/broadcasts/broadcast.worker'
 import { alertRoutes } from './modules/alerts/alerts.routes'
 import { surveyRoutes } from './modules/surveys/surveys.routes'
+import { factCheckRoutes } from './modules/factcheck/factcheck.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
@@ -139,6 +140,7 @@ async function bootstrap() {
   await app.register(broadcastRoutes)
   await app.register(alertRoutes)
   await app.register(surveyRoutes)
+  await app.register(factCheckRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)
