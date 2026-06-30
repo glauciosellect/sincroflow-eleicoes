@@ -12,12 +12,18 @@ export async function surveyRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
-    const { voterName, voterPhone, neighborhood, intention, notes } = z.object({
+    const { voterName, voterPhone, neighborhood, intention, notes, prefVereador, prefDepEstadual, prefDepFederal, prefSenador, prefGovernador, prefPresidente } = z.object({
       voterName: z.string().optional(),
       voterPhone: z.string().optional(),
       neighborhood: z.string().optional(),
       intention: z.enum(['APOIADOR', 'INDECISO', 'CRITICO']),
       notes: z.string().optional(),
+      prefVereador: z.string().optional(),
+      prefDepEstadual: z.string().optional(),
+      prefDepFederal: z.string().optional(),
+      prefSenador: z.string().optional(),
+      prefGovernador: z.string().optional(),
+      prefPresidente: z.string().optional(),
     }).parse(req.body)
 
     const member = await prisma.teamMember.findFirst({
@@ -33,6 +39,12 @@ export async function surveyRoutes(app: FastifyInstance) {
         neighborhood,
         intention,
         notes,
+        prefVereador,
+        prefDepEstadual,
+        prefDepFederal,
+        prefSenador,
+        prefGovernador,
+        prefPresidente,
       },
     })
 
@@ -68,7 +80,7 @@ export async function surveyRoutes(app: FastifyInstance) {
     const { since } = req.query as { since?: string }
     const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const [totals, byNeighborhood, byAgent, trend] = await Promise.all([
+    const [totals, byNeighborhood, byAgent, trend, prefData] = await Promise.all([
       prisma.voteSurveyResponse.groupBy({
         by: ['intention'],
         where: { candidateId, createdAt: { gte: sinceDate } },
@@ -95,6 +107,11 @@ export async function surveyRoutes(app: FastifyInstance) {
         GROUP BY DATE("createdAt"), intention
         ORDER BY DATE("createdAt") ASC
       `,
+      // Preferências por cargo — busca todos os campos preenchidos
+      prisma.voteSurveyResponse.findMany({
+        where: { candidateId, createdAt: { gte: sinceDate } },
+        select: { prefVereador: true, prefDepEstadual: true, prefDepFederal: true, prefSenador: true, prefGovernador: true, prefPresidente: true },
+      }),
     ])
 
     const totalMap = Object.fromEntries(totals.map(t => [t.intention, t._count]))
@@ -118,6 +135,34 @@ export async function surveyRoutes(app: FastifyInstance) {
       return acc
     }, {})
 
+    // Conta os nomes mais citados por cargo (normaliza para minúsculas para agrupar variações)
+    type CargoKey = 'prefVereador' | 'prefDepEstadual' | 'prefDepFederal' | 'prefSenador' | 'prefGovernador' | 'prefPresidente'
+    const CARGOS: CargoKey[] = ['prefVereador', 'prefDepEstadual', 'prefDepFederal', 'prefSenador', 'prefGovernador', 'prefPresidente']
+    const CARGO_LABELS: Record<CargoKey, string> = {
+      prefVereador: 'Vereador',
+      prefDepEstadual: 'Dep. Estadual',
+      prefDepFederal: 'Dep. Federal',
+      prefSenador: 'Senador',
+      prefGovernador: 'Governador',
+      prefPresidente: 'Presidente',
+    }
+
+    const byCargoRanking = CARGOS.reduce<Record<string, { label: string; top: { name: string; count: number }[] }>>((acc, cargo) => {
+      const counts: Record<string, number> = {}
+      for (const row of prefData) {
+        const val = row[cargo]
+        if (!val) continue
+        const key = val.trim().toLowerCase()
+        counts[key] = (counts[key] ?? 0) + 1
+      }
+      const top = Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+      if (top.length > 0) acc[cargo] = { label: CARGO_LABELS[cargo], top }
+      return acc
+    }, {})
+
     return reply.send({
       period: { since: sinceDate.toISOString() },
       totals: { apoiador, indeciso, critico, total },
@@ -129,6 +174,7 @@ export async function surveyRoutes(app: FastifyInstance) {
       byNeighborhood,
       byAgent: Object.values(byAgentSummary).sort((a, b) => b.total - a.total),
       trend: trend.map(t => ({ date: t.date, intention: t.intention, count: Number(t.count) })),
+      byCargoRanking,
     })
   })
 

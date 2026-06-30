@@ -560,15 +560,22 @@ enum VoteIntention {
 
 // Pesquisa de intenção de voto coletada pelos agentes de campo
 model VoteSurveyResponse {
-  id              String        @id @default(cuid())
-  candidateId     String
-  collectedById   String?       // TeamMember que coletou (null = coletado pelo próprio candidato)
-  voterName       String?
-  voterPhone      String?
-  neighborhood    String?
-  intention       VoteIntention
-  notes           String?
-  createdAt       DateTime      @default(now())
+  id                    String        @id @default(cuid())
+  candidateId           String
+  collectedById         String?
+  voterName             String?
+  voterPhone            String?
+  neighborhood          String?
+  intention             VoteIntention
+  notes                 String?
+  // Intenção por cargo — texto livre para flexibilidade durante a campanha
+  prefVereador          String?
+  prefDepEstadual       String?
+  prefDepFederal        String?
+  prefSenador           String?
+  prefGovernador        String?
+  prefPresidente        String?
+  createdAt             DateTime      @default(now())
 
   candidate       Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   collectedBy     TeamMember?   @relation(fields: [collectedById], references: [id], onDelete: SetNull)

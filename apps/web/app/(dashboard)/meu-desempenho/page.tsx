@@ -29,6 +29,15 @@ export default function MeuDesempenhoPage() {
   return <AgentView />
 }
 
+const CARGOS = [
+  { key: 'prefVereador', label: 'Vereador' },
+  { key: 'prefDepEstadual', label: 'Dep. Estadual' },
+  { key: 'prefDepFederal', label: 'Dep. Federal' },
+  { key: 'prefSenador', label: 'Senador' },
+  { key: 'prefGovernador', label: 'Governador' },
+  { key: 'prefPresidente', label: 'Presidente' },
+]
+
 function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast()
   const [voterName, setVoterName] = useState('')
@@ -36,15 +45,28 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
   const [neighborhood, setNeighborhood] = useState('')
   const [intention, setIntention] = useState<VoteIntention | null>(null)
   const [notes, setNotes] = useState('')
+  const [prefs, setPrefs] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: () => api.post('/surveys/vote', { voterName: voterName || undefined, voterPhone: voterPhone || undefined, neighborhood: neighborhood || undefined, intention, notes: notes || undefined }),
+    mutationFn: () => api.post('/surveys/vote', {
+      voterName: voterName || undefined,
+      voterPhone: voterPhone || undefined,
+      neighborhood: neighborhood || undefined,
+      intention,
+      notes: notes || undefined,
+      prefVereador: prefs.prefVereador || undefined,
+      prefDepEstadual: prefs.prefDepEstadual || undefined,
+      prefDepFederal: prefs.prefDepFederal || undefined,
+      prefSenador: prefs.prefSenador || undefined,
+      prefGovernador: prefs.prefGovernador || undefined,
+      prefPresidente: prefs.prefPresidente || undefined,
+    }),
     onSuccess: () => {
       setSubmitted(true)
       onSuccess()
       setTimeout(() => {
-        setVoterName(''); setVoterPhone(''); setNeighborhood(''); setIntention(null); setNotes(''); setSubmitted(false)
+        setVoterName(''); setVoterPhone(''); setNeighborhood(''); setIntention(null); setNotes(''); setPrefs({}); setSubmitted(false)
       }, 2000)
     },
     onError: (err: any) => toast({ title: 'Erro ao registrar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
@@ -99,6 +121,24 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
               </button>
             )
           })}
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3">
+        <Label className="text-sm font-semibold text-gray-700">Preferências por cargo <span className="font-normal text-gray-400">(opcional)</span></Label>
+        <p className="text-xs text-gray-400 mb-2 mt-0.5">Escreva o nome do candidato preferido em cada cargo</p>
+        <div className="grid grid-cols-2 gap-2">
+          {CARGOS.map(cargo => (
+            <div key={cargo.key}>
+              <Label className="text-xs text-gray-500">{cargo.label}</Label>
+              <Input
+                className="mt-0.5 text-sm"
+                placeholder="Nome do candidato..."
+                value={prefs[cargo.key] || ''}
+                onChange={e => setPrefs(p => ({ ...p, [cargo.key]: e.target.value }))}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -301,6 +341,32 @@ function AdminView() {
                     <span className="text-xs bg-red-50 text-red-700 rounded px-1.5 py-0.5">{agent.CRITICO} cr.</span>
                   </div>
                   <span className="text-sm font-bold text-gray-700">{agent.total}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Preferências por cargo */}
+      {surveySummary?.byCargoRanking && Object.keys(surveySummary.byCargoRanking).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Preferências por cargo</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {Object.entries(surveySummary.byCargoRanking).map(([cargo, data]: any) => (
+                <div key={cargo} className="space-y-1.5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{data.label}</p>
+                  {data.top.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-4">#{i + 1}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className="bg-[#002776] h-2 rounded-full" style={{ width: `${Math.round((item.count / data.top[0].count) * 100)}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-700 capitalize truncate max-w-[100px]">{item.name}</span>
+                      <span className="text-xs font-bold text-gray-500 shrink-0">{item.count}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
