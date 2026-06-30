@@ -132,7 +132,20 @@ function ProfileTab() {
             </div>
             <div>
               <Label>Cargo disputado</Label>
-              <Input className="mt-1" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} />
+              <select
+                className="mt-1 w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={form.position}
+                onChange={e => setForm({ ...form, position: e.target.value })}
+              >
+                <option value="">Selecione...</option>
+                <option value="Vereador">Vereador(a)</option>
+                <option value="Prefeito">Prefeito(a)</option>
+                <option value="Deputado Estadual">Deputado(a) Estadual</option>
+                <option value="Deputado Federal">Deputado(a) Federal</option>
+                <option value="Senador">Senador(a)</option>
+                <option value="Governador">Governador(a)</option>
+                <option value="Presidente">Presidente</option>
+              </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

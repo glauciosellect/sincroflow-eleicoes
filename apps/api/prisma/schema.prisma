@@ -588,7 +588,9 @@ model VoteSurveyResponse {
   collectedById         String?
   voterName             String?
   voterPhone            String?
+  cep                   String?
   neighborhood          String?
+  city                  String?
   intention             VoteIntention
   notes                 String?
   // Intenção por cargo — texto livre para flexibilidade durante a campanha

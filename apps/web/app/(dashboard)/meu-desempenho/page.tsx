@@ -42,17 +42,38 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast()
   const [voterName, setVoterName] = useState('')
   const [voterPhone, setVoterPhone] = useState('')
+  const [cep, setCep] = useState('')
   const [neighborhood, setNeighborhood] = useState('')
+  const [city, setCity] = useState('')
+  const [cepLoading, setCepLoading] = useState(false)
   const [intention, setIntention] = useState<VoteIntention | null>(null)
   const [notes, setNotes] = useState('')
   const [prefs, setPrefs] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
 
+  const lookupCep = async (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setCepLoading(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      const data = await res.json()
+      if (!data.erro) {
+        setNeighborhood(data.bairro || '')
+        setCity(data.localidade || '')
+      }
+    } catch { /* ignora falha de rede */ } finally {
+      setCepLoading(false)
+    }
+  }
+
   const mutation = useMutation({
     mutationFn: () => api.post('/surveys/vote', {
       voterName: voterName || undefined,
       voterPhone: voterPhone || undefined,
+      cep: cep.replace(/\D/g, '') || undefined,
       neighborhood: neighborhood || undefined,
+      city: city || undefined,
       intention,
       notes: notes || undefined,
       prefVereador: prefs.prefVereador || undefined,
@@ -66,7 +87,7 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
       setSubmitted(true)
       onSuccess()
       setTimeout(() => {
-        setVoterName(''); setVoterPhone(''); setNeighborhood(''); setIntention(null); setNotes(''); setPrefs({}); setSubmitted(false)
+        setVoterName(''); setVoterPhone(''); setCep(''); setNeighborhood(''); setCity(''); setIntention(null); setNotes(''); setPrefs({}); setSubmitted(false)
       }, 2000)
     },
     onError: (err: any) => toast({ title: 'Erro ao registrar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
@@ -95,9 +116,31 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      <div>
-        <Label>Bairro / Região</Label>
-        <Input className="mt-1" placeholder="Ex: Centro, Vila Nova..." value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <Label>CEP</Label>
+          <div className="relative mt-1">
+            <Input
+              placeholder="00000-000"
+              value={cep}
+              maxLength={9}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2')
+                setCep(v)
+                lookupCep(v)
+              }}
+            />
+            {cepLoading && <Loader2 className="absolute right-2 top-2.5 w-4 h-4 animate-spin text-gray-400" />}
+          </div>
+        </div>
+        <div>
+          <Label>Bairro</Label>
+          <Input className="mt-1" placeholder="Auto ou manual" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+        </div>
+        <div>
+          <Label>Cidade</Label>
+          <Input className="mt-1" placeholder="Auto ou manual" value={city} onChange={e => setCity(e.target.value)} />
+        </div>
       </div>
 
       <div>
@@ -294,7 +337,7 @@ function AdminView() {
       {/* Por bairro */}
       {surveySummary?.byNeighborhood?.length > 0 && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Por bairro / região</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">{surveySummary?.regionLabel ?? 'Por bairro / região'}</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
               {Object.entries(
@@ -341,32 +384,6 @@ function AdminView() {
                     <span className="text-xs bg-red-50 text-red-700 rounded px-1.5 py-0.5">{agent.CRITICO} cr.</span>
                   </div>
                   <span className="text-sm font-bold text-gray-700">{agent.total}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Preferências por cargo */}
-      {surveySummary?.byCargoRanking && Object.keys(surveySummary.byCargoRanking).length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Preferências por cargo</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {Object.entries(surveySummary.byCargoRanking).map(([cargo, data]: any) => (
-                <div key={cargo} className="space-y-1.5">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{data.label}</p>
-                  {data.top.map((item: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-4">#{i + 1}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div className="bg-[#002776] h-2 rounded-full" style={{ width: `${Math.round((item.count / data.top[0].count) * 100)}%` }} />
-                      </div>
-                      <span className="text-xs text-gray-700 capitalize truncate max-w-[100px]">{item.name}</span>
-                      <span className="text-xs font-bold text-gray-500 shrink-0">{item.count}</span>
-                    </div>
-                  ))}
                 </div>
               ))}
             </div>

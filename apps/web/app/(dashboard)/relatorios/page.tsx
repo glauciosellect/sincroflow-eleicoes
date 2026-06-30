@@ -498,7 +498,7 @@ function VoteSurveyReport({ surveySummary }: { surveySummary: any }) {
         {/* Por bairro */}
         {surveySummary.byNeighborhood?.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-600">Por bairro / região</p>
+            <p className="text-xs font-medium text-gray-600">{surveySummary.regionLabel ?? 'Por bairro / região'}</p>
             {Object.entries(
               surveySummary.byNeighborhood.reduce((acc: any, row: any) => {
                 if (!row.neighborhood) return acc
