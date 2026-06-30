@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Users, MessageSquare, FileWarning, Activity, MessageCircleQuestion, HelpCircle, Clock3, Download, CalendarRange, Smile, Meh, Frown, MapPin } from 'lucide-react'
+import { Loader2, Users, MessageSquare, FileWarning, Activity, MessageCircleQuestion, HelpCircle, Clock3, Download, CalendarRange, Smile, Meh, Frown, MapPin, ThumbsUp, ThumbsDown, ClipboardList } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 
@@ -75,6 +75,11 @@ export default function RelatoriosPage() {
     queryKey: ['report-region-requests', selectedRegion, start, end],
     queryFn: () => api.get(`/analytics/by-region/${encodeURIComponent(selectedRegion!)}/contacts`, { params: { start, end } }).then(r => r.data),
     enabled: !!selectedRegion,
+  })
+
+  const { data: surveySummary } = useQuery({
+    queryKey: ['survey-summary-report', start],
+    queryFn: () => api.get('/surveys/vote/summary', { params: { since: start } }).then(r => r.data),
   })
 
   const handleDownloadPdf = async () => {
@@ -443,6 +448,70 @@ export default function RelatoriosPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Relatório: Pesquisa de Intenção de Voto */}
+      {surveySummary && surveySummary.totals.total > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-[#002776]" />Pesquisa de Intenção de Voto
+            </CardTitle>
+            <Link href="/meu-desempenho" className="text-xs text-[#002776] hover:underline font-medium">Detalhes por agente →</Link>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex rounded-full overflow-hidden h-4">
+              {surveySummary.percentages.apoiador > 0 && <div className="bg-green-500" style={{ width: `${surveySummary.percentages.apoiador}%` }} />}
+              {surveySummary.percentages.indeciso > 0 && <div className="bg-amber-400" style={{ width: `${surveySummary.percentages.indeciso}%` }} />}
+              {surveySummary.percentages.critico > 0 && <div className="bg-red-500" style={{ width: `${surveySummary.percentages.critico}%` }} />}
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-green-50 rounded-lg p-3 flex flex-col items-center gap-1">
+                <ThumbsUp className="w-4 h-4 text-green-600" />
+                <div className="text-2xl font-bold text-green-700">{surveySummary.totals.apoiador}</div>
+                <div className="text-xs text-green-600 font-medium">{surveySummary.percentages.apoiador}% Apoiadores</div>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 flex flex-col items-center gap-1">
+                <HelpCircle className="w-4 h-4 text-amber-600" />
+                <div className="text-2xl font-bold text-amber-700">{surveySummary.totals.indeciso}</div>
+                <div className="text-xs text-amber-600 font-medium">{surveySummary.percentages.indeciso}% Indecisos</div>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3 flex flex-col items-center gap-1">
+                <ThumbsDown className="w-4 h-4 text-red-600" />
+                <div className="text-2xl font-bold text-red-700">{surveySummary.totals.critico}</div>
+                <div className="text-xs text-red-600 font-medium">{surveySummary.percentages.critico}% Críticos</div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 text-center">{surveySummary.totals.total} eleitores pesquisados no período</p>
+
+            {surveySummary.byNeighborhood?.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-600">Por bairro / região</p>
+                {Object.entries(
+                  surveySummary.byNeighborhood.reduce((acc: any, row: any) => {
+                    if (!row.neighborhood) return acc
+                    if (!acc[row.neighborhood]) acc[row.neighborhood] = { APOIADOR: 0, INDECISO: 0, CRITICO: 0 }
+                    acc[row.neighborhood][row.intention] += row._count
+                    return acc
+                  }, {})
+                ).slice(0, 8).map(([bairro, counts]: any) => {
+                  const total = counts.APOIADOR + counts.INDECISO + counts.CRITICO
+                  return (
+                    <div key={bairro} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-700 w-28 truncate">{bairro}</span>
+                      <div className="flex-1 flex rounded-full overflow-hidden h-2.5">
+                        {counts.APOIADOR > 0 && <div className="bg-green-500" style={{ width: `${Math.round(counts.APOIADOR / total * 100)}%` }} />}
+                        {counts.INDECISO > 0 && <div className="bg-amber-400" style={{ width: `${Math.round(counts.INDECISO / total * 100)}%` }} />}
+                        {counts.CRITICO > 0 && <div className="bg-red-500" style={{ width: `${Math.round(counts.CRITICO / total * 100)}%` }} />}
+                      </div>
+                      <span className="text-xs text-gray-400 w-6 text-right">{total}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

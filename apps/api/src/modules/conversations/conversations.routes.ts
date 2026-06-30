@@ -226,6 +226,19 @@ export async function conversationRoutes(app: FastifyInstance) {
     return reply.send(updated)
   })
 
+  app.post('/conversations/:id/unurgent', { onRequest: [requireModule('chat')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { id } = req.params as { id: string }
+
+    const conv = await prisma.conversation.findFirst({ where: { id, candidateId } })
+    if (!conv) return reply.status(404).send({ error: 'Conversa não encontrada' })
+
+    const updated = await prisma.conversation.update({ where: { id }, data: { status: 'ACTIVE' } })
+    try { emitConversationUpdated(candidateId, updated) } catch {}
+    return reply.send(updated)
+  })
+
   app.post('/conversations/:id/close', { onRequest: [requireModule('chat')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)

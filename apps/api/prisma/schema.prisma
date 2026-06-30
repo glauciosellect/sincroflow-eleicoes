@@ -116,6 +116,7 @@ model Candidate {
   invoices         Invoice[]
   creatives        Creative[]
   broadcasts       Broadcast[]
+  voteSurveys      VoteSurveyResponse[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -153,6 +154,7 @@ model TeamMember {
   candidate   Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   referredContacts Contact[]
+  voteSurveys  VoteSurveyResponse[]
 
   @@unique([candidateId, email])
 }
@@ -548,4 +550,30 @@ enum EventType {
 enum EnvVarType {
   TEXT
   NUMBER
+}
+
+enum VoteIntention {
+  APOIADOR   // vai votar com certeza
+  INDECISO   // ainda não decidiu
+  CRITICO    // não vai votar / crítico
+}
+
+// Pesquisa de intenção de voto coletada pelos agentes de campo
+model VoteSurveyResponse {
+  id              String        @id @default(cuid())
+  candidateId     String
+  collectedById   String?       // TeamMember que coletou (null = coletado pelo próprio candidato)
+  voterName       String?
+  voterPhone      String?
+  neighborhood    String?
+  intention       VoteIntention
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  candidate       Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  collectedBy     TeamMember?   @relation(fields: [collectedById], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, createdAt])
+  @@index([candidateId, intention])
+  @@index([candidateId, collectedById])
 }

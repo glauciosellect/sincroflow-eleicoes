@@ -309,11 +309,15 @@ function ChatContent() {
   })
   const urgentMutation = useMutation({
     mutationFn: (id: string) => api.post(`/conversations/${id}/urgent`),
-    onSuccess: (res) => { setSelected((p: any) => p ? { ...p, ...res.data } : p); qc.invalidateQueries({ queryKey: ['conversations'] }) },
+    onSuccess: (res) => { setSelected((p: any) => p ? { ...p, ...res.data } : p); qc.invalidateQueries({ queryKey: ['conversations'] }); qc.invalidateQueries({ queryKey: ['alerts-dashboard'] }) },
+  })
+  const unurgentMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/conversations/${id}/unurgent`),
+    onSuccess: (res) => { setSelected((p: any) => p ? { ...p, ...res.data } : p); qc.invalidateQueries({ queryKey: ['conversations'] }); qc.invalidateQueries({ queryKey: ['alerts-dashboard'] }) },
   })
   const closeMutation = useMutation({
     mutationFn: (id: string) => api.post(`/conversations/${id}/close`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['conversations'] }); setSelected(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['conversations'] }); qc.invalidateQueries({ queryKey: ['alerts-dashboard'] }); setSelected(null) },
   })
   const sendMutation = useMutation({
     mutationFn: ({ id, content, mediaUrl, mediaType }: { id: string; content: string; mediaUrl?: string; mediaType?: string }) =>
@@ -414,6 +418,11 @@ function ChatContent() {
               {selected.status !== 'URGENT' && (
                 <Button size="sm" variant="outline" onClick={() => urgentMutation.mutate(selected.id)} disabled={urgentMutation.isPending} className="h-7 text-xs text-red-500 border-red-200 hover:bg-red-50">
                   <AlertTriangle className="w-3 h-3 mr-1" />Marcar urgente
+                </Button>
+              )}
+              {selected.status === 'URGENT' && (
+                <Button size="sm" variant="outline" onClick={() => unurgentMutation.mutate(selected.id)} disabled={unurgentMutation.isPending} className="h-7 text-xs text-gray-500 border-gray-200 hover:bg-gray-50">
+                  <AlertTriangle className="w-3 h-3 mr-1" />Remover urgência
                 </Button>
               )}
               {selected.status !== 'CLOSED' && (

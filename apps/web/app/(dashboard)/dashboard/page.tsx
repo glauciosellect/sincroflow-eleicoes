@@ -7,6 +7,7 @@ import {
   Bot, Users, MessageSquare, AlertTriangle,
   Plug, ShieldAlert, ShieldCheck, Activity, FileWarning,
   ArrowUpRight, ArrowDownRight, Minus, Wifi, WifiOff,
+  ThumbsUp, HelpCircle, ThumbsDown, ClipboardList,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import Link from 'next/link'
@@ -115,6 +116,14 @@ export default function DashboardPage() {
     queryKey: ['alerts-dashboard'],
     queryFn: () => api.get('/alerts').then(r => r.data),
     staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  })
+
+  const { data: surveySummary } = useQuery({
+    queryKey: ['survey-summary'],
+    queryFn: () => api.get('/surveys/vote/summary').then(r => r.data),
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   })
 
   const compliance = realtime?.compliance
@@ -314,6 +323,45 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Termômetro de intenção de voto */}
+      {surveySummary && surveySummary.totals.total > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />Termômetro — Intenção de Voto
+            </CardTitle>
+            <Link href="/meu-desempenho" className="text-xs text-[#002776] hover:underline font-medium">Ver detalhes →</Link>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex rounded-full overflow-hidden h-4">
+                {surveySummary.percentages.apoiador > 0 && <div className="bg-green-500" style={{ width: `${surveySummary.percentages.apoiador}%` }} />}
+                {surveySummary.percentages.indeciso > 0 && <div className="bg-amber-400" style={{ width: `${surveySummary.percentages.indeciso}%` }} />}
+                {surveySummary.percentages.critico > 0 && <div className="bg-red-500" style={{ width: `${surveySummary.percentages.critico}%` }} />}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-green-50 rounded-lg p-2 flex flex-col items-center gap-0.5">
+                  <ThumbsUp className="w-3.5 h-3.5 text-green-600" />
+                  <div className="text-xl font-bold text-green-700">{surveySummary.totals.apoiador}</div>
+                  <div className="text-xs text-green-600">{surveySummary.percentages.apoiador}% Apoiadores</div>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-2 flex flex-col items-center gap-0.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <div className="text-xl font-bold text-amber-700">{surveySummary.totals.indeciso}</div>
+                  <div className="text-xs text-amber-600">{surveySummary.percentages.indeciso}% Indecisos</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-2 flex flex-col items-center gap-0.5">
+                  <ThumbsDown className="w-3.5 h-3.5 text-red-600" />
+                  <div className="text-xl font-bold text-red-700">{surveySummary.totals.critico}</div>
+                  <div className="text-xs text-red-600">{surveySummary.percentages.critico}% Críticos</div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 text-center">{surveySummary.totals.total} eleitores pesquisados nos últimos 30 dias</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Atividade recente */}
       <Card>
