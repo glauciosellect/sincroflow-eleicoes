@@ -301,6 +301,10 @@ model Contact {
   // preenchido manualmente, sempre a mensagem espontânea do próprio eleitor.
   referredByTeamMemberId String?
   referredByTeamMember   TeamMember?  @relation(fields: [referredByTeamMemberId], references: [id], onDelete: SetNull)
+  // Eleitor respondeu SAIR/STOP/PARAR — para de receber re-engajamento e criativos
+  // em broadcast, mas continua podendo escrever normalmente (mensagem do eleitor
+  // sempre é respondida; opt-out só bloqueia mensagens ATIVAS do agente).
+  optedOutAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @default(now()) @updatedAt
   candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)

@@ -99,7 +99,7 @@ export async function detectRequestIntent(message: string): Promise<{ isRequest:
   try {
     const res = await callLLM({
       model: DEFAULT_MODEL,
-      system: `Você classifica mensagens de eleitores para uma campanha eleitoral. Determine se a mensagem é um PEDIDO ou RECLAMAÇÃO que deve ser registrado como solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre um serviço público, denúncia, pedido de ajuda).
+      system: `Você classifica mensagens de eleitores para um serviço de atendimento ao eleitor. Determine se a mensagem é um PEDIDO ou RECLAMAÇÃO que deve ser registrado como solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre um serviço público, denúncia, pedido de ajuda).
 NÃO classifique como solicitação: perguntas sobre propostas do candidato, perguntas sobre agenda/eventos, cumprimentos, conversas gerais.
 Se a mensagem mencionar um bairro, região ou localidade específica, extraia esse nome em "neighborhood" (ex: "Centro", "Jardim das Flores") — senão omita o campo.
 Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do pedido em até 8 palavras", "neighborhood": "<bairro mencionado ou omitir>"} (subject pode ser omitido se isRequest for false). Nenhum texto adicional.`,
@@ -129,7 +129,7 @@ export async function classifyMessageForAlerts(
       : '\n\n"mentionedAgentName": sempre null (não há agentes de campo cadastrados).'
     const res = await callLLM({
       model: DEFAULT_MODEL,
-      system: `Classifique a mensagem de um eleitor para uma campanha eleitoral. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", "mentionedAgentName": "<nome ou null>"}.
+      system: `Classifique a mensagem de um eleitor para um serviço de atendimento ao eleitor. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", "mentionedAgentName": "<nome ou null>"}.
 "topicKey": a chave do tema da lista se a mensagem for uma pergunta/comentário sobre esse tema, senão null.
 "isUrgent": true se a mensagem tiver tom agressivo, ameaça, xingamento, ou relatar situação sensível/grave que exige atenção humana imediata.
 "sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).${agentInstructions}

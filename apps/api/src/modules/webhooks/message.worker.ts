@@ -8,6 +8,7 @@ import { getAgendaContextForPrompt } from '../calendar/calendar.service'
 import { generateSpeech } from '../tts/tts.service'
 import { getValidGmailToken, sendReply, sendReplyWithAttachment } from '../../lib/gmail'
 import { createRequest, getRequestStatusMessage } from '../requests/requests.service'
+import { buildWelcomeMessage } from '../../lib/tse-disclaimer'
 import axios from 'axios'
 
 // Detecta se o remetente é um grupo do WhatsApp (@g.us)
@@ -176,7 +177,7 @@ export function startMessageWorker() {
       // só é pulada se o limite de mensagens ativas tiver esgotado, mas isso é extremamente
       // raro acontecer logo no primeiro contato; ainda assim, a IA responde normalmente abaixo.
       if (isNewContact && activeMsgsAvailable) {
-        const disclaimerText = agentConfig.disclaimer || DISCLAIMER_FALLBACK
+        const disclaimerText = buildWelcomeMessage(agentConfig.disclaimer || DISCLAIMER_FALLBACK)
         if (channelType === 'WHATSAPP') {
           await getWhatsAppProvider().sendText(channelId, from, disclaimerText)
         } else if (channelType === 'TELEGRAM') {
@@ -260,6 +261,29 @@ export function startMessageWorker() {
       }
 
       const lowerText = text.trim().toLowerCase()
+
+      // ── Opt-out (SAIR/STOP/PARAR) ───────────────────────────────────────────
+      // Eleitor para de receber mensagens ATIVAS (re-engajamento, broadcasts) — mas
+      // continua podendo escrever normalmente; só bloqueia o que o agente inicia.
+      const isOptOutMessage = /^\/?(sair|stop|parar|não\s*quero|nao\s*quero|descadastrar|cancelar\s*inscri[cç][aã]o)[\s!.]*$/i.test(lowerText)
+      if (isOptOutMessage) {
+        if (!contact.optedOutAt) {
+          await prisma.contact.update({ where: { id: contact.id }, data: { optedOutAt: new Date() } })
+        }
+        const optOutMsg = 'Você foi removido da nossa lista e não receberá mais mensagens. Para voltar a receber, é só nos enviar uma mensagem.'
+        if (channelType === 'WHATSAPP') await getWhatsAppProvider().sendText(channelId, from, optOutMsg)
+        else if (channelType === 'TELEGRAM') {
+          const botToken = (channel.config as any).botToken
+          await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, { chat_id: from, text: optOutMsg })
+        }
+        const optOutConfirm = await prisma.message.create({ data: { conversationId: conversation.id, senderType: 'AGENT', content: optOutMsg } })
+        try { emitNewMessage(candidate.id, conversation.id, optOutConfirm) } catch {}
+        return
+      }
+      if (contact.optedOutAt) {
+        await prisma.contact.update({ where: { id: contact.id }, data: { optedOutAt: null } })
+      }
+
       if (lowerText === '#texto' || lowerText === '#audio' || lowerText === '#áudio') {
         const newPref = lowerText === '#texto' ? 'text' : 'audio'
         await prisma.contact.update({ where: { id: contact.id }, data: { audioPreference: newPref } })
@@ -344,7 +368,7 @@ export function startMessageWorker() {
 
       // Busca o criativo ("Santinho") do tema identificado, se houver um cadastrado —
       // usado tanto no WhatsApp quanto no e-mail, sempre em resposta a uma pergunta
-      // do eleitor, nunca disparo em massa.
+      // do eleitor, nunca re-engajamento em lote.
       const topicCreative = classification.topicKey
         ? await prisma.creative.findFirst({
             where: { candidateId: candidate.id, topicKey: classification.topicKey },

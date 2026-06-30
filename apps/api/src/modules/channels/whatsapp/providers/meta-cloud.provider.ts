@@ -134,6 +134,28 @@ export class MetaCloudApiProvider implements WhatsAppProvider {
     }, { headers: { Authorization: `Bearer ${accessToken}` } })
   }
 
+  async sendTemplate(channelId: string, to: string, templateName: string, languageCode: string, params?: string[], imageUrl?: string) {
+    const { phoneNumberId, accessToken } = await this.getConfig(channelId)
+    const components: any[] = []
+    if (imageUrl) {
+      components.push({ type: 'header', parameters: [{ type: 'image', image: { link: imageUrl } }] })
+    }
+    if (params && params.length > 0) {
+      components.push({ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) })
+    }
+
+    await axios.post(`${GRAPH_URL}/${phoneNumberId}/messages`, {
+      messaging_product: 'whatsapp',
+      to: normalizeBrazilianNumber(to),
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        ...(components.length > 0 ? { components } : {}),
+      },
+    }, { headers: { Authorization: `Bearer ${accessToken}` } })
+  }
+
   parseWebhook(payload: any): WhatsAppMessage | null {
     const value = payload?.entry?.[0]?.changes?.[0]?.value
     const msg = value?.messages?.[0]

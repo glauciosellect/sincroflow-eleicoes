@@ -21,6 +21,7 @@ import { billingRoutes } from './modules/billing/billing.routes'
 import { stripeRoutes } from './modules/billing/stripe.routes'
 import { metaIntegrationRoutes } from './modules/integrations/meta.routes'
 import { metaWhatsAppSignupRoutes } from './modules/integrations/meta-whatsapp-signup.routes'
+import { salvyRoutes } from './modules/integrations/salvy.routes'
 import { apiKeyRoutes } from './modules/auth/apikeys.routes'
 import { envVariableRoutes } from './modules/auth/env-variables.routes'
 import { webhookRoutes } from './modules/webhooks/webhooks.routes'
@@ -43,6 +44,7 @@ import { startComplianceWorker } from './modules/compliance/compliance.worker'
 import { startCalendarSyncWorker } from './modules/calendar/calendar-sync.worker'
 import { startBriefingWorker } from './modules/analytics/briefing.worker'
 import { startCampaignPaymentWorker } from './modules/billing/campaign-payment.worker'
+import { startQualityRatingWorker } from './modules/channels/whatsapp/quality-rating.worker'
 import { initSocket } from './lib/socket'
 
 const app = Fastify({ logger: process.env.NODE_ENV === 'development' })
@@ -140,6 +142,7 @@ async function bootstrap() {
   await app.register(stripeRoutes)
   await app.register(metaIntegrationRoutes)
   await app.register(metaWhatsAppSignupRoutes)
+  await app.register(salvyRoutes)
   await app.register(apiKeyRoutes)
   await app.register(envVariableRoutes)
   await app.register(webhookRoutes)
@@ -163,6 +166,7 @@ async function bootstrap() {
   startBroadcastWorker()
   startBriefingWorker()
   startCampaignPaymentWorker()
+  startQualityRatingWorker()
 
   const port = Number(process.env.PORT) || 3001
   await app.listen({ port, host: '0.0.0.0' })

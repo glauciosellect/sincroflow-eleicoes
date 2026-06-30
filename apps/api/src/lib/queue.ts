@@ -28,6 +28,7 @@ export const alertsQueue = new Queue('alerts-email', { connection })
 export const broadcastQueue = new Queue('broadcast', { connection })
 export const briefingQueue = new Queue('weekly-briefing', { connection })
 export const campaignPaymentQueue = new Queue('campaign-payment-expiry', { connection })
+export const qualityRatingQueue = new Queue('quality-rating-check', { connection })
 
 export type MessageJobData = {
   channelId: string

@@ -283,6 +283,10 @@ function ChannelsTab() {
   const [telegramToken, setTelegramToken] = useState('')
   const [blockSendersChannel, setBlockSendersChannel] = useState<any>(null)
   const [blockSendersText, setBlockSendersText] = useState('')
+  const [showVirtualNumberDialog, setShowVirtualNumberDialog] = useState(false)
+  const [virtualNumberAreaCode, setVirtualNumberAreaCode] = useState<number | null>(null)
+  const [pendingVirtualChannelId, setPendingVirtualChannelId] = useState<string | null>(null)
+  const [virtualVerificationCode, setVirtualVerificationCode] = useState('')
   const searchParams = useSearchParams()
   const { token: authToken, refreshToken: authRefreshToken } = useAuthStore()
 
@@ -392,6 +396,61 @@ function ChannelsTab() {
     })
   }
 
+  // Número virtual (Salvy) — alternativa a trazer um número próprio: a plataforma
+  // provisiona um número novo, registra na WABA e o candidato confirma com o
+  // código SMS recebido. Ver salvy.routes.ts (Adquirir → Ativar → opcional Cancelar).
+  const { data: areaCodesData } = useQuery({
+    queryKey: ['salvy-area-codes'],
+    queryFn: () => api.get('/integrations/salvy/area-codes').then(r => r.data),
+    enabled: showVirtualNumberDialog,
+  })
+
+  const acquireVirtualNumberMutation = useMutation({
+    mutationFn: (areaCode: number) => api.post('/integrations/salvy/virtual-numbers', { areaCode }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['channels'] })
+      setPendingVirtualChannelId(res.data.channel.id)
+      toast({ title: 'Número adquirido! Aguardando SMS com o código de verificação do WhatsApp...' })
+    },
+    onError: (err: any) => toast({ title: 'Erro ao adquirir número', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const { data: verificationStatus } = useQuery({
+    queryKey: ['salvy-verification-code', pendingVirtualChannelId],
+    queryFn: () => api.get(`/integrations/salvy/virtual-numbers/${pendingVirtualChannelId}/verification-code`).then(r => r.data),
+    enabled: !!pendingVirtualChannelId,
+    refetchInterval: 5000,
+  })
+
+  useEffect(() => {
+    if (verificationStatus?.verificationCode && !virtualVerificationCode) {
+      setVirtualVerificationCode(verificationStatus.verificationCode)
+    }
+  }, [verificationStatus?.verificationCode])
+
+  const activateVirtualNumberMutation = useMutation({
+    mutationFn: () => api.post(`/integrations/salvy/virtual-numbers/${pendingVirtualChannelId}/activate`, { verificationCode: virtualVerificationCode }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['channels'] })
+      toast({ title: 'WhatsApp ativado com sucesso!' })
+      closeVirtualNumberDialog()
+    },
+    onError: (err: any) => toast({ title: 'Erro ao ativar', description: err.response?.data?.error || 'Código inválido ou expirado', variant: 'destructive' }),
+  })
+
+  const cancelVirtualNumberMutation = useMutation({
+    mutationFn: (channelId: string) => api.delete(`/integrations/salvy/virtual-numbers/${channelId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['channels'] }); toast({ title: 'Número cancelado' }) },
+    onError: (err: any) => toast({ title: 'Erro ao cancelar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const closeVirtualNumberDialog = () => {
+    setShowVirtualNumberDialog(false)
+    setVirtualNumberAreaCode(null)
+    setPendingVirtualChannelId(null)
+    setVirtualVerificationCode('')
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -406,7 +465,11 @@ function ChannelsTab() {
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={connectWhatsAppMeta} className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50" disabled={whatsappEmbeddedSignupMutation.isPending || whatsappAtLimit} title={whatsappAtLimit ? 'Limite do plano atingido — faça upgrade para conectar mais números' : undefined}>
             {whatsappEmbeddedSignupMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Plus className="w-3 h-3 mr-1" />}
-            WhatsApp{whatsappAtLimit ? ' (limite atingido)' : ''}
+            WhatsApp (número próprio){whatsappAtLimit ? ' — limite atingido' : ''}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowVirtualNumberDialog(true)} className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50" disabled={whatsappAtLimit} title={whatsappAtLimit ? 'Limite do plano atingido — faça upgrade para conectar mais números' : undefined}>
+            <Plus className="w-3 h-3 mr-1" />
+            WhatsApp (número novo){whatsappAtLimit ? ' — limite atingido' : ''}
           </Button>
           <Button variant="outline" size="sm" onClick={() => connectMeta('instagram')} className="border-pink-200 text-pink-700 hover:bg-pink-50">
             <Plus className="w-3 h-3 mr-1" />Instagram
@@ -484,6 +547,14 @@ function ChannelsTab() {
                 {channel.type === 'WHATSAPP' && (
                   <div className="mt-3 text-center text-sm text-green-600 font-medium py-2">
                     Conectado via API oficial — {channel.config?.displayPhoneNumber || 'WhatsApp Business'}
+                    {channel.config?.salvyVirtualPhoneAccountId && (
+                      <div className="text-xs text-gray-400 font-normal mt-0.5">Número virtual (Salvy)</div>
+                    )}
+                    {channel.config?.qualityRating && channel.config.qualityRating !== 'GREEN' && (
+                      <div className="text-xs text-amber-600 font-normal mt-0.5">
+                        Quality Rating: {channel.config.qualityRating === 'YELLOW' ? 'Médio' : channel.config.qualityRating === 'RED' ? 'Baixo' : channel.config.qualityRating}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -509,10 +580,17 @@ function ChannelsTab() {
                 )}
 
                 <div className="mt-3 pt-3 border-t border-gray-100">
-                  <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(channel.id)} disabled={deleteMutation.isPending} className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full">
-                    {deleteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Trash2 className="w-3 h-3 mr-2" />}
-                    Desconectar
-                  </Button>
+                  {channel.config?.salvyVirtualPhoneAccountId ? (
+                    <Button variant="ghost" size="sm" onClick={() => cancelVirtualNumberMutation.mutate(channel.id)} disabled={cancelVirtualNumberMutation.isPending} className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full">
+                      {cancelVirtualNumberMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Trash2 className="w-3 h-3 mr-2" />}
+                      Cancelar número
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(channel.id)} disabled={deleteMutation.isPending} className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full">
+                      {deleteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Trash2 className="w-3 h-3 mr-2" />}
+                      Desconectar
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -550,6 +628,75 @@ function ChannelsTab() {
               Salvar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showVirtualNumberDialog} onOpenChange={(open) => !open && closeVirtualNumberDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adquirir número de WhatsApp</DialogTitle>
+          </DialogHeader>
+
+          {!pendingVirtualChannelId ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Escolha o DDD do novo número. Ele será provisionado automaticamente e registrado na nossa conta oficial do WhatsApp (Meta).
+              </p>
+              <div>
+                <Label>DDD</Label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={virtualNumberAreaCode ?? ''}
+                  onChange={(e) => setVirtualNumberAreaCode(Number(e.target.value) || null)}
+                >
+                  <option value="">Selecione...</option>
+                  {(areaCodesData?.areaCodes || []).map((code: number) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <DialogFooter>
+                <Button
+                  className="w-full"
+                  disabled={!virtualNumberAreaCode || acquireVirtualNumberMutation.isPending}
+                  onClick={() => acquireVirtualNumberMutation.mutate(virtualNumberAreaCode!)}
+                >
+                  {acquireVirtualNumberMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Adquirir número
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Número adquirido! Assim que o SMS com o código de verificação chegar, ele aparece automaticamente abaixo — ou cole manualmente se preferir.
+              </p>
+              <div>
+                <Label>Código de verificação</Label>
+                <Input
+                  className="mt-1 font-mono"
+                  placeholder="123456"
+                  value={virtualVerificationCode}
+                  onChange={(e) => setVirtualVerificationCode(e.target.value)}
+                />
+                {verificationStatus?.verificationCode ? (
+                  <p className="text-xs text-green-600 mt-1">Código recebido via SMS</p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Aguardando SMS...</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  className="w-full"
+                  disabled={!virtualVerificationCode.trim() || activateVirtualNumberMutation.isPending}
+                  onClick={() => activateVirtualNumberMutation.mutate()}
+                >
+                  {activateVirtualNumberMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Confirmar e ativar
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -45,6 +45,7 @@ interface AgentConfig {
   agentStyle: 'FORMAL' | 'INFORMAL' | 'ACOLHEDOR'
   story: string | null
   disclaimer: string
+  fixedAiDisclaimer: string
   candidateSite: string | null
   voiceEnabled: boolean
   ttsVoice: string | null
@@ -243,11 +244,17 @@ function DisclaimerTab({ form, setForm, onSave, saving }: { form: Partial<AgentC
   return (
     <Card>
       <CardContent className="p-6 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          Esta mensagem é obrigatória pela Resolução TSE nº 23.755/2026 e será enviada automaticamente na primeira mensagem de cada novo contato. Não remova a identificação como assistente virtual.
+        <div>
+          <Label>Disclaimer de IA (obrigatório por lei — não editável)</Label>
+          <div className="mt-1 bg-gray-100 border border-gray-300 rounded-lg p-3 text-sm text-gray-700 select-none">
+            {form.fixedAiDisclaimer}
+          </div>
+          <p className="mt-1 text-xs text-amber-700">
+            Exigido pela Resolução TSE nº 23.755/2026 — é enviado automaticamente antes da sua mensagem de apresentação, na primeira mensagem de cada novo contato, e não pode ser removido nem alterado.
+          </p>
         </div>
         <div>
-          <Label htmlFor="disclaimer">Mensagem de apresentação</Label>
+          <Label htmlFor="disclaimer">Mensagem de apresentação (editável)</Label>
           <Textarea
             id="disclaimer"
             className="mt-1"
@@ -258,8 +265,8 @@ function DisclaimerTab({ form, setForm, onSave, saving }: { form: Partial<AgentC
         </div>
         <div>
           <Label>Preview — é assim que o eleitor vai receber:</Label>
-          <div className="mt-2 bg-[#DCF8C6] rounded-2xl rounded-tl-none p-3 max-w-sm text-sm text-gray-800 shadow-sm">
-            {form.disclaimer || 'Sua mensagem aparecerá aqui...'}
+          <div className="mt-2 bg-[#DCF8C6] rounded-2xl rounded-tl-none p-3 max-w-sm text-sm text-gray-800 shadow-sm whitespace-pre-wrap">
+            {`${form.fixedAiDisclaimer || ''}\n\n${form.disclaimer || 'Sua mensagem aparecerá aqui...'}`}
           </div>
         </div>
         <Button onClick={onSave} disabled={saving} style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }} className="text-white">
@@ -367,13 +374,14 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
 
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null)
   const [broadcastContactType, setBroadcastContactType] = useState('VOTER')
-  const [broadcastChannelType, setBroadcastChannelType] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP')
+  const [broadcastChannelType, setBroadcastChannelType] = useState<'WHATSAPP' | 'EMAIL' | 'TELEGRAM'>('WHATSAPP')
 
   const { data: channels } = useQuery<{ id: string; type: string; isActive: boolean }[]>({
     queryKey: ['channels'],
     queryFn: () => api.get('/channels').then(r => r.data),
   })
   const hasEmailChannel = !!channels?.some(c => c.type === 'EMAIL' && c.isActive)
+  const hasTelegramChannel = !!channels?.some(c => c.type === 'TELEGRAM' && c.isActive)
 
   const { data: preview, isLoading: loadingPreview } = useQuery({
     queryKey: ['broadcast-preview', selectedCreative?.id, broadcastContactType, broadcastChannelType],
@@ -509,17 +517,18 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                     <p className="text-xs text-gray-400">{topics?.find(t => t.topicKey === selectedCreative.topicKey)?.topicName || 'Genérico'}</p>
                   </div>
 
-                  {hasEmailChannel && (
+                  {(hasEmailChannel || hasTelegramChannel) && (
                     <div>
                       <Label htmlFor="broadcast-channel">Enviar por</Label>
                       <select
                         id="broadcast-channel"
                         className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                         value={broadcastChannelType}
-                        onChange={(e) => setBroadcastChannelType(e.target.value as 'WHATSAPP' | 'EMAIL')}
+                        onChange={(e) => setBroadcastChannelType(e.target.value as 'WHATSAPP' | 'EMAIL' | 'TELEGRAM')}
                       >
                         <option value="WHATSAPP">WhatsApp</option>
-                        <option value="EMAIL">E-mail</option>
+                        {hasEmailChannel && <option value="EMAIL">E-mail</option>}
+                        {hasTelegramChannel && <option value="TELEGRAM">Telegram</option>}
                       </select>
                     </div>
                   )}
@@ -544,7 +553,9 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-gray-500">Contatos elegíveis</span><span className="font-medium">{preview.totalTargets}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Mensagens ativas restantes</span><span className="font-medium">{preview.activeMsgsRemaining}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Já enviados nas últimas 24h</span><span className="font-medium">{preview.sentLast24h}/{preview.max24hPerLine}</span></div>
+                      {preview.max24hPerLine !== null && (
+                        <div className="flex justify-between"><span className="text-gray-500">Já enviados nas últimas 24h</span><span className="font-medium">{preview.sentLast24h}/{preview.max24hPerLine}</span></div>
+                      )}
                       {preview.alreadyReceivedCount > 0 && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800 flex items-start gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -569,7 +580,7 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                         </div>
                       )}
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
-                        Este envio é considerado mensagem ativa e será registrado em log de auditoria. Use apenas para conteúdo já autorizado pela campanha — disparo de propaganda eleitoral deve seguir a Resolução TSE nº 23.755/2026.
+                        Este envio é considerado mensagem ativa e será registrado em log de auditoria. Use apenas para conteúdo já autorizado pelo contratante — todo re-engajamento deve seguir a Resolução TSE nº 23.755/2026.
                       </div>
                     </div>
                   )}

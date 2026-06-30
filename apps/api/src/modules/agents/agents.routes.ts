@@ -5,12 +5,16 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 import { requireModule } from '../../lib/rbac'
+import { TSE_AI_DISCLAIMER } from '../../lib/tse-disclaimer'
 
 const configSchema = z.object({
   agentName: z.string().min(1).max(100).optional(),
   agentRole: z.string().max(200).optional(),
   agentStyle: z.enum(['FORMAL', 'INFORMAL', 'ACOLHEDOR']).optional(),
   story: z.string().max(20000).optional().nullable(),
+  // Apenas a Parte B (editável) da mensagem de boas-vindas — a Parte A (disclaimer
+  // fixo de IA exigido pela Res. TSE 23.755/2026) nunca é editável pelo contratante
+  // e é sempre concatenada antes desta, ver lib/tse-disclaimer.ts.
   disclaimer: z.string().min(1).max(2000).optional(),
   candidateSite: z.string().url().or(z.literal('')).optional().nullable(),
   voiceEnabled: z.boolean().optional(),
@@ -29,7 +33,7 @@ export async function agentRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const config = await prisma.agentConfig.findUnique({ where: { candidateId } })
-    return reply.send(config)
+    return reply.send({ ...config, fixedAiDisclaimer: TSE_AI_DISCLAIMER })
   })
 
   app.patch('/agent/config', { onRequest: [requireModule('story')] }, async (req, reply) => {

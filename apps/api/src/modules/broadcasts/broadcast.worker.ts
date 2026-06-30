@@ -4,6 +4,8 @@ import { createWorker } from '../../lib/queue'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { getValidGmailToken, sendNewEmailWithAttachment } from '../../lib/gmail'
 import { emitNewMessage } from '../../lib/socket'
+import { isWhatsAppWindowOpen, WABA_TEMPLATES } from '../../lib/whatsapp-window'
+import { sendTelegramCreative } from '../../lib/telegram-broadcast'
 
 export type BroadcastJobData = {
   broadcastId: string
@@ -55,9 +57,20 @@ async function processBroadcastJob(job: Job<BroadcastJobData>) {
         attachmentUrl: broadcast.creative.fileUrl,
         attachmentName: broadcast.creative.title,
       })
+    } else if (broadcast.channel.type === 'TELEGRAM') {
+      const botToken = (broadcast.channel.config as any)?.botToken
+      if (!botToken) throw new Error('Canal Telegram sem botToken configurado')
+      await sendTelegramCreative(botToken, contact.externalId, broadcast.creative.fileUrl, broadcast.creative.fileType, broadcast.creative.title)
     } else {
       const provider = getWhatsAppProvider()
-      await provider.sendMedia(broadcast.channelId, contact.externalId, broadcast.creative.fileUrl, broadcast.creative.title)
+      const windowOpen = await isWhatsAppWindowOpen(contact.id)
+      if (windowOpen) {
+        await provider.sendMedia(broadcast.channelId, contact.externalId, broadcast.creative.fileUrl, broadcast.creative.title)
+      } else {
+        if (!provider.sendTemplate) throw new Error('Provedor WhatsApp não suporta envio de template (necessário fora da janela de 24h)')
+        const { name, languageCode } = WABA_TEMPLATES.reengagement
+        await provider.sendTemplate(broadcast.channelId, contact.externalId, name, languageCode, [contact.name || 'eleitor'], broadcast.creative.fileUrl)
+      }
     }
 
     let conversation = await prisma.conversation.findFirst({
