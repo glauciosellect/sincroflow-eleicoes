@@ -27,10 +27,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (hydrated && !user) router.push('/login')
   }, [hydrated, user, router])
 
-  // Agente de Campo só acessa "Meu Desempenho" — qualquer outra rota redireciona
-  // para lá em vez de mostrar uma tela vazia/com erro de permissão.
+  // Agente de Campo só acessa as rotas do módulo field_agent — qualquer outra redireciona
+  const AGENTE_CAMPO_ROUTES = ['/meu-desempenho', '/consultor-fatos']
   useEffect(() => {
-    if (hydrated && role === 'AGENTE_CAMPO' && pathname !== '/meu-desempenho') {
+    if (hydrated && role === 'AGENTE_CAMPO' && !AGENTE_CAMPO_ROUTES.includes(pathname)) {
       router.replace('/meu-desempenho')
     }
   }, [hydrated, role, pathname, router])
