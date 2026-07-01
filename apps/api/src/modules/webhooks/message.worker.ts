@@ -154,7 +154,14 @@ export function startMessageWorker() {
       const isNewContact = !contact
       if (!contact) {
         contact = await prisma.contact.create({
-          data: { candidateId: candidate.id, channelId, externalId: from, name, phone: channelType === 'WHATSAPP' ? from : undefined },
+          data: {
+            candidateId: candidate.id,
+            channelId,
+            externalId: from,
+            name,
+            phone: channelType === 'WHATSAPP' ? from : undefined,
+            email: channelType === 'EMAIL' ? from : undefined,
+          },
         })
       } else {
         await prisma.contact.update({
