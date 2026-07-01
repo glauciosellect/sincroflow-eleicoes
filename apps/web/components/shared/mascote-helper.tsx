@@ -47,7 +47,7 @@ const TUTORIAL_STEPS = [
   {
     step: 9,
     title: 'Monitorar pelo Chat',
-    content: 'Em **Chat** você vê todas as conversas em tempo real. Pode responder manualmente a qualquer momento (assumindo o atendimento), marcar uma conversa como **Urgente**, ou devolver para o assistente continuar.',
+    content: 'Em **Chat** você vê todas as conversas em tempo real. Pode responder manualmente a qualquer momento (assumindo o atendimento), marcar uma conversa como **Urgente** ou **Remover urgência**, ou devolver para o assistente continuar. Alertas urgentes aparecem no Dashboard com botão X para dispensar.',
   },
   {
     step: 10,
@@ -57,7 +57,7 @@ const TUTORIAL_STEPS = [
   {
     step: 11,
     title: 'Analisar Relatórios',
-    content: 'Em **Relatórios** você acompanha conversas, temas mais perguntados, perguntas sem resposta (gaps de conteúdo), horários de pico e eleitores mais engajados. Use o botão **Baixar PDF** para exportar e enviar ao partido.',
+    content: 'Em **Relatórios** clique no ícone de expandir (⊠) em qualquer card para abrir um relatório detalhado com **seletor de período próprio** e botão **Gerar PDF** daquele relatório específico. Inclui pesquisa de intenção de voto dos agentes de campo.',
   },
   {
     step: 12,
@@ -71,8 +71,23 @@ const TUTORIAL_STEPS = [
   },
   {
     step: 14,
-    title: 'Adicionar Equipe',
-    content: 'Em **Equipe** convide colaboradores da sua campanha pelo e-mail. Cada pessoa tem seu próprio acesso, com papéis diferentes conforme a função na campanha.',
+    title: 'Adicionar Equipe e Agentes de Campo',
+    content: 'Em **Equipe** convide colaboradores da sua campanha pelo e-mail. O papel **Agente de Campo** acessa apenas **Meu Desempenho** (para registrar pesquisas de voto com CEP) e o **Consultor de Fatos** (para tirar dúvidas de eleitores em campo com IA).',
+  },
+  {
+    step: 15,
+    title: 'Pesquisa de Intenção de Voto',
+    content: 'Em **Meu Desempenho**, agentes de campo registram eleitores pesquisados com nome, telefone, **CEP** (preenchimento automático de bairro e cidade) e intenção de voto (Apoiador, Indeciso ou Crítico). Também é possível registrar preferências por cargo (Vereador, Dep. Estadual, Dep. Federal, Senador, Governador, Presidente).',
+  },
+  {
+    step: 16,
+    title: 'Mapa de Apoiadores',
+    content: 'Em **Mapa de Apoiadores** você visualiza no mapa onde estão seus apoiadores, indecisos e críticos. Cada círculo representa um bairro ou cidade — o tamanho é proporcional ao volume e a cor indica a intenção predominante. Clique para ver o detalhamento. Para **Vereadores** agrupa por bairro; para **Deputados, Senadores, Governadores e Presidente** agrupa por cidade.',
+  },
+  {
+    step: 17,
+    title: 'Consultor de Fatos com IA',
+    content: 'Em **Consultor de Fatos**, agentes de campo colam uma dúvida ou boato recebido de um eleitor. A IA analisa com base em fontes públicas (TSE, IBGE, legislação, veículos reconhecidos) e retorna um **veredicto** (Verdadeiro, Falso, Parcialmente verdadeiro ou Inconclusivo), uma **análise** e uma **resposta pronta** para usar com o eleitor. Respostas podem ser salvas na **Biblioteca** para reuso quando o mesmo boato aparecer novamente.',
   },
 ]
 
@@ -88,7 +103,10 @@ const FAQ = [
   { q: 'Como exporto um relatório em PDF?', step: 11 },
   { q: 'Quando o assistente é desativado pelo TSE?', step: 12 },
   { q: 'Como compro mais linhas de WhatsApp?', step: 13 },
-  { q: 'Como adiciono minha equipe?', step: 14 },
+  { q: 'Como adiciono agentes de campo?', step: 14 },
+  { q: 'Como registrar pesquisa de intenção de voto?', step: 15 },
+  { q: 'Como funciona o Mapa de Apoiadores?', step: 16 },
+  { q: 'O que é o Consultor de Fatos?', step: 17 },
 ]
 
 function renderMarkdown(text: string) {
