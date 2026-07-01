@@ -1,5 +1,5 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +7,7 @@ import {
   Bot, Users, MessageSquare, AlertTriangle,
   Plug, ShieldAlert, ShieldCheck, Activity, FileWarning,
   ArrowUpRight, ArrowDownRight, Minus, Wifi, WifiOff,
-  ThumbsUp, HelpCircle, ThumbsDown, ClipboardList,
+  ThumbsUp, HelpCircle, ThumbsDown, ClipboardList, X,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import Link from 'next/link'
@@ -68,6 +68,8 @@ function KPICard({ title, value, icon: Icon, sub, prevValue, href, accent, loadi
 export default function DashboardPage() {
   const { candidate } = useAuthStore()
   const [period, setPeriod] = useState(30)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const qc = useQueryClient()
   const STALE = 5 * 60 * 1000
 
   const end = new Date().toISOString()
@@ -118,6 +120,20 @@ export default function DashboardPage() {
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
   })
+
+  const unurgentMutation = useMutation({
+    mutationFn: (conversationId: string) => api.post(`/conversations/${conversationId}/unurgent`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts-dashboard'] }),
+  })
+
+  const dismissAlert = (alert: any) => {
+    setDismissedAlerts(prev => { const s = new Set(prev); s.add(alert.message); return s })
+    if (alert.type === 'urgent' && alert.data?.conversationId) {
+      unurgentMutation.mutate(alert.data.conversationId)
+    }
+  }
+
+  const visibleAlerts = alerts.filter((a: any) => !dismissedAlerts.has(a.message))
 
   const { data: surveySummary } = useQuery({
     queryKey: ['survey-summary'],
@@ -194,13 +210,25 @@ export default function DashboardPage() {
       </div>
 
       {/* Alertas automáticos */}
-      {alerts.length > 0 && (
+      {visibleAlerts.length > 0 && (
         <div className="space-y-2">
-          {alerts.slice(0, 3).map((alert: any, i: number) => (
+          {visibleAlerts.slice(0, 5).map((alert: any, i: number) => (
             <div key={i} className={cn('flex items-center gap-3 rounded-xl p-3 text-sm border',
               alert.type === 'urgent' || alert.type === 'tse_deactivation' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800')}>
               <FileWarning className="w-4 h-4 shrink-0" />
-              <span>{alert.message}</span>
+              <span className="flex-1">{alert.message}</span>
+              {alert.data?.conversationId && (
+                <Link href={`/chat?conversation=${alert.data.conversationId}`} className="text-xs font-semibold underline shrink-0 hover:opacity-70">
+                  Ver conversa
+                </Link>
+              )}
+              <button
+                onClick={() => dismissAlert(alert)}
+                className="shrink-0 p-0.5 rounded hover:bg-black/10 transition-colors"
+                title="Dispensar alerta"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>
