@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -35,6 +35,7 @@ const navItems = [
     { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
+    { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'reports' },
   ] },
   { section: 'SISTEMA', items: [{ href: '/settings', label: 'Configurações', icon: Settings, module: 'settings' }] },
 ]

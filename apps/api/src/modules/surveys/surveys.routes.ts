@@ -238,6 +238,89 @@ export async function surveyRoutes(app: FastifyInstance) {
     })
   })
 
+  // Mapa de apoiadores — retorna regiões com contagens e coordenadas (geocoding via Nominatim)
+  app.get('/surveys/vote/map', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { since } = req.query as { since?: string }
+    const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+    const candidate = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      select: { position: true, city: true, state: true },
+    })
+    const groupByCity = candidate?.position
+      ? !['Vereador', 'Prefeito'].includes(candidate.position)
+      : false
+
+    // Busca contagens por região + intenção
+    const rows = groupByCity
+      ? await prisma.voteSurveyResponse.groupBy({
+          by: ['city', 'intention'],
+          where: { candidateId, city: { not: null }, createdAt: { gte: sinceDate } },
+          _count: true,
+        })
+      : await prisma.voteSurveyResponse.groupBy({
+          by: ['neighborhood', 'intention'],
+          where: { candidateId, neighborhood: { not: null }, createdAt: { gte: sinceDate } },
+          _count: true,
+        })
+
+    // Agrupa por região
+    const regionMap: Record<string, { apoiador: number; indeciso: number; critico: number }> = {}
+    for (const row of rows as any[]) {
+      const key = groupByCity ? row.city : row.neighborhood
+      if (!key) continue
+      if (!regionMap[key]) regionMap[key] = { apoiador: 0, indeciso: 0, critico: 0 }
+      if (row.intention === 'APOIADOR') regionMap[key].apoiador += row._count
+      if (row.intention === 'INDECISO') regionMap[key].indeciso += row._count
+      if (row.intention === 'CRITICO') regionMap[key].critico += row._count
+    }
+
+    // Geocodifica cada região via Nominatim (OpenStreetMap) — sem chave, gratuito
+    const baseCity = candidate?.city ?? ''
+    const baseState = candidate?.state ?? 'Brasil'
+
+    const geocoded = await Promise.all(
+      Object.entries(regionMap).map(async ([region, counts]) => {
+        const total = counts.apoiador + counts.indeciso + counts.critico
+        const dominant =
+          counts.apoiador >= counts.indeciso && counts.apoiador >= counts.critico ? 'APOIADOR'
+          : counts.indeciso >= counts.critico ? 'INDECISO'
+          : 'CRITICO'
+
+        // Tenta geocodificar: bairro + cidade + estado, ou só cidade + estado
+        const query = groupByCity
+          ? `${region}, ${baseState}, Brasil`
+          : `${region}, ${baseCity}, ${baseState}, Brasil`
+
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
+          const res = await fetch(url, { headers: { 'User-Agent': 'SyncroFlowEleicoes/1.0' } })
+          const data = await res.json() as any[]
+          if (data.length > 0) {
+            return {
+              region,
+              lat: parseFloat(data[0].lat),
+              lng: parseFloat(data[0].lon),
+              dominant,
+              total,
+              ...counts,
+            }
+          }
+        } catch { /* ignora falha de geocoding */ }
+
+        return null
+      })
+    )
+
+    return reply.send({
+      groupByCity,
+      regionLabel: groupByCity ? 'Cidade' : 'Bairro',
+      points: geocoded.filter(Boolean),
+    })
+  })
+
   // Apagar uma resposta (admin)
   app.delete('/surveys/vote/:id', { onRequest: [requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
