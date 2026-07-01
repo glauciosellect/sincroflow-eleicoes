@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Users, MessageSquare, FileWarning, Activity, MessageCircleQuestion, HelpCircle, Clock3, Download, CalendarRange, Smile, Meh, Frown, MapPin, ThumbsUp, ThumbsDown, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react'
+import { Loader2, Users, MessageSquare, FileWarning, Activity, MessageCircleQuestion, HelpCircle, Clock3, Download, CalendarRange, Smile, Meh, Frown, MapPin, ThumbsUp, ThumbsDown, ClipboardList, ChevronDown, ChevronRight, Maximize2, FileDown } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 
@@ -15,7 +15,93 @@ const periodOptions = [
   { label: '7 dias', days: 7 },
   { label: '14 dias', days: 14 },
   { label: '30 dias', days: 30 },
+  { label: '60 dias', days: 60 },
+  { label: '90 dias', days: 90 },
 ]
+
+interface ReportModalConfig {
+  title: string
+  reportType: string
+  children: React.ReactNode
+}
+
+function ReportModal({ config, onClose }: { config: ReportModalConfig; onClose: () => void }) {
+  const [days, setDays] = useState(30)
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [useCustom, setUseCustom] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  const start = useCustom && customStart ? new Date(customStart).toISOString()
+    : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  const end = useCustom && customEnd ? new Date(customEnd).toISOString() : new Date().toISOString()
+
+  const handlePdf = async () => {
+    setDownloading(true)
+    try {
+      const res = await api.get('/analytics/export-pdf', {
+        params: { start, end, type: config.reportType },
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio-${config.reportType}-${new Date().toISOString().slice(0, 10)}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileDown className="w-4 h-4 text-[#002776]" />
+            {config.title}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Seletor de período */}
+        <div className="flex flex-wrap items-center gap-2 py-3 border-y border-gray-100">
+          <span className="text-xs text-gray-500 font-medium">Período:</span>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {[7, 14, 30, 60, 90].map(d => (
+              <button
+                key={d}
+                onClick={() => { setDays(d); setUseCustom(false) }}
+                className={cn('px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+                  !useCustom && days === d ? 'bg-white text-[#002776] shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input type="date" value={customStart} onChange={e => { setCustomStart(e.target.value); setUseCustom(true) }}
+              className="border border-gray-200 rounded px-2 py-1 text-xs" />
+            <span className="text-gray-400 text-xs">até</span>
+            <input type="date" value={customEnd} onChange={e => { setCustomEnd(e.target.value); setUseCustom(true) }}
+              className="border border-gray-200 rounded px-2 py-1 text-xs" />
+          </div>
+        </div>
+
+        {/* Conteúdo do relatório */}
+        <div className="py-2">{config.children}</div>
+
+        {/* Rodapé com PDF */}
+        <div className="flex justify-end pt-2 border-t border-gray-100">
+          <Button onClick={handlePdf} disabled={downloading} className="bg-[#002776] hover:bg-[#001a5e] text-white">
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            Gerar PDF
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 const channelIcon: Record<string, string> = { WHATSAPP: '📱', INSTAGRAM: '📸', FACEBOOK: '📘', TELEGRAM: '✈️', EMAIL: '📧' }
 const REQUEST_STATUS_LABELS: Record<string, string> = { RECEIVED: 'Recebido', ANALYZING: 'Em análise', FORWARDED: 'Encaminhado', RESOLVED: 'Resolvido' }
@@ -33,6 +119,7 @@ export default function RelatoriosPage() {
   const [showCustomRange, setShowCustomRange] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<{ key: string; name: string } | null>(null)
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
+  const [reportModal, setReportModal] = useState<ReportModalConfig | null>(null)
 
   // Calculado uma vez por mudança de período/customRange (useMemo), não a cada
   // render — sem isso, "new Date()" mudava a cada milissegundo e a queryKey do
@@ -150,31 +237,29 @@ export default function RelatoriosPage() {
 
       {/* Relatório 1: Visão Geral da Semana */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><CardContent className="p-5">
-          <div className="flex items-center justify-between"><MessageSquare className="w-5 h-5 text-[#002776]" /><Trend value={overview?.conversations} prev={prevOverview?.conversations} /></div>
-          <div className="text-2xl font-bold text-gray-900 mt-2">{l1 ? '—' : overview?.conversations ?? 0}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Conversas</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-5">
-          <div className="flex items-center justify-between"><Users className="w-5 h-5 text-[#009C3B]" /><Trend value={overview?.newContacts} prev={prevOverview?.newContacts} /></div>
-          <div className="text-2xl font-bold text-gray-900 mt-2">{l1 ? '—' : overview?.newContacts ?? 0}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Novos eleitores</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-5">
-          <div className="flex items-center justify-between"><FileWarning className="w-5 h-5 text-amber-600" /><Trend value={overview?.requests} prev={prevOverview?.requests} /></div>
-          <div className="text-2xl font-bold text-gray-900 mt-2">{l1 ? '—' : overview?.requests ?? 0}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Solicitações</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-5">
-          <div className="flex items-center justify-between"><Activity className="w-5 h-5 text-purple-600" /></div>
-          <div className="text-2xl font-bold text-gray-900 mt-2">{l1 ? '—' : `${overview?.resolutionRate ?? 0}%`}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Taxa de resolução</div>
-        </CardContent></Card>
+        {[
+          { icon: <MessageSquare className="w-5 h-5 text-[#002776]" />, value: overview?.conversations, prev: prevOverview?.conversations, label: 'Conversas', type: 'conversations' },
+          { icon: <Users className="w-5 h-5 text-[#009C3B]" />, value: overview?.newContacts, prev: prevOverview?.newContacts, label: 'Novos eleitores', type: 'contacts' },
+          { icon: <FileWarning className="w-5 h-5 text-amber-600" />, value: overview?.requests, prev: prevOverview?.requests, label: 'Solicitações', type: 'requests' },
+          { icon: <Activity className="w-5 h-5 text-purple-600" />, value: overview?.resolutionRate, prev: undefined, label: 'Taxa de resolução', type: 'resolution', suffix: '%' },
+        ].map((item) => (
+          <Card key={item.type} className="cursor-pointer hover:shadow-md transition-shadow group"
+            onClick={() => setReportModal({ title: item.label, reportType: item.type, children: <div className="text-center py-8"><div className="text-5xl font-bold text-[#002776]">{l1 ? '—' : (item.value ?? 0)}{item.suffix ?? ''}</div><div className="text-gray-400 mt-2">{item.label} no período selecionado</div></div> })}>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">{item.icon}<div className="flex items-center gap-2"><Trend value={item.value} prev={item.prev} /><Maximize2 className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" /></div></div>
+              <div className="text-2xl font-bold text-gray-900 mt-2">{l1 ? '—' : (item.value ?? 0)}{item.suffix ?? ''}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{item.label}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Relatório 9: Evolução */}
       <Card>
-        <CardHeader><CardTitle className="text-base font-semibold">Evolução de Conversas</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-semibold">Evolução de Conversas</CardTitle>
+          <button onClick={() => setReportModal({ title: 'Evolução de Conversas', reportType: 'timeline', children: <ResponsiveContainer width="100%" height={260}><AreaChart data={timeline || []}><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#002776" stopOpacity={0.15}/><stop offset="95%" stopColor="#002776" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/><XAxis dataKey="date" tick={{fontSize:10}} tickFormatter={v=>v.slice(5)}/><YAxis tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="count" stroke="#002776" strokeWidth={2} fill="url(#g2)"/></AreaChart></ResponsiveContainer> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+        </CardHeader>
         <CardContent>
           {l4 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
             <ResponsiveContainer width="100%" height={220}>
@@ -199,7 +284,10 @@ export default function RelatoriosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Relatório 4: Volume por Canal */}
         <Card>
-          <CardHeader><CardTitle className="text-base font-semibold">Volume por Canal</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Volume por Canal</CardTitle>
+            <button onClick={() => setReportModal({ title: 'Volume por Canal', reportType: 'channels', children: <div className="space-y-3">{(byChannel||[]).map((c:any,i:number)=><div key={i} className="flex items-center gap-3"><span>{channelIcon[c.type]||'📡'}</span><span className="flex-1 text-sm">{c.name}</span><span className="font-bold text-sm">{c.count}</span></div>)}</div> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+          </CardHeader>
           <CardContent>
             {l2 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!byChannel || byChannel.length === 0) ? (
               <div className="text-center py-8 text-gray-400 text-sm">Sem dados no período</div>
@@ -242,7 +330,10 @@ export default function RelatoriosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Relatório 2: Temas Mais Perguntados */}
         <Card>
-          <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><MessageCircleQuestion className="w-4 h-4 text-[#002776]" />Temas Mais Perguntados</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2"><MessageCircleQuestion className="w-4 h-4 text-[#002776]" />Temas Mais Perguntados</CardTitle>
+            <button onClick={() => setReportModal({ title: 'Temas Mais Perguntados', reportType: 'topics', children: <div className="space-y-3">{(topTopics||[]).map((t:any,i:number)=><div key={i} className="flex items-center gap-3"><span className="text-sm font-bold text-gray-400 w-5">#{i+1}</span><span className="flex-1 text-sm">{t.topicName}</span><span className="font-bold text-sm text-[#002776]">{t.count}</span></div>)}</div> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+          </CardHeader>
           <CardContent>
             {l6 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!topTopics || topTopics.length === 0) ? (
               <div className="text-center py-8 text-gray-400 text-sm">Sem dados no período</div>
@@ -297,7 +388,10 @@ export default function RelatoriosPage() {
 
       {/* Relatório 7: Horários de Pico */}
       <Card>
-        <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><Clock3 className="w-4 h-4 text-purple-600" />Horários de Pico</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-semibold flex items-center gap-2"><Clock3 className="w-4 h-4 text-purple-600" />Horários de Pico</CardTitle>
+          <button onClick={() => setReportModal({ title: 'Horários de Pico', reportType: 'peak_hours', children: <ResponsiveContainer width="100%" height={220}><BarChart data={peakHours||[]}><CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/><XAxis dataKey="hour" tick={{fontSize:10}} tickFormatter={h=>`${h}h`}/><YAxis tick={{fontSize:10}} allowDecimals={false}/><Tooltip formatter={(v:any)=>[v,'Mensagens']} labelFormatter={h=>`${h}h às ${h+1}h`}/><Bar dataKey="count" fill="#7C3AED" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+        </CardHeader>
         <CardContent>
           {l8 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
             <ResponsiveContainer width="100%" height={180}>
@@ -315,7 +409,10 @@ export default function RelatoriosPage() {
 
       {/* Relatório 8: Eleitores Mais Engajados */}
       <Card>
-        <CardHeader><CardTitle className="text-base font-semibold">Eleitores Mais Engajados (Top 20)</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-semibold">Eleitores Mais Engajados (Top 20)</CardTitle>
+          <button onClick={() => setReportModal({ title: 'Eleitores Mais Engajados', reportType: 'top_contacts', children: <div className="space-y-2">{(topContacts||[]).map((c:any,i:number)=><div key={c.id} className="flex items-center gap-3"><span className="text-xs font-bold text-gray-400 w-5">#{i+1}</span><div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:'linear-gradient(135deg,#002776,#009C3B)'}}>{(c.name||c.phone||'?')[0]?.toUpperCase()}</div><div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{c.name||c.phone}</div><div className="text-xs text-gray-400">{c.totalInteractions} interações</div></div></div>)}</div> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+        </CardHeader>
         <CardContent>
           {l3 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!topContacts || topContacts.length === 0) ? (
             <div className="text-center py-8 text-gray-400 text-sm">Nenhum dado ainda</div>
@@ -341,7 +438,10 @@ export default function RelatoriosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Relatório 5: Sentimento dos Eleitores */}
         <Card>
-          <CardHeader><CardTitle className="text-base font-semibold">Sentimento dos Eleitores</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Sentimento dos Eleitores</CardTitle>
+            <button onClick={() => setReportModal({ title: 'Sentimento dos Eleitores', reportType: 'sentiment', children: <div className="grid grid-cols-3 gap-4 py-4">{Object.entries(SENTIMENT_CONFIG).map(([key,cfg])=>{const Icon=cfg.icon;return(<div key={key} className={cn('rounded-xl p-4 text-center',cfg.bg)}><Icon className={cn('w-8 h-8 mx-auto mb-2',cfg.color)}/><div className={cn('text-3xl font-bold',cfg.color)}>{sentiment?.[key]??0}</div><div className="text-sm text-gray-500 mt-1">{cfg.label}</div></div>)})}</div> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+          </CardHeader>
           <CardContent>
             {l9 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (
               <div className="grid grid-cols-3 gap-3">
@@ -363,7 +463,10 @@ export default function RelatoriosPage() {
 
         {/* Relatório 3: Solicitações por Região */}
         <Card>
-          <CardHeader><CardTitle className="text-base font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-[#002776]" />Solicitações por Região</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-[#002776]" />Solicitações por Região</CardTitle>
+            <button onClick={() => setReportModal({ title: 'Solicitações por Região', reportType: 'by_region', children: <div className="space-y-2">{(byRegion?.byRegion||[]).map((r:any,i:number)=><div key={r.neighborhood} className="flex items-center gap-3"><span className="text-xs font-bold text-gray-400 w-5">#{i+1}</span><span className="flex-1 text-sm">{r.neighborhood}</span><span className="font-bold text-sm text-[#002776]">{r.count}</span></div>)}</div> })} className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"><Maximize2 className="w-4 h-4" /></button>
+          </CardHeader>
           <CardContent>
             {l10 ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div> : (!byRegion?.byRegion || byRegion.byRegion.length === 0) ? (
               <div className="text-center py-8 text-gray-400 text-sm">Nenhum bairro identificado ainda</div>
@@ -453,6 +556,9 @@ export default function RelatoriosPage() {
       {surveySummary && surveySummary.totals.total > 0 && (
         <VoteSurveyReport surveySummary={surveySummary} />
       )}
+
+      {/* Modal de detalhe com período próprio e PDF */}
+      {reportModal && <ReportModal config={reportModal} onClose={() => setReportModal(null)} />}
     </div>
   )
 }
