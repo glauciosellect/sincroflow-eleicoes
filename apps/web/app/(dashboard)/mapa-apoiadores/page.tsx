@@ -1,10 +1,32 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useState } from 'react'
+import { useState, Component, ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Map, Users, ThumbsUp, HelpCircle, ThumbsDown, AlertCircle } from 'lucide-react'
+
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
+          <AlertCircle className="w-10 h-10 text-amber-400" />
+          <p className="text-sm font-medium text-gray-500">Não foi possível carregar o mapa.</p>
+          <button className="text-xs text-[#002776] underline" onClick={() => this.setState({ hasError: false })}>
+            Tentar novamente
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const MapComponent = dynamic(() => import('./MapComponent'), {
   ssr: false,
@@ -141,7 +163,9 @@ export default function MapaApoiadoresPage() {
             </div>
           ) : (
             <div className="h-full rounded-lg overflow-hidden">
-              <MapComponent points={points} regionLabel={data?.regionLabel ?? 'Bairro'} />
+              <MapErrorBoundary>
+                <MapComponent points={points} regionLabel={data?.regionLabel ?? 'Bairro'} />
+              </MapErrorBoundary>
             </div>
           )}
         </CardContent>
