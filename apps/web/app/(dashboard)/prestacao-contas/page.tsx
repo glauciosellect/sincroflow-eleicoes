@@ -58,7 +58,7 @@ const ETAPAS_PARCIAL: Step[] = [
     detalhe: [
       'Cada despesa precisa de: nota fiscal ou recibo sem rasura, data, valor, CNPJ/CPF do fornecedor.',
       'Pagamento DEVE ser por Pix nominal, transferência ou cheque nominal ao fornecedor.',
-      'Dinheiro em espécie aceito apenas até ½ salário mínimo por item (Fundo de Caixa).',
+      'Dinheiro em espécie aceito apenas até R$ 759,00 por item (½ salário mínimo de 2026 — Fundo de Caixa).',
       'Pessoal (cabos eleitorais, coordenadores): lançar com CPF de cada um.',
       'O lançamento é igual ao que você fez aqui no SyncroFlow — o código TSE (ex: 2.04) já está preenchido.',
     ],
@@ -306,7 +306,7 @@ export default function PrestacaoContasPage() {
           {[
             { titulo: 'Tipo de contrato', texto: 'Prestação de Serviços Eleitorais — não gera CLT, sem férias ou 13º.' },
             { titulo: 'Deve ser escrito', texto: 'Contrato assinado com data de início, término, função e valor. O TSE disponibiliza modelo.' },
-            { titulo: 'Pagamento obrigatório', texto: 'Pix nominal, TED ou cheque nominal ao colaborador. Nunca em dinheiro acima de ½ SM.' },
+            { titulo: 'Pagamento obrigatório', texto: 'Pix nominal, TED ou cheque nominal ao colaborador. Nunca em dinheiro acima de R$ 759,00 (½ salário mínimo de 2026) por pagamento.' },
             { titulo: 'Limite de pessoal', texto: 'Municípios até 30 mil eleitores: 1% do eleitorado. Acima: +1 por cada 1.000 eleitores excedentes.' },
             { titulo: 'O que declarar', texto: 'Nome completo, CPF e valor total pago a cada colaborador. Use o Relatório TSE da aba Equipe.' },
             { titulo: 'INSS', texto: 'O colaborador é contribuinte individual. O candidato não recolhe INSS patronal.' },

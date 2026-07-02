@@ -17,7 +17,7 @@ const PERIODICIDADES: Record<string, string> = {
   mensal: 'Mensal', fixo: 'Valor Fixo (único)',
 }
 const FORMAS_PAG: Record<string, string> = {
-  pix: 'Pix', transferencia: 'Transferência', cheque: 'Cheque Nominal', dinheiro: 'Dinheiro (até ½ SM)',
+  pix: 'Pix', transferencia: 'Transferência', cheque: 'Cheque Nominal', dinheiro: 'Dinheiro (até R$ 759 — ½ salário mínimo)',
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -356,7 +356,7 @@ export default function EquipePage() {
         <div className="space-y-5">
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>O TSE exige declarar <strong>nome, CPF e total pago</strong> a cada colaborador. Pagamentos devem ser feitos por Pix nominal, transferência ou cheque — nunca em dinheiro acima de ½ salário mínimo por item.</span>
+            <span>O TSE exige declarar <strong>nome, CPF e total pago</strong> a cada colaborador. Pagamentos devem ser feitos por Pix nominal, transferência ou cheque — nunca em dinheiro acima de R$ 759 (½ salário mínimo de 2026) por item.</span>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
