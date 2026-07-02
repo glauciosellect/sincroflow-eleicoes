@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -10,7 +10,7 @@ type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'A
 
 // Módulos liberados por role (espelha lib/rbac.ts do backend — seção 4.10 da spec)
 const ROLE_MODULES: Record<TeamRole, string[]> = {
-  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent', 'portal'],
+  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent', 'portal', 'financeiro'],
   ATENDIMENTO: ['chat', 'contacts', 'agenda'],
   CONTEUDO: ['story', 'platform', 'agenda'],
   RELATORIOS: ['contacts', 'reports'],
@@ -40,6 +40,7 @@ const navItems = [
     { href: '/portal', label: 'Portal do Eleitor', icon: Globe, module: 'portal' },
     { href: '/conteudo', label: 'Conteúdo com IA', icon: Sparkles, module: 'platform' },
     { href: '/radar', label: 'Radar Político', icon: Radar, module: 'reports' },
+    { href: '/financeiro', label: 'Financeiro', icon: Wallet, module: 'financeiro' },
   ] },
   { section: 'SISTEMA', items: [{ href: '/settings', label: 'Configurações', icon: Settings, module: 'settings' }] },
 ]
