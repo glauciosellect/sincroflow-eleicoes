@@ -129,14 +129,15 @@ export async function gabineteRoutes(app: FastifyInstance) {
       ementa: z.string().min(5),
       tipo: z.enum(['pl', 'pec', 'requerimento', 'indicacao', 'mocao', 'outro']),
       status: z.enum(['rascunho', 'protocolado', 'tramitando', 'aprovado', 'rejeitado', 'arquivado']).default('rascunho'),
-      dataProtocolo: z.string().datetime({ offset: true }).optional(),
+      dataProtocolo: z.string().optional().nullable(),
       temas: z.array(z.string()).default([]),
-      linkOficial: z.string().url().optional(),
+      linkOficial: z.string().url().optional().or(z.literal('')).nullable(),
     }).parse(req.body)
 
     const projeto = await prisma.projetoLei.create({
       data: {
         candidateId, ...data,
+        linkOficial: data.linkOficial || null,
         ...(data.dataProtocolo ? { dataProtocolo: new Date(data.dataProtocolo) } : {}),
       },
     })
