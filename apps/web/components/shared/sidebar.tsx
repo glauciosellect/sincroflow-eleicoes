@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -11,40 +11,54 @@ type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'A
 // Módulos liberados por role (espelha lib/rbac.ts do backend — seção 4.10 da spec)
 const ROLE_MODULES: Record<TeamRole, string[]> = {
   ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'field_agent', 'portal', 'financeiro', 'gabinete', 'equipe', 'prestacao'],
-  COORDENADOR: ['chat', 'contacts', 'agenda', 'reports', 'equipe', 'field_agent'],
-  ATENDIMENTO: ['chat', 'contacts', 'agenda'],
-  CONTEUDO: ['story', 'platform', 'agenda'],
-  RELATORIOS: ['contacts', 'reports'],
-  AGENTE_CAMPO: ['field_agent'],
+  COORDENADOR:   ['chat', 'contacts', 'agenda', 'reports', 'equipe', 'field_agent'],
+  ATENDIMENTO:   ['chat', 'contacts', 'agenda'],
+  CONTEUDO:      ['story', 'platform', 'agenda'],
+  RELATORIOS:    ['contacts', 'reports'],
+  AGENTE_CAMPO:  ['field_agent'],
 }
 
 const navItems = [
-  { section: 'VISÃO GERAL', items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, module: null }] },
-  { section: 'CADASTRO DO AGENTE', items: [{ href: '/agents', label: 'Minha História e Propostas', icon: FileText, module: 'story' }] },
+  { section: 'VISÃO GERAL', items: [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, module: null },
+  ] },
+
+  { section: 'CANDIDATO', items: [
+    { href: '/agents', label: 'Minha História e Propostas', icon: FileText, module: 'story' },
+    { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
+    { href: '/portal', label: 'Portal do Eleitor', icon: Globe, module: 'portal' },
+  ] },
+
   { section: 'ATENDIMENTO', items: [
     { href: '/chat', label: 'Chat', icon: MessageSquare, module: 'chat' },
     { href: '/contacts', label: 'Contatos', icon: Contact, module: 'contacts' },
     { href: '/solicitacoes', label: 'Solicitações', icon: FileWarning, module: 'chat' },
-  ] },
-  { section: 'AGENDA', items: [
     { href: '/agenda', label: 'Agenda', icon: CalendarDays, module: 'agenda' },
     { href: '/integrations', label: 'Integrações', icon: Plug, module: 'agenda' },
   ] },
-  { section: 'GESTÃO', items: [
-    { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
-    { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
+
+  { section: 'CAMPO & PESQUISA', items: [
+    { href: '/pesquisa', label: 'Pesquisa de Voto', icon: ClipboardList, module: 'field_agent' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
-    { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'reports' },
-    { href: '/portal', label: 'Portal do Eleitor', icon: Globe, module: 'portal' },
-    { href: '/conteudo', label: 'Conteúdo com IA', icon: Sparkles, module: 'platform' },
+  ] },
+
+  { section: 'INTELIGÊNCIA', items: [
+    { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
     { href: '/radar', label: 'Radar Político', icon: Radar, module: 'reports' },
-    { href: '/financeiro', label: 'Financeiro', icon: Wallet, module: 'financeiro' },
+    { href: '/conteudo', label: 'Conteúdo com IA', icon: Sparkles, module: 'platform' },
+  ] },
+
+  { section: 'CAMPANHA', items: [
     { href: '/equipe', label: 'Equipe de Campanha', icon: UserCheck, module: 'equipe' },
+    { href: '/financeiro', label: 'Financeiro', icon: Wallet, module: 'financeiro' },
     { href: '/prestacao-contas', label: 'Prestação de Contas', icon: Scale, module: 'prestacao' },
     { href: '/gabinete', label: 'Gabinete', icon: Building2, module: 'gabinete' },
   ] },
-  { section: 'SISTEMA', items: [{ href: '/settings', label: 'Configurações', icon: Settings, module: 'settings' }] },
+
+  { section: 'SISTEMA', items: [
+    { href: '/settings', label: 'Configurações', icon: Settings, module: 'settings' },
+  ] },
 ]
 
 const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDATE: 'Plano Mandato' }

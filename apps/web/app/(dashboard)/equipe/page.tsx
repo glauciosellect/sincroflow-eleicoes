@@ -34,8 +34,9 @@ interface Colaborador {
   id: string; nome: string; cpf: string; funcao: string; funcaoCustom?: string
   telefone?: string; email?: string; dataInicio: string; dataFim?: string
   valorAcordado: number; periodicidade: string; formaPagamento: string
-  observacao?: string; status: string; teamMemberId?: string
+  observacao?: string; status: string; teamMemberId?: string; supervisorId?: string
   teamMember?: { id: string; email: string; role: string; status: string } | null
+  supervisor?: { id: string; nome: string; funcao: string } | null
   _count: { pagamentos: number }
   pagamentos: { valor: number; dataPagamento: string; competencia?: string }[]
 }
@@ -51,7 +52,7 @@ const emptyColabForm = {
   nome: '', cpf: '', funcao: 'cabo_eleitoral', funcaoCustom: '',
   telefone: '', email: '', dataInicio: new Date().toISOString().slice(0, 10),
   dataFim: '', valorAcordado: '', periodicidade: 'mensal', formaPagamento: 'pix',
-  observacao: '', status: 'ativo',
+  observacao: '', status: 'ativo', supervisorId: '',
   acessoAtivo: false, acessoRole: 'ATENDIMENTO', acessoEmail: '', acessoWhatsapp: '',
 }
 const emptyPagForm = {
@@ -123,6 +124,7 @@ export default function EquipePage() {
       dataFim: c.dataFim ? new Date(c.dataFim).toISOString().slice(0, 10) : '',
       valorAcordado: String(c.valorAcordado), periodicidade: c.periodicidade,
       formaPagamento: c.formaPagamento, observacao: c.observacao ?? '', status: c.status,
+      supervisorId: c.supervisorId ?? '',
       acessoAtivo: !!c.teamMember,
       acessoRole: c.teamMember?.role ?? 'ATENDIMENTO',
       acessoEmail: c.teamMember?.email ?? c.email ?? '',
@@ -142,6 +144,7 @@ export default function EquipePage() {
         funcaoCustom: rest.funcaoCustom || undefined,
         observacao: rest.observacao || undefined,
         telefone: rest.telefone || undefined,
+        supervisorId: rest.supervisorId || undefined,
         valorAcordado: parseFloat(rest.valorAcordado),
         acesso: {
           ativo: acessoAtivo,
@@ -308,6 +311,11 @@ export default function EquipePage() {
                         <span>CPF: {c.cpf}</span>
                         {c.telefone && <span>{c.telefone}</span>}
                         <span>Desde {fmtDate(c.dataInicio)}</span>
+                        {c.supervisor && (
+                          <span className="flex items-center gap-1 text-gray-400">
+                            ↳ {FUNCOES[c.supervisor.funcao] ?? c.supervisor.funcao}: <strong className="text-gray-600">{c.supervisor.nome}</strong>
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -517,6 +525,23 @@ export default function EquipePage() {
                   </div>
                 )}
               </div>
+              {/* Hierarquia — quem é o superior direto */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Reporta para <span className="font-normal text-gray-400">(superior direto)</span></label>
+                <select value={colabForm.supervisorId}
+                  onChange={e => setColabForm(f => ({ ...f, supervisorId: e.target.value }))}
+                  className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                  <option value="">— Nenhum (topo da hierarquia) —</option>
+                  {colaboradores
+                    .filter(c => c.id !== editColab?.id && c.status === 'ativo')
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} — {FUNCOES[c.funcao] ?? c.funcao}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Valor acordado (R$) *</label>

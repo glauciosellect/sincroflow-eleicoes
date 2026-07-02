@@ -46,13 +46,42 @@ export async function equipeRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
-    const { status, funcao } = req.query as { status?: string; funcao?: string }
+    const { status, funcao, supervisorId } = req.query as { status?: string; funcao?: string; supervisorId?: string }
+
+    // Coordenador vê apenas subordinados diretos e deles em diante
+    // Admin/candidato vê todos — identificamos pelo teamMemberId vinculado ao sub
+    let coordColaboradorId: string | undefined
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { userId: sub, candidateId, status: 'ACTIVE' },
+      select: { role: true, colaboradorVinculo: { select: { id: true } } },
+    })
+    if (teamMember?.role === 'COORDENADOR' && teamMember.colaboradorVinculo?.id) {
+      coordColaboradorId = teamMember.colaboradorVinculo.id
+    }
+
+    // Coleta IDs da árvore abaixo do coordenador (até 3 níveis)
+    let allowedIds: string[] | undefined
+    if (coordColaboradorId) {
+      const nivel1 = await prisma.colaboradorCampanha.findMany({
+        where: { supervisorId: coordColaboradorId, candidateId },
+        select: { id: true },
+      })
+      const ids1 = nivel1.map(c => c.id)
+      const nivel2 = ids1.length ? await prisma.colaboradorCampanha.findMany({
+        where: { supervisorId: { in: ids1 }, candidateId },
+        select: { id: true },
+      }) : []
+      const ids2 = nivel2.map(c => c.id)
+      allowedIds = [coordColaboradorId, ...ids1, ...ids2]
+    }
 
     const colaboradores = await prisma.colaboradorCampanha.findMany({
       where: {
         candidateId,
+        ...(allowedIds ? { id: { in: allowedIds } } : {}),
         ...(status ? { status } : {}),
         ...(funcao ? { funcao } : {}),
+        ...(supervisorId ? { supervisorId } : {}),
       },
       include: {
         _count: { select: { pagamentos: true } },
@@ -62,6 +91,7 @@ export async function equipeRoutes(app: FastifyInstance) {
           select: { valor: true, dataPagamento: true, competencia: true },
         },
         teamMember: { select: { id: true, email: true, role: true, status: true } },
+        supervisor: { select: { id: true, nome: true, funcao: true } },
       },
       orderBy: { nome: 'asc' },
     })
@@ -106,6 +136,7 @@ export async function equipeRoutes(app: FastifyInstance) {
       periodicidade: z.enum(['diario','semanal','quinzenal','mensal','fixo']).default('mensal'),
       formaPagamento: z.enum(['pix','transferencia','cheque','dinheiro']).default('pix'),
       observacao: z.string().max(1000).optional(),
+      supervisorId: z.string().optional(),
       acesso: z.object({
         ativo: z.boolean(),
         role: z.enum(['ADMINISTRADOR','ATENDIMENTO','CONTEUDO','RELATORIOS','AGENTE_CAMPO','COORDENADOR']).optional(),
@@ -178,6 +209,7 @@ export async function equipeRoutes(app: FastifyInstance) {
       formaPagamento: z.string().optional(),
       observacao: z.string().optional().nullable(),
       status: z.enum(['ativo','inativo','encerrado']).optional(),
+      supervisorId: z.string().optional().nullable(),
       acesso: z.object({
         ativo: z.boolean(),
         role: z.enum(['ADMINISTRADOR','ATENDIMENTO','CONTEUDO','RELATORIOS','AGENTE_CAMPO','COORDENADOR']).optional(),

@@ -167,9 +167,10 @@ model TeamMember {
   inviteToken String?          @unique
   candidate   Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  referredContacts Contact[]
-  voteSurveys  VoteSurveyResponse[]
-  factChecks   FactCheck[]
+  referredContacts   Contact[]
+  voteSurveys        VoteSurveyResponse[]
+  factChecks         FactCheck[]
+  colaboradorVinculo ColaboradorCampanha?
 
   @@unique([candidateId, email])
 }
@@ -498,6 +499,7 @@ enum TeamRole {
   CONTEUDO
   RELATORIOS
   AGENTE_CAMPO
+  COORDENADOR
 }
 
 enum TeamMemberStatus {
@@ -834,29 +836,37 @@ model MetaOrcamento {
 // ─── Equipe de Campanha — M8 ─────────────────────────────────────────────────
 
 model ColaboradorCampanha {
-  id           String   @id @default(cuid())
-  candidateId  String
-  nome         String
-  cpf          String
-  funcao       String   // cabo_eleitoral | coordenador | motorista | assessor | mesario | outro
-  funcaoCustom String?  // descrição quando funcao = 'outro'
-  telefone     String?
-  email        String?
-  dataInicio   DateTime
-  dataFim      DateTime?
-  valorAcordado Decimal  @db.Decimal(12, 2)
-  periodicidade String   @default("mensal") // diario | semanal | quinzenal | mensal | fixo
-  formaPagamento String  @default("pix")    // pix | transferencia | cheque | dinheiro
-  observacao   String?  @db.Text
-  status       String   @default("ativo")  // ativo | inativo | encerrado
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  candidateId    String
+  nome           String
+  cpf            String
+  funcao         String   // cabo_eleitoral | coordenador | motorista | assessor | mesario | outro
+  funcaoCustom   String?
+  telefone       String?
+  email          String?
+  dataInicio     DateTime
+  dataFim        DateTime?
+  valorAcordado  Decimal  @db.Decimal(12, 2)
+  periodicidade  String   @default("mensal")
+  formaPagamento String   @default("pix")
+  observacao     String?  @db.Text
+  status         String   @default("ativo")
+  // Hierarquia: aponta para o superior direto (Coordenador → Supervisor → Agente)
+  supervisorId   String?
+  // Vínculo com TeamMember quando o colaborador tem acesso ao SyncroFlow
+  teamMemberId   String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  candidate  Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  pagamentos PagamentoColaborador[]
+  candidate    Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  teamMember   TeamMember?             @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
+  supervisor   ColaboradorCampanha?    @relation("Hierarquia", fields: [supervisorId], references: [id], onDelete: SetNull)
+  subordinados ColaboradorCampanha[]   @relation("Hierarquia")
+  pagamentos   PagamentoColaborador[]
 
   @@index([candidateId, status])
   @@index([candidateId, funcao])
+  @@index([supervisorId])
 }
 
 model PagamentoColaborador {
