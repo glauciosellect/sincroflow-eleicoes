@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,7 +25,7 @@ type Form = z.infer<typeof schema>
 
 const ASSUNTOS = ['Saúde', 'Educação', 'Segurança', 'Infraestrutura', 'Emprego', 'Outro']
 
-export default function CoordenadorEleitoresPage() {
+function EleitoresContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [eleitores, setEleitores] = useState<any[]>([])
@@ -207,5 +207,13 @@ export default function CoordenadorEleitoresPage() {
         </button>
       )}
     </div>
+  )
+}
+
+export default function CoordenadorEleitoresPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}>
+      <EleitoresContent />
+    </Suspense>
   )
 }
