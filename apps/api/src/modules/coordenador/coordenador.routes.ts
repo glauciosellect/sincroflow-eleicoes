@@ -4,6 +4,55 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
+import { sendEmail } from '../../lib/mailer'
+
+const APP_URL = process.env.FRONTEND_URL || 'https://app.syncrofloweleicoes.com.br'
+
+function boasVindasCoordenadorEmail(nome: string, email: string, senha: string, candidateName: string): string {
+  const loginUrl = `${APP_URL}/coordenador/login`
+  return `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0">
+      <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+        <div style="background:linear-gradient(135deg,#002776 0%,#009C3B 100%);padding:32px 24px;text-align:center">
+          <h1 style="color:#fff;margin:0;font-size:22px">SyncroFlow<span style="color:#FFDF00">Eleições</span></h1>
+          <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px">Plataforma de Gestão de Campanha</p>
+        </div>
+        <div style="padding:32px 24px">
+          <h2 style="color:#002776;margin:0 0 16px">Olá, ${nome}! 👋</h2>
+          <p style="color:#444;line-height:1.6">Você foi cadastrado como <strong>Coordenador de Campo</strong> na campanha de <strong>${candidateName}</strong>.</p>
+          <p style="color:#444;line-height:1.6">Use as credenciais abaixo para acessar seu painel:</p>
+
+          <div style="background:#f8f9fa;border-radius:8px;padding:20px;margin:20px 0;border-left:4px solid #009C3B">
+            <p style="margin:0 0 8px;color:#666;font-size:13px">E-mail de acesso:</p>
+            <p style="margin:0 0 16px;font-weight:bold;color:#002776;font-size:16px">${email}</p>
+            <p style="margin:0 0 8px;color:#666;font-size:13px">Senha:</p>
+            <p style="margin:0;font-weight:bold;color:#002776;font-size:16px;letter-spacing:2px">${senha}</p>
+          </div>
+
+          <div style="text-align:center;margin:28px 0">
+            <a href="${loginUrl}" style="background:#009C3B;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;display:inline-block">
+              Acessar Meu Painel
+            </a>
+          </div>
+
+          <p style="color:#666;font-size:13px;text-align:center">
+            Ou acesse diretamente:<br>
+            <a href="${loginUrl}" style="color:#009C3B">${loginUrl}</a>
+          </p>
+
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+          <p style="color:#999;font-size:12px;text-align:center">
+            Por segurança, recomendamos alterar sua senha no primeiro acesso.<br>
+            Se tiver dúvidas, entre em contato com o responsável da campanha.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -251,6 +300,14 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
     })
 
     await auditLog({ candidateId, eventType: 'coordenador_created', metadata: { coordenadorId: coord.id, email: data.email } })
+
+    // Envia email de boas-vindas com credenciais de acesso
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { name: true } })
+    sendEmail(
+      data.email,
+      `Bem-vindo à campanha de ${candidate?.name ?? 'seu candidato'} — SyncroFlow Eleições`,
+      boasVindasCoordenadorEmail(data.nome, data.email, data.senha, candidate?.name ?? '')
+    ).catch(() => {}) // não bloqueia a resposta se o email falhar
 
     return reply.status(201).send(coord)
   })
