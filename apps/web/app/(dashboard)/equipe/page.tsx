@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import {
   Plus, Users, Wallet, TrendingDown, X, Loader2, Pencil, Trash2,
   AlertCircle, ChevronDown, ChevronUp, Download, CreditCard, Calendar,
+  ShieldCheck,
 } from 'lucide-react'
 import api from '@/lib/api'
 import { validarCPF, formatarCPF } from '@/lib/cpf'
@@ -24,11 +25,17 @@ const FORMAS_PAG: Record<string, string> = {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR')
 
+const ROLES_FLOW: Record<string, string> = {
+  ADMINISTRADOR: 'Administrador', ATENDIMENTO: 'Atendimento', CONTEUDO: 'Conteúdo',
+  RELATORIOS: 'Relatórios', AGENTE_CAMPO: 'Agente de Campo', COORDENADOR: 'Coordenador',
+}
+
 interface Colaborador {
   id: string; nome: string; cpf: string; funcao: string; funcaoCustom?: string
   telefone?: string; email?: string; dataInicio: string; dataFim?: string
   valorAcordado: number; periodicidade: string; formaPagamento: string
-  observacao?: string; status: string
+  observacao?: string; status: string; teamMemberId?: string
+  teamMember?: { id: string; email: string; role: string; status: string } | null
   _count: { pagamentos: number }
   pagamentos: { valor: number; dataPagamento: string; competencia?: string }[]
 }
@@ -45,6 +52,7 @@ const emptyColabForm = {
   telefone: '', email: '', dataInicio: new Date().toISOString().slice(0, 10),
   dataFim: '', valorAcordado: '', periodicidade: 'mensal', formaPagamento: 'pix',
   observacao: '', status: 'ativo',
+  acessoAtivo: false, acessoRole: 'ATENDIMENTO', acessoEmail: '', acessoWhatsapp: '',
 }
 const emptyPagForm = {
   valor: '', dataPagamento: new Date().toISOString().slice(0, 10),
@@ -115,6 +123,10 @@ export default function EquipePage() {
       dataFim: c.dataFim ? new Date(c.dataFim).toISOString().slice(0, 10) : '',
       valorAcordado: String(c.valorAcordado), periodicidade: c.periodicidade,
       formaPagamento: c.formaPagamento, observacao: c.observacao ?? '', status: c.status,
+      acessoAtivo: !!c.teamMember,
+      acessoRole: c.teamMember?.role ?? 'ATENDIMENTO',
+      acessoEmail: c.teamMember?.email ?? c.email ?? '',
+      acessoWhatsapp: '',
     })
     setErroColab(''); setShowColab(true)
   }
@@ -122,14 +134,19 @@ export default function EquipePage() {
   const salvarColab = async () => {
     setErroColab(''); setSavingColab(true)
     try {
-      const payload = {
-        ...colabForm,
-        email: colabForm.email || undefined,
-        dataFim: colabForm.dataFim || undefined,
-        funcaoCustom: colabForm.funcaoCustom || undefined,
-        observacao: colabForm.observacao || undefined,
-        telefone: colabForm.telefone || undefined,
-        valorAcordado: parseFloat(colabForm.valorAcordado),
+      const { acessoAtivo, acessoRole, acessoEmail, acessoWhatsapp, ...rest } = colabForm
+      const payload: any = {
+        ...rest,
+        email: rest.email || undefined,
+        dataFim: rest.dataFim || undefined,
+        funcaoCustom: rest.funcaoCustom || undefined,
+        observacao: rest.observacao || undefined,
+        telefone: rest.telefone || undefined,
+        valorAcordado: parseFloat(rest.valorAcordado),
+        acesso: {
+          ativo: acessoAtivo,
+          ...(acessoAtivo ? { role: acessoRole, email: acessoEmail || rest.email || undefined, whatsapp: acessoWhatsapp || undefined } : {}),
+        },
       }
       if (editColab) await api.patch(`/equipe/${editColab.id}`, payload)
       else await api.post('/equipe', payload)
@@ -279,6 +296,13 @@ export default function EquipePage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.status === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                           {c.status}
                         </span>
+                        {c.teamMember && (
+                          <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            <ShieldCheck className="w-3 h-3" />
+                            {ROLES_FLOW[c.teamMember.role] ?? c.teamMember.role}
+                            {c.teamMember.status === 'PENDING' && <span className="text-blue-400"> · aguardando</span>}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mt-0.5 text-xs text-gray-400 flex-wrap">
                         <span>CPF: {c.cpf}</span>
@@ -544,12 +568,61 @@ export default function EquipePage() {
                   </select>
                 </div>
               )}
+
+              {/* Acesso ao SyncroFlow */}
+              <div className="border rounded-xl p-4 space-y-3 bg-gray-50">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={colabForm.acessoAtivo}
+                    onChange={e => setColabForm(f => ({ ...f, acessoAtivo: e.target.checked }))}
+                    className="w-4 h-4 rounded accent-[#002776]" />
+                  <div>
+                    <span className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" /> Dar acesso ao SyncroFlow
+                    </span>
+                    <p className="text-xs text-gray-400 mt-0.5">Envia convite por e-mail para este colaborador acessar a plataforma</p>
+                  </div>
+                </label>
+
+                {colabForm.acessoAtivo && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Perfil de acesso *</label>
+                      <select value={colabForm.acessoRole}
+                        onChange={e => setColabForm(f => ({ ...f, acessoRole: e.target.value }))}
+                        className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                        {Object.entries(ROLES_FLOW).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">E-mail para convite *</label>
+                      <input type="email" value={colabForm.acessoEmail}
+                        onChange={e => setColabForm(f => ({ ...f, acessoEmail: e.target.value }))}
+                        placeholder="email@exemplo.com"
+                        className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                      {editColab?.teamMember && colabForm.acessoAtivo && (
+                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          {editColab.teamMember.status === 'PENDING' ? 'Convite pendente — reenviar vai gerar novo link' : `Acesso ativo (${editColab.teamMember.status})`}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp (opcional)</label>
+                      <input value={colabForm.acessoWhatsapp}
+                        onChange={e => setColabForm(f => ({ ...f, acessoWhatsapp: e.target.value }))}
+                        placeholder="(32) 99999-9999"
+                        className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {erroColab && (
                 <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl p-3">
                   <AlertCircle className="w-4 h-4 shrink-0" />{erroColab}
                 </div>
               )}
-              <button onClick={salvarColab} disabled={savingColab || !colabForm.nome || !validarCPF(colabForm.cpf) || !colabForm.valorAcordado}
+              <button onClick={salvarColab} disabled={savingColab || !colabForm.nome || !validarCPF(colabForm.cpf) || !colabForm.valorAcordado || (colabForm.acessoAtivo && !colabForm.acessoEmail)}
                 className="w-full py-3 rounded-xl bg-[#002776] text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
                 {savingColab && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editColab ? 'Salvar alterações' : 'Cadastrar colaborador'}

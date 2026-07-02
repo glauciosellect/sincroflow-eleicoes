@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
+import crypto from 'crypto'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
+import { sendEmail, teamInviteEmail } from '../../lib/mailer'
 
 function validarCPF(cpf: string): boolean {
   const nums = cpf.replace(/\D/g, '')
@@ -59,6 +61,7 @@ export async function equipeRoutes(app: FastifyInstance) {
           take: 1,
           select: { valor: true, dataPagamento: true, competencia: true },
         },
+        teamMember: { select: { id: true, email: true, role: true, status: true } },
       },
       orderBy: { nome: 'asc' },
     })
@@ -103,17 +106,50 @@ export async function equipeRoutes(app: FastifyInstance) {
       periodicidade: z.enum(['diario','semanal','quinzenal','mensal','fixo']).default('mensal'),
       formaPagamento: z.enum(['pix','transferencia','cheque','dinheiro']).default('pix'),
       observacao: z.string().max(1000).optional(),
+      acesso: z.object({
+        ativo: z.boolean(),
+        role: z.enum(['ADMINISTRADOR','ATENDIMENTO','CONTEUDO','RELATORIOS','AGENTE_CAMPO','COORDENADOR']).optional(),
+        email: z.string().email().optional(),
+        whatsapp: z.string().max(20).optional(),
+      }).optional(),
     }).parse(req.body)
+
+    const { acesso, ...colabData } = data
 
     const colaborador = await prisma.colaboradorCampanha.create({
       data: {
         candidateId,
-        ...data,
-        email: data.email || undefined,
-        dataInicio: new Date(data.dataInicio),
-        dataFim: data.dataFim ? new Date(data.dataFim) : undefined,
+        ...colabData,
+        email: colabData.email || undefined,
+        dataInicio: new Date(colabData.dataInicio),
+        dataFim: colabData.dataFim ? new Date(colabData.dataFim) : undefined,
       },
     })
+
+    // Se acesso ao Flow solicitado, criar TeamMember e enviar convite
+    if (acesso?.ativo && acesso.email && acesso.role) {
+      const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { name: true } })
+      const inviter = await prisma.user.findUnique({ where: { id: sub }, select: { name: true } })
+      const token = crypto.randomBytes(32).toString('hex')
+
+      const teamMember = await prisma.teamMember.upsert({
+        where: { candidateId_email: { candidateId, email: acesso.email } },
+        update: { name: data.nome, whatsapp: acesso.whatsapp ?? '', role: acesso.role, inviteToken: token, status: 'PENDING', acceptedAt: null, invitedAt: new Date() },
+        create: { candidateId, name: data.nome, email: acesso.email, whatsapp: acesso.whatsapp ?? '', role: acesso.role, inviteToken: token },
+      })
+
+      await prisma.colaboradorCampanha.update({
+        where: { id: colaborador.id },
+        data: { teamMemberId: teamMember.id },
+      })
+
+      const acceptUrl = `${process.env.FRONTEND_URL}/accept-invite?token=${token}`
+      await sendEmail(
+        acesso.email,
+        `Convite para a campanha de ${candidate?.name} — SyncroFlowEleições`,
+        teamInviteEmail(inviter?.name ?? 'Alguém', candidate?.name ?? '', acesso.role, acceptUrl),
+      ).catch(() => {})
+    }
 
     await auditLog({ candidateId, eventType: 'colaborador_criado', metadata: { id: colaborador.id, nome: data.nome } })
     return reply.status(201).send(colaborador)
@@ -142,16 +178,54 @@ export async function equipeRoutes(app: FastifyInstance) {
       formaPagamento: z.string().optional(),
       observacao: z.string().optional().nullable(),
       status: z.enum(['ativo','inativo','encerrado']).optional(),
+      acesso: z.object({
+        ativo: z.boolean(),
+        role: z.enum(['ADMINISTRADOR','ATENDIMENTO','CONTEUDO','RELATORIOS','AGENTE_CAMPO','COORDENADOR']).optional(),
+        email: z.string().email().optional(),
+        whatsapp: z.string().max(20).optional(),
+      }).optional(),
     }).parse(req.body)
+
+    const { acesso, ...colabData } = data
 
     const updated = await prisma.colaboradorCampanha.update({
       where: { id },
       data: {
-        ...data,
-        ...(data.dataInicio ? { dataInicio: new Date(data.dataInicio) } : {}),
-        ...(data.dataFim !== undefined ? { dataFim: data.dataFim ? new Date(data.dataFim) : null } : {}),
+        ...colabData,
+        ...(colabData.dataInicio ? { dataInicio: new Date(colabData.dataInicio) } : {}),
+        ...(colabData.dataFim !== undefined ? { dataFim: colabData.dataFim ? new Date(colabData.dataFim) : null } : {}),
       },
     })
+
+    // Se acesso alterado para ativo e email fornecido, criar/reenviar convite
+    if (acesso?.ativo && acesso.email && acesso.role) {
+      const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { name: true } })
+      const inviter = await prisma.user.findUnique({ where: { id: sub }, select: { name: true } })
+      const token = crypto.randomBytes(32).toString('hex')
+      const nome = data.nome ?? existing.nome
+
+      const teamMember = await prisma.teamMember.upsert({
+        where: { candidateId_email: { candidateId, email: acesso.email } },
+        update: { name: nome, whatsapp: acesso.whatsapp ?? '', role: acesso.role, inviteToken: token, status: 'PENDING', acceptedAt: null, invitedAt: new Date() },
+        create: { candidateId, name: nome, email: acesso.email, whatsapp: acesso.whatsapp ?? '', role: acesso.role, inviteToken: token },
+      })
+
+      await prisma.colaboradorCampanha.update({
+        where: { id },
+        data: { teamMemberId: teamMember.id },
+      })
+
+      const acceptUrl = `${process.env.FRONTEND_URL}/accept-invite?token=${token}`
+      await sendEmail(
+        acesso.email,
+        `Convite para a campanha de ${candidate?.name} — SyncroFlowEleições`,
+        teamInviteEmail(inviter?.name ?? 'Alguém', candidate?.name ?? '', acesso.role, acceptUrl),
+      ).catch(() => {})
+    } else if (acesso && !acesso.ativo && existing.teamMemberId) {
+      // Remover acesso ao Flow (não deleta TeamMember, apenas desvincula)
+      await prisma.colaboradorCampanha.update({ where: { id }, data: { teamMemberId: null } })
+    }
+
     return reply.send(updated)
   })
 

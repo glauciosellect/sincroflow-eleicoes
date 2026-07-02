@@ -6,11 +6,12 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
 
-type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO'
+type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO' | 'COORDENADOR'
 
 // Módulos liberados por role (espelha lib/rbac.ts do backend — seção 4.10 da spec)
 const ROLE_MODULES: Record<TeamRole, string[]> = {
-  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent', 'portal', 'financeiro', 'gabinete', 'equipe', 'prestacao'],
+  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'field_agent', 'portal', 'financeiro', 'gabinete', 'equipe', 'prestacao'],
+  COORDENADOR: ['chat', 'contacts', 'agenda', 'reports', 'equipe', 'field_agent'],
   ATENDIMENTO: ['chat', 'contacts', 'agenda'],
   CONTEUDO: ['story', 'platform', 'agenda'],
   RELATORIOS: ['contacts', 'reports'],
@@ -31,8 +32,6 @@ const navItems = [
   ] },
   { section: 'GESTÃO', items: [
     { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
-    { href: '/team', label: 'Equipe', icon: Users, module: 'team' },
-    { href: '/equipe/coordenadores', label: 'Coordenadores', icon: Users, module: 'team' },
     { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },

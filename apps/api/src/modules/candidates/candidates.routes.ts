@@ -111,7 +111,7 @@ export async function candidateRoutes(app: FastifyInstance) {
       name: z.string().min(2).max(120),
       email: z.string().email(),
       whatsapp: z.string().min(10).max(20),
-      role: z.enum(['ADMINISTRADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS', 'AGENTE_CAMPO']).default('ATENDIMENTO'),
+      role: z.enum(['ADMINISTRADOR', 'COORDENADOR', 'ATENDIMENTO', 'CONTEUDO', 'RELATORIOS', 'AGENTE_CAMPO']).default('ATENDIMENTO'),
     }).parse(req.body)
 
     const inviter = await prisma.user.findUnique({ where: { id: sub }, select: { name: true } })

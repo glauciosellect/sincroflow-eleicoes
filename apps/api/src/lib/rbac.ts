@@ -23,6 +23,7 @@ export type Module =
 // contatos completos, não configura nada.
 const ROLE_MODULES: Record<string, Module[]> = {
   ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent', 'portal', 'financeiro', 'gabinete'],
+  COORDENADOR: ['chat', 'contacts', 'agenda', 'reports', 'field_agent'],
   ATENDIMENTO: ['chat', 'contacts', 'agenda'],
   CONTEUDO: ['story', 'platform', 'agenda'],
   RELATORIOS: ['contacts', 'reports'],
