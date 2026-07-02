@@ -135,8 +135,9 @@ export async function financeiroRoutes(app: FastifyInstance) {
       valor: z.number().positive(),
       data: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
       fornecedor: z.string().max(200).optional(),
+      doadorCpf: z.string().max(14).optional(),
       notaFiscal: z.string().max(100).optional(),
-      comprovante: z.string().url().optional(),
+      comprovante: z.string().url().optional().or(z.literal('')).nullable(),
       observacao: z.string().max(1000).optional(),
       status: z.enum(['confirmado', 'pendente', 'cancelado']).default('confirmado'),
     }).parse(req.body)
@@ -170,8 +171,9 @@ export async function financeiroRoutes(app: FastifyInstance) {
       valor: z.number().positive().optional(),
       data: z.string().optional(),
       fornecedor: z.string().optional().nullable(),
+      doadorCpf: z.string().max(14).optional().nullable(),
       notaFiscal: z.string().optional().nullable(),
-      comprovante: z.string().url().optional().nullable(),
+      comprovante: z.string().url().optional().or(z.literal('')).nullable(),
       observacao: z.string().optional().nullable(),
       status: z.enum(['confirmado', 'pendente', 'cancelado']).optional(),
       categoria: z.string().optional(),
@@ -222,18 +224,24 @@ export async function financeiroRoutes(app: FastifyInstance) {
       orderBy: { data: 'asc' },
     })
 
-    const header = 'Tipo,Categoria,Codigo TSE,Descricao,Valor,Data,Fornecedor,Nota Fiscal,Status\n'
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { name: true } })
+    const header = 'Tipo,Codigo TSE,Categoria,Descricao,Valor (R$),Data,Fornecedor/Doador,CPF Doador,Nota Fiscal,Status\n'
     const rows = lancamentos.map(l => [
-      l.tipo, l.categoria, l.tseCategoria ?? '',
+      l.tipo === 'receita' ? 'RECEITA' : 'DESPESA',
+      l.tseCategoria ?? '',
+      l.categoria,
       `"${l.descricao.replace(/"/g, '""')}"`,
       Number(l.valor).toFixed(2).replace('.', ','),
       new Date(l.data).toLocaleDateString('pt-BR'),
-      l.fornecedor ?? '', l.notaFiscal ?? '', l.status,
+      `"${(l.fornecedor ?? '').replace(/"/g, '""')}"`,
+      (l as any).doadorCpf ?? '',
+      l.notaFiscal ?? '',
+      l.status,
     ].join(','))
 
-    const csv = '﻿' + header + rows.join('\n')
+    const csv = '﻿' + `Prestação de Contas - ${candidate?.name ?? ''}\n` + header + rows.join('\n')
     reply.header('Content-Type', 'text/csv; charset=utf-8')
-    reply.header('Content-Disposition', 'attachment; filename="prestacao-contas.csv"')
+    reply.header('Content-Disposition', `attachment; filename="prestacao-contas-${new Date().toISOString().slice(0,10)}.csv"`)
     return reply.send(csv)
   })
 
@@ -261,5 +269,68 @@ export async function financeiroRoutes(app: FastifyInstance) {
       update: { totalPrevisto, alertaPercentual },
     })
     return reply.send(meta)
+  })
+
+  // GET /financeiro/relatorio — relatório consolidado para contador
+  app.get('/financeiro/relatorio', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { dataInicio, dataFim } = req.query as { dataInicio?: string; dataFim?: string }
+
+    const where: Record<string, unknown> = { candidateId, status: { not: 'cancelado' } }
+    if (dataInicio || dataFim) {
+      where.data = {
+        ...(dataInicio ? { gte: new Date(dataInicio) } : {}),
+        ...(dataFim ? { lte: new Date(dataFim + 'T23:59:59') } : {}),
+      }
+    }
+
+    const lancamentos = await prisma.lancamentoFinanceiro.findMany({
+      where,
+      orderBy: { data: 'asc' },
+    })
+
+    const receitas = lancamentos.filter(l => l.tipo === 'receita')
+    const despesas = lancamentos.filter(l => l.tipo === 'despesa')
+
+    const totalReceita = receitas.reduce((s, l) => s + Number(l.valor), 0)
+    const totalDespesa = despesas.reduce((s, l) => s + Number(l.valor), 0)
+
+    // Receitas agrupadas por categoria
+    const receitasPorCategoria: Record<string, number> = {}
+    for (const l of receitas) {
+      receitasPorCategoria[l.categoria] = (receitasPorCategoria[l.categoria] ?? 0) + Number(l.valor)
+    }
+
+    // Despesas agrupadas por categoria
+    const despesasPorCategoria: Record<string, number> = {}
+    for (const l of despesas) {
+      despesasPorCategoria[l.categoria] = (despesasPorCategoria[l.categoria] ?? 0) + Number(l.valor)
+    }
+
+    // Lista de doadores (pessoa física — tem CPF)
+    const doadores = receitas
+      .filter(l => l.categoria === 'doacao_pessoa_fisica' && (l as any).doadorCpf)
+      .map(l => ({
+        nome: l.fornecedor ?? 'Não informado',
+        cpf: (l as any).doadorCpf,
+        valor: Number(l.valor),
+        data: l.data,
+      }))
+      .sort((a, b) => b.valor - a.valor)
+
+    // Top 5 despesas
+    const maioresDespesas = [...despesas]
+      .sort((a, b) => Number(b.valor) - Number(a.valor))
+      .slice(0, 5)
+      .map(l => ({ descricao: l.descricao, categoria: l.categoria, valor: Number(l.valor), data: l.data, fornecedor: l.fornecedor }))
+
+    return reply.send({
+      periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
+      totalReceita, totalDespesa, saldo: totalReceita - totalDespesa,
+      receitasPorCategoria, despesasPorCategoria,
+      doadores, maioresDespesas,
+      totalLancamentos: lancamentos.length,
+    })
   })
 }

@@ -801,6 +801,7 @@ model LancamentoFinanceiro {
   valor        Decimal  @db.Decimal(12, 2)
   data         DateTime
   fornecedor   String?
+  doadorCpf    String?  // CPF obrigatório para doação de pessoa física (TSE)
   notaFiscal   String?
   comprovante  String?
   observacao   String?  @db.Text
