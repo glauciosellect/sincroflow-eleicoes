@@ -119,6 +119,7 @@ model Candidate {
   voteSurveys      VoteSurveyResponse[]
   factChecks       FactCheck[]
   portalEleitor    PortalEleitor?
+  coordenadores    Coordenador[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -651,4 +652,43 @@ model CadastroPortal {
 
   @@index([portalId, status])
   @@index([portalId, createdAt])
+}
+
+// ─── Área do Coordenador — M2 ─────────────────────────────────────────────────
+
+model Coordenador {
+  id           String    @id @default(cuid())
+  candidateId  String
+  nome         String
+  telefone     String?
+  email        String    @unique
+  senhaHash    String
+  cidade       String?
+  bairros      String[]
+  metaVotos    Int?
+  ativo        Boolean   @default(true)
+  ultimoAcesso DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  candidate  Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  checkIns   CheckInLider[]
+
+  @@index([candidateId, ativo])
+}
+
+model CheckInLider {
+  id             String      @id @default(cuid())
+  liderId        String
+  coordenadorId  String
+  candidateId    String
+  tipo           String
+  observacao     String?
+  dataCheckin    DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+
+  coordenador Coordenador @relation(fields: [coordenadorId], references: [id], onDelete: Cascade)
+
+  @@index([coordenadorId])
+  @@index([candidateId, dataCheckin])
 }

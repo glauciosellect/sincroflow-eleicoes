@@ -32,6 +32,7 @@ const navItems = [
   { section: 'GESTÃO', items: [
     { href: '/relatorios', label: 'Relatórios', icon: BarChart3, module: 'reports' },
     { href: '/team', label: 'Equipe', icon: Users, module: 'team' },
+    { href: '/equipe/coordenadores', label: 'Coordenadores', icon: Users, module: 'team' },
     { href: '/agents?tab=Criativos', label: 'Criativos', icon: ImageIcon, module: 'story' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
