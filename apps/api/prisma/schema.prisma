@@ -762,6 +762,7 @@ model RadarResultado {
   relevancia    Int             @default(0)
   lido          Boolean         @default(false)
   alertaGerado  Boolean         @default(false)
+  sugestaoIA    String?         @db.Text
   coletadoEm   DateTime        @default(now())
 
   radar     RadarMonitorado @relation(fields: [radarId], references: [id], onDelete: Cascade)

@@ -82,6 +82,23 @@ export async function portalPublicRoutes(app: FastifyInstance) {
       data: { totalCadastros: { increment: 1 } },
     })
 
+    // Gera protocolo automaticamente se o eleitor informou assunto ou mensagem
+    if (data.assunto || data.mensagem) {
+      const ano = new Date().getFullYear()
+      const numero = `GAB-${ano}-${String(Date.now()).slice(-6)}`
+      await prisma.protocoloAtendimento.create({
+        data: {
+          candidateId: portal.candidateId,
+          numero,
+          solicitante: data.nome,
+          assunto: data.assunto ?? 'Solicitação via Portal',
+          descricao: data.mensagem ?? undefined,
+          prioridade: 'normal',
+          status: 'aberto',
+        },
+      }).catch(() => {}) // não bloqueia o cadastro se o gabinete não estiver ativo
+    }
+
     return reply.status(201).send({ id: cadastro.id, nome: cadastro.nome })
   })
 }

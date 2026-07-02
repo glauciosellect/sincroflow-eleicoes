@@ -33,7 +33,7 @@ const SENTIMENTO_CONFIG = {
 }
 
 const TIPO_LABEL = { adversario: 'Adversário', proprio: 'Próprio nome', tema: 'Tema', palavra_chave: 'Palavra-chave' }
-const PLATAFORMAS_OPT = ['google_alerts', 'twitter', 'instagram']
+const PLATAFORMAS_OPT = ['google_alerts', 'twitter']
 
 export default function RadarPage() {
   const [tab, setTab] = useState<'alertas' | 'monitorar' | 'resumos'>('alertas')
@@ -199,9 +199,9 @@ export default function RadarPage() {
                               ) : contraNarr ? (
                                 <div className="space-y-2">
                                   <p className="text-xs font-semibold text-purple-700">Sugestão de resposta ({contraNarr.tom})</p>
-                                  <p className="text-sm text-gray-800">{contraNarr.contranarativa}</p>
+                                  <p className="text-sm text-gray-800">{contraNarr.contranarrativa}</p>
                                   {contraNarr.racional && <p className="text-xs text-gray-500 italic">{contraNarr.racional}</p>}
-                                  <button onClick={() => { navigator.clipboard.writeText(contraNarr.contranarativa); toast({ title: 'Copiado!' }) }}
+                                  <button onClick={() => { navigator.clipboard.writeText(contraNarr.contranarrativa); toast({ title: 'Copiado!' }) }}
                                     className="text-xs text-purple-600 hover:underline">Copiar sugestão</button>
                                 </div>
                               ) : null}

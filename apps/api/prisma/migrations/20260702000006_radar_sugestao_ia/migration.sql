@@ -1,0 +1,1 @@
+ALTER TABLE "RadarResultado" ADD COLUMN IF NOT EXISTS "sugestaoIA" TEXT;

@@ -219,6 +219,23 @@ export async function coordenadorRoutes(app: FastifyInstance) {
 
     await prisma.portalEleitor.update({ where: { id: portal.id }, data: { totalCadastros: { increment: 1 } } })
 
+    // Gera protocolo automaticamente se o coordenador informou assunto ou mensagem
+    if (data.assunto || data.mensagem) {
+      const ano = new Date().getFullYear()
+      const numero = `GAB-${ano}-${String(Date.now()).slice(-6)}`
+      await prisma.protocoloAtendimento.create({
+        data: {
+          candidateId: payload.candidateId,
+          numero,
+          solicitante: data.nome,
+          assunto: data.assunto ?? 'Solicitação via App do Coordenador',
+          descricao: data.mensagem ?? undefined,
+          prioridade: 'normal',
+          status: 'aberto',
+        },
+      }).catch(() => {})
+    }
+
     return reply.status(201).send(cadastro)
   })
 

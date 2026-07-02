@@ -211,6 +211,11 @@ export async function radarRoutes(app: FastifyInstance) {
       select: { name: true, position: true, party: true },
     })
 
+    // Retorna sugestão já salva se existir
+    if (resultado.sugestaoIA) {
+      try { return reply.send(JSON.parse(resultado.sugestaoIA)) } catch { return reply.send({ contranarrativa: resultado.sugestaoIA, tom: 'propositivo', racional: '' }) }
+    }
+
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 800,
@@ -221,8 +226,11 @@ Retorne JSON: {"contranarrativa":"sugestão de post/resposta (máx 500 chars)","
     })
 
     const raw = (message.content[0] as { type: string; text: string }).text
-    let parsed: { contranarativa: string; tom: string; racional: string }
-    try { parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}') } catch { parsed = { contranarativa: raw, tom: 'propositivo', racional: '' } }
+    let parsed: { contranarrativa: string; tom: string; racional: string }
+    try { parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}') } catch { parsed = { contranarrativa: raw, tom: 'propositivo', racional: '' } }
+
+    // Persiste para não chamar IA novamente
+    await prisma.radarResultado.update({ where: { id: resultadoId }, data: { sugestaoIA: JSON.stringify(parsed) } }).catch(() => {})
 
     return reply.send(parsed)
   })
