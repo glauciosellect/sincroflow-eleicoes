@@ -55,7 +55,8 @@ export function Sidebar() {
   const { candidate, role } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const allowedModules = role ? ROLE_MODULES[role as TeamRole] ?? [] : []
+  // null = candidato-dono (sem role de TeamMember) → acesso total como ADMINISTRADOR
+  const allowedModules = role ? ROLE_MODULES[role as TeamRole] ?? [] : ROLE_MODULES['ADMINISTRADOR']
   const activeMsgsRemaining = candidate
     ? Math.max(0, candidate.activeMsgsIncluded + candidate.activeMsgsExtra - candidate.activeMsgsUsed)
     : 0
