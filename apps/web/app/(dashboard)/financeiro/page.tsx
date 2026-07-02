@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, TrendingUp, TrendingDown, Wallet, AlertCircle, X, Loader2, Filter, Download, Pencil, Trash2, FileBarChart2, Users } from 'lucide-react'
 import api from '@/lib/api'
+import { validarCPF, formatarCPF } from '@/lib/cpf'
 
 const LABEL_CATEGORIA: Record<string, string> = {
   recursos_proprios: 'Recursos Próprios', doacao_pessoa_fisica: 'Doação Pessoa Física',
@@ -598,9 +599,19 @@ export default function FinanceiroPage() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     CPF do doador <span className="text-red-500 font-semibold">(obrigatório TSE)</span>
                   </label>
-                  <input value={form.doadorCpf} onChange={e => setForm(f => ({ ...f, doadorCpf: e.target.value }))}
+                  <input value={form.doadorCpf}
+                    onChange={e => setForm(f => ({ ...f, doadorCpf: formatarCPF(e.target.value) }))}
                     placeholder="000.000.000-00" maxLength={14}
-                    className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                    className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776] ${form.doadorCpf.replace(/\D/g,'').length === 11 && !validarCPF(form.doadorCpf) ? 'border-red-400 bg-red-50' : ''}`}
+                  />
+                  {form.doadorCpf.replace(/\D/g,'').length === 11 && !validarCPF(form.doadorCpf) && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> CPF inválido — verifique os números
+                    </p>
+                  )}
+                  {form.doadorCpf.replace(/\D/g,'').length === 11 && validarCPF(form.doadorCpf) && (
+                    <p className="text-xs text-green-600 mt-1">✓ CPF válido</p>
+                  )}
                 </div>
               )}
               <div>
@@ -619,7 +630,7 @@ export default function FinanceiroPage() {
                   <AlertCircle className="w-4 h-4 shrink-0" />{erro}
                 </div>
               )}
-              <button onClick={salvar} disabled={saving || !form.categoria || !form.descricao || !form.valor}
+              <button onClick={salvar} disabled={saving || !form.categoria || !form.descricao || !form.valor || (isDoacao && !validarCPF(form.doadorCpf))}
                 className="w-full py-3 rounded-xl bg-[#002776] text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editando ? 'Salvar alterações' : 'Salvar lançamento'}

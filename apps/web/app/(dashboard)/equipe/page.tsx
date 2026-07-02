@@ -5,6 +5,7 @@ import {
   AlertCircle, ChevronDown, ChevronUp, Download, CreditCard, Calendar,
 } from 'lucide-react'
 import api from '@/lib/api'
+import { validarCPF, formatarCPF } from '@/lib/cpf'
 
 const FUNCOES: Record<string, string> = {
   cabo_eleitoral: 'Cabo Eleitoral', coordenador: 'Coordenador',
@@ -453,9 +454,20 @@ export default function EquipePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">CPF * <span className="text-red-500">(obrigatório TSE)</span></label>
-                  <input value={colabForm.cpf} onChange={e => setColabForm(f => ({ ...f, cpf: e.target.value }))}
+                  <input
+                    value={colabForm.cpf}
+                    onChange={e => setColabForm(f => ({ ...f, cpf: formatarCPF(e.target.value) }))}
                     placeholder="000.000.000-00" maxLength={14}
-                    className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                    className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776] ${colabForm.cpf.replace(/\D/g,'').length === 11 && !validarCPF(colabForm.cpf) ? 'border-red-400 bg-red-50' : ''}`}
+                  />
+                  {colabForm.cpf.replace(/\D/g,'').length === 11 && !validarCPF(colabForm.cpf) && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> CPF inválido — verifique os números
+                    </p>
+                  )}
+                  {colabForm.cpf.replace(/\D/g,'').length === 11 && validarCPF(colabForm.cpf) && (
+                    <p className="text-xs text-green-600 mt-1">✓ CPF válido</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Telefone</label>
@@ -537,7 +549,7 @@ export default function EquipePage() {
                   <AlertCircle className="w-4 h-4 shrink-0" />{erroColab}
                 </div>
               )}
-              <button onClick={salvarColab} disabled={savingColab || !colabForm.nome || !colabForm.cpf || !colabForm.valorAcordado}
+              <button onClick={salvarColab} disabled={savingColab || !colabForm.nome || !validarCPF(colabForm.cpf) || !colabForm.valorAcordado}
                 className="w-full py-3 rounded-xl bg-[#002776] text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
                 {savingColab && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editColab ? 'Salvar alterações' : 'Cadastrar colaborador'}

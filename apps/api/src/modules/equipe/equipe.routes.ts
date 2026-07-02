@@ -4,6 +4,23 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
 
+function validarCPF(cpf: string): boolean {
+  const nums = cpf.replace(/\D/g, '')
+  if (nums.length !== 11 || /^(\d)\1{10}$/.test(nums)) return false
+  const calc = (len: number) => {
+    let sum = 0
+    for (let i = 0; i < len; i++) sum += parseInt(nums[i]) * (len + 1 - i)
+    const r = (sum * 10) % 11
+    return r >= 10 ? 0 : r
+  }
+  return calc(9) === parseInt(nums[9]) && calc(10) === parseInt(nums[10])
+}
+
+const cpfValido = z.string().min(11).max(14).refine(
+  v => validarCPF(v),
+  { message: 'CPF inválido' }
+)
+
 const FUNCOES: Record<string, string> = {
   cabo_eleitoral: 'Cabo Eleitoral',
   coordenador: 'Coordenador',
@@ -75,7 +92,7 @@ export async function equipeRoutes(app: FastifyInstance) {
 
     const data = z.object({
       nome: z.string().min(2).max(200),
-      cpf: z.string().min(11).max(14),
+      cpf: cpfValido,
       funcao: z.enum(['cabo_eleitoral','coordenador','motorista','assessor','mesario','fotografo','social_media','advogado','contador','outro']),
       funcaoCustom: z.string().max(100).optional(),
       telefone: z.string().max(20).optional(),
@@ -113,7 +130,7 @@ export async function equipeRoutes(app: FastifyInstance) {
 
     const data = z.object({
       nome: z.string().min(2).max(200).optional(),
-      cpf: z.string().min(11).max(14).optional(),
+      cpf: cpfValido.optional(),
       funcao: z.string().optional(),
       funcaoCustom: z.string().optional().nullable(),
       telefone: z.string().optional().nullable(),
