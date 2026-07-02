@@ -193,8 +193,16 @@ export async function coordenadorRoutes(app: FastifyInstance) {
       mensagem: z.string().optional(),
     }).parse(req.body)
 
-    const portal = await prisma.portalEleitor.findUnique({ where: { candidateId: payload.candidateId } })
-    if (!portal) return reply.status(400).send({ error: 'Portal não configurado para este candidato' })
+    // Cria portal padrão automaticamente se não existir — permite cadastro pelo app do coordenador
+    // mesmo sem o candidato ter configurado o Portal do Eleitor manualmente
+    let portal = await prisma.portalEleitor.findUnique({ where: { candidateId: payload.candidateId } })
+    if (!portal) {
+      const candidate = await prisma.candidate.findUnique({ where: { id: payload.candidateId }, select: { name: true } })
+      const slug = payload.candidateId.slice(-8)
+      portal = await prisma.portalEleitor.create({
+        data: { candidateId: payload.candidateId, slug, titulo: candidate?.name ?? 'Campanha', ativo: true },
+      })
+    }
 
     const cadastro = await prisma.cadastroPortal.create({
       data: {
@@ -248,6 +256,68 @@ export async function coordenadorRoutes(app: FastifyInstance) {
     })
 
     return reply.send(checkIns)
+  })
+
+  // GET /coordenador/ranking — ranking de coordenadores da campanha por cadastros
+  app.get('/coordenador/ranking', { onRequest: [requireCoordenador] }, async (req, reply) => {
+    const payload = req.user as unknown as CoordenadorPayload
+
+    const coordenadores = await prisma.coordenador.findMany({
+      where: { candidateId: payload.candidateId, ativo: true },
+      select: { id: true, nome: true, cidade: true, metaVotos: true },
+    })
+
+    const portal = await prisma.portalEleitor.findUnique({ where: { candidateId: payload.candidateId } })
+
+    const ranking = await Promise.all(coordenadores.map(async (c) => {
+      const cadastros = portal ? await prisma.cadastroPortal.count({
+        where: {
+          portalId: portal.id,
+          ...(c.cidade ? { cidade: c.cidade } : {}),
+        },
+      }) : 0
+      const checkins = await prisma.checkInLider.count({ where: { coordenadorId: c.id } })
+      const pct = c.metaVotos && cadastros > 0 ? Math.min(100, Math.round((cadastros / c.metaVotos) * 100)) : 0
+      return { id: c.id, nome: c.nome, cidade: c.cidade, cadastros, checkins, metaVotos: c.metaVotos, pct, isMe: c.id === payload.coordenadorId }
+    }))
+
+    ranking.sort((a, b) => b.cadastros - a.cadastros)
+    return reply.send(ranking)
+  })
+
+  // GET /coordenador/pesquisas — resultados de intenção de voto da área do coordenador
+  app.get('/coordenador/pesquisas', { onRequest: [requireCoordenador] }, async (req, reply) => {
+    const payload = req.user as unknown as CoordenadorPayload
+
+    const where = {
+      candidateId: payload.candidateId,
+      ...(payload.cidade ? { city: payload.cidade } : {}),
+      ...(payload.bairros.length > 0 ? { neighborhood: { in: payload.bairros } } : {}),
+    }
+
+    const [total, porIntencao] = await Promise.all([
+      prisma.voteSurveyResponse.count({ where }),
+      prisma.voteSurveyResponse.groupBy({
+        by: ['intention'],
+        where,
+        _count: { intention: true },
+      }),
+    ])
+
+    const ultimas = await prisma.voteSurveyResponse.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, voterName: true, intention: true, neighborhood: true, city: true, createdAt: true },
+    })
+
+    const intencoes = porIntencao.map(g => ({
+      intencao: g.intention,
+      total: g._count.intention,
+      pct: total > 0 ? Math.round((g._count.intention / total) * 100) : 0,
+    })).sort((a, b) => b.total - a.total)
+
+    return reply.send({ total, intencoes, ultimas })
   })
 }
 

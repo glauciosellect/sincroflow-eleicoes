@@ -2,12 +2,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
-import { Users, MapPin, Target, TrendingUp, Plus, LogOut, Phone, Calendar, CheckCircle } from 'lucide-react'
+import { Users, MapPin, Target, TrendingUp, Plus, LogOut, Phone, CheckCircle, Trophy, BarChart2, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.syncrofloweleicoes.com.br'
 const STORAGE_KEY = 'coord_token'
-
 function getToken() { return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null }
 
 interface DashData {
@@ -16,20 +15,52 @@ interface DashData {
   ultimosCadastros: { id: string; nome: string; telefone: string; cidade?: string; createdAt: string }[]
 }
 
+interface RankingItem {
+  id: string; nome: string; cidade?: string; cadastros: number
+  checkins: number; metaVotos?: number; pct: number; isMe: boolean
+}
+
+interface Pesquisas {
+  total: number
+  intencoes: { intencao: string; total: number; pct: number }[]
+  ultimas: { id: string; voterName?: string; intention: string; neighborhood?: string; city?: string; createdAt: string }[]
+}
+
+const INTENCAO_CONFIG: Record<string, { label: string; icon: typeof ThumbsUp; color: string; bg: string }> = {
+  FAVORAVEL: { label: 'Favorável', icon: ThumbsUp, color: 'text-green-600', bg: 'bg-green-100' },
+  DESFAVORAVEL: { label: 'Desfavorável', icon: ThumbsDown, color: 'text-red-500', bg: 'bg-red-100' },
+  INDECISO: { label: 'Indeciso', icon: Minus, color: 'text-amber-500', bg: 'bg-amber-100' },
+  NEUTRO: { label: 'Neutro', icon: Minus, color: 'text-gray-400', bg: 'bg-gray-100' },
+}
+
 export default function CoordenadorDashboard() {
   const router = useRouter()
   const [data, setData] = useState<DashData | null>(null)
+  const [ranking, setRanking] = useState<RankingItem[]>([])
+  const [pesquisas, setPesquisas] = useState<Pesquisas | null>(null)
+  const [tab, setTab] = useState<'home' | 'ranking' | 'pesquisas'>('home')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const token = getToken()
-    if (!token) { router.push('/coordenador/login'); return }
+  const token = getToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
 
-    axios.get(`${API_URL}/coordenador/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
+  useEffect(() => {
+    if (!token) { router.push('/coordenador/login'); return }
+    axios.get(`${API_URL}/coordenador/dashboard`, { headers })
       .then(r => setData(r.data))
       .catch(() => { localStorage.removeItem(STORAGE_KEY); router.push('/coordenador/login') })
       .finally(() => setLoading(false))
-  }, [router])
+  }, [])
+
+  useEffect(() => {
+    if (!token) return
+    if (tab === 'ranking' && ranking.length === 0) {
+      axios.get(`${API_URL}/coordenador/ranking`, { headers }).then(r => setRanking(r.data)).catch(() => {})
+    }
+    if (tab === 'pesquisas' && !pesquisas) {
+      axios.get(`${API_URL}/coordenador/pesquisas`, { headers }).then(r => setPesquisas(r.data)).catch(() => {})
+    }
+  }, [tab])
 
   const logout = () => { localStorage.removeItem(STORAGE_KEY); router.push('/coordenador/login') }
 
@@ -40,13 +71,12 @@ export default function CoordenadorDashboard() {
   )
 
   if (!data) return null
-
   const { coordenador, stats, ultimosCadastros } = data
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="bg-[#002776] text-white px-4 pt-8 pb-6">
+      <div className="bg-[#002776] text-white px-4 pt-8 pb-4">
         <div className="flex items-center justify-between mb-1">
           <div>
             <p className="text-sm opacity-75">Olá,</p>
@@ -65,31 +95,44 @@ export default function CoordenadorDashboard() {
         <p className="text-xs opacity-50 mt-1">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
       </div>
 
-      <div className="px-4 py-5 space-y-5">
-        {/* Cards KPI */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <Users className="w-4 h-4 text-blue-600" />
-              </div>
-              <span className="text-xs text-gray-500 font-medium">Eleitores</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalCadastros}</p>
-          </div>
+      {/* Tabs */}
+      <div className="flex bg-white border-b sticky top-0 z-10">
+        {[
+          { key: 'home', label: 'Início', icon: Users },
+          { key: 'ranking', label: 'Ranking', icon: Trophy },
+          { key: 'pesquisas', label: 'Pesquisas', icon: BarChart2 },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key as any)}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${tab === t.key ? 'border-[#009C3B] text-[#009C3B]' : 'border-transparent text-gray-400'}`}>
+            <t.icon className="w-4 h-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 text-green-600" />
+      {/* ── HOME ── */}
+      {tab === 'home' && (
+        <div className="px-4 py-5 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-xs text-gray-500 font-medium">Eleitores</span>
               </div>
-              <span className="text-xs text-gray-500 font-medium">Check-ins</span>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalCadastros}</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{stats.checkIns}</p>
-          </div>
-
-          {stats.metaVotos > 0 && (
-            <>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                </div>
+                <span className="text-xs text-gray-500 font-medium">Check-ins</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{stats.checkIns}</p>
+            </div>
+            {stats.metaVotos > 0 && (<>
               <div className="bg-white rounded-2xl p-4 shadow-sm border">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
@@ -99,7 +142,6 @@ export default function CoordenadorDashboard() {
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{stats.metaVotos.toLocaleString()}</p>
               </div>
-
               <div className="bg-white rounded-2xl p-4 shadow-sm border">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -109,48 +151,146 @@ export default function CoordenadorDashboard() {
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{stats.metaPct}%</p>
                 <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${stats.metaPct}%` }} />
+                  <div className="h-full bg-amber-400 rounded-full" style={{ width: `${stats.metaPct}%` }} />
                 </div>
               </div>
-            </>
-          )}
-        </div>
-
-        {/* Últimos cadastros */}
-        <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h2 className="font-semibold text-gray-900 text-sm">Últimos cadastros</h2>
-            <a href="/coordenador/eleitores" className="text-xs text-[#002776] font-medium">Ver todos</a>
+            </>)}
           </div>
-          {ultimosCadastros.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum cadastro ainda</div>
-          ) : (
-            <div className="divide-y">
-              {ultimosCadastros.map(c => (
-                <div key={c.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-gray-600">{c.nome.charAt(0).toUpperCase()}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{c.nome}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.telefone}</span>
-                      {c.cidade && <span>· {c.cidade}</span>}
-                    </div>
-                  </div>
-                  <span className="text-xs text-gray-400 shrink-0">{formatDate(c.createdAt)}</span>
-                </div>
-              ))}
+
+          <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h2 className="font-semibold text-gray-900 text-sm">Últimos cadastros</h2>
+              <a href="/coordenador/eleitores" className="text-xs text-[#002776] font-medium">Ver todos</a>
             </div>
-          )}
+            {ultimosCadastros.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum cadastro ainda</div>
+            ) : (
+              <div className="divide-y">
+                {ultimosCadastros.map(c => (
+                  <div key={c.id} className="px-4 py-3 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                      <span className="text-sm font-bold text-gray-600">{c.nome.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{c.nome}</p>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.telefone}</span>
+                        {c.cidade && <span>· {c.cidade}</span>}
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-400 shrink-0">{formatDate(c.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── RANKING ── */}
+      {tab === 'ranking' && (
+        <div className="px-4 py-5 space-y-3">
+          <p className="text-xs text-gray-400 text-center">Coordenadores ordenados por eleitores cadastrados</p>
+          {ranking.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Carregando...</div>
+          ) : ranking.map((r, i) => (
+            <div key={r.id} className={`bg-white rounded-2xl shadow-sm border p-4 flex items-center gap-3 ${r.isMe ? 'border-[#009C3B] border-2' : ''}`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                i === 0 ? 'bg-yellow-100 text-yellow-600' :
+                i === 1 ? 'bg-gray-100 text-gray-500' :
+                i === 2 ? 'bg-orange-100 text-orange-500' : 'bg-blue-50 text-blue-400'
+              }`}>
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{r.nome}</p>
+                  {r.isMe && <span className="text-xs bg-[#009C3B] text-white px-1.5 py-0.5 rounded-full">Você</span>}
+                </div>
+                {r.cidade && <p className="text-xs text-gray-400">{r.cidade}</p>}
+                {r.metaVotos && (
+                  <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#009C3B] rounded-full" style={{ width: `${r.pct}%` }} />
+                  </div>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-lg font-bold text-[#002776]">{r.cadastros}</p>
+                <p className="text-xs text-gray-400">eleitores</p>
+                {r.metaVotos && <p className="text-xs text-green-600 font-medium">{r.pct}% da meta</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── PESQUISAS ── */}
+      {tab === 'pesquisas' && (
+        <div className="px-4 py-5 space-y-4">
+          {!pesquisas ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Carregando...</div>
+          ) : pesquisas.total === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Nenhuma pesquisa registrada na sua área ainda</div>
+          ) : (<>
+            <div className="bg-white rounded-2xl shadow-sm border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900 text-sm">Intenção de voto</h3>
+                <span className="text-xs text-gray-400">{pesquisas.total} pesquisas</span>
+              </div>
+              <div className="space-y-3">
+                {pesquisas.intencoes.map(int => {
+                  const conf = INTENCAO_CONFIG[int.intencao] ?? { label: int.intencao, icon: Minus, color: 'text-gray-400', bg: 'bg-gray-100' }
+                  const Icon = conf.icon
+                  return (
+                    <div key={int.intencao}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${conf.bg}`}>
+                            <Icon className={`w-3.5 h-3.5 ${conf.color}`} />
+                          </div>
+                          <span className="text-sm text-gray-700">{conf.label}</span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-900">{int.pct}% <span className="text-xs font-normal text-gray-400">({int.total})</span></span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${int.intencao === 'FAVORAVEL' ? 'bg-green-500' : int.intencao === 'DESFAVORAVEL' ? 'bg-red-400' : 'bg-amber-400'}`}
+                          style={{ width: `${int.pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <h3 className="font-semibold text-gray-900 text-sm">Últimas pesquisas</h3>
+              </div>
+              <div className="divide-y">
+                {pesquisas.ultimas.map(u => {
+                  const conf = INTENCAO_CONFIG[u.intention] ?? { label: u.intention, color: 'text-gray-400' }
+                  return (
+                    <div key={u.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{u.voterName ?? 'Anônimo'}</p>
+                        <p className="text-xs text-gray-400">{[u.neighborhood, u.city].filter(Boolean).join(', ')}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-xs font-semibold ${conf.color}`}>{conf.label}</p>
+                        <p className="text-xs text-gray-400">{formatDate(u.createdAt)}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>)}
+        </div>
+      )}
 
       {/* FAB */}
-      <a
-        href="/coordenador/eleitores?novo=1"
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#002776] text-white shadow-lg flex items-center justify-center hover:bg-[#001f5e] transition-colors"
-      >
+      <a href="/coordenador/eleitores?novo=1"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#002776] text-white shadow-lg flex items-center justify-center hover:bg-[#001f5e] transition-colors">
         <Plus className="w-6 h-6" />
       </a>
     </div>
