@@ -120,6 +120,7 @@ model Candidate {
   factChecks       FactCheck[]
   portalEleitor    PortalEleitor?
   coordenadores    Coordenador[]
+  conteudos        ConteudoIA[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -691,4 +692,29 @@ model CheckInLider {
 
   @@index([coordenadorId])
   @@index([candidateId, dataCheckin])
+}
+
+// ─── Criação de Conteúdo com IA — M4 ─────────────────────────────────────────
+
+model ConteudoIA {
+  id              String   @id @default(cuid())
+  candidateId     String
+  tema            String
+  temaCustomizado String?
+  plataforma      String
+  tom             String   @default("proximo")
+  textoGerado     String   @db.Text
+  hashtags        String[]
+  status          String   @default("rascunho")
+  agendadoPara    DateTime?
+  enviadoEm       DateTime?
+  canalEnvio      String?
+  tokensUsados    Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, status])
+  @@index([candidateId, createdAt])
 }
