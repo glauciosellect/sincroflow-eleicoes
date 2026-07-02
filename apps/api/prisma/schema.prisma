@@ -129,6 +129,8 @@ model Candidate {
   audiencias           Audiencia[]
   projetosLei          ProjetoLei[]
   protocolosAtendimento ProtocoloAtendimento[]
+  colaboradoresCampanha ColaboradorCampanha[]
+  pagamentosColaborador PagamentoColaborador[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -826,6 +828,54 @@ model MetaOrcamento {
   updatedAt   DateTime @updatedAt
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+// ─── Equipe de Campanha — M8 ─────────────────────────────────────────────────
+
+model ColaboradorCampanha {
+  id           String   @id @default(cuid())
+  candidateId  String
+  nome         String
+  cpf          String
+  funcao       String   // cabo_eleitoral | coordenador | motorista | assessor | mesario | outro
+  funcaoCustom String?  // descrição quando funcao = 'outro'
+  telefone     String?
+  email        String?
+  dataInicio   DateTime
+  dataFim      DateTime?
+  valorAcordado Decimal  @db.Decimal(12, 2)
+  periodicidade String   @default("mensal") // diario | semanal | quinzenal | mensal | fixo
+  formaPagamento String  @default("pix")    // pix | transferencia | cheque | dinheiro
+  observacao   String?  @db.Text
+  status       String   @default("ativo")  // ativo | inativo | encerrado
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate  Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  pagamentos PagamentoColaborador[]
+
+  @@index([candidateId, status])
+  @@index([candidateId, funcao])
+}
+
+model PagamentoColaborador {
+  id              String   @id @default(cuid())
+  candidateId     String
+  colaboradorId   String
+  valor           Decimal  @db.Decimal(12, 2)
+  dataPagamento   DateTime
+  competencia     String?  // ex: "07/2026" — mês/ano de referência
+  formaPagamento  String   @default("pix")
+  comprovante     String?  // URL do comprovante (futuro: Supabase Storage)
+  observacao      String?
+  lancamentoId    String?  // vínculo com LancamentoFinanceiro gerado automaticamente
+  createdAt       DateTime @default(now())
+
+  candidate    Candidate            @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  colaborador  ColaboradorCampanha  @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, dataPagamento])
+  @@index([colaboradorId])
 }
 
 // ─── Gabinete 360 — M7 ───────────────────────────────────────────────────────
