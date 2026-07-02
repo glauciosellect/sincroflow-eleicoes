@@ -121,6 +121,9 @@ model Candidate {
   portalEleitor    PortalEleitor?
   coordenadores    Coordenador[]
   conteudos        ConteudoIA[]
+  radarMonitorados RadarMonitorado[]
+  radarResultados  RadarResultado[]
+  resumosRadar     ResumoRadar[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -717,4 +720,66 @@ model ConteudoIA {
 
   @@index([candidateId, status])
   @@index([candidateId, createdAt])
+}
+
+// ─── Radar Político + Social — M5 ────────────────────────────────────────────
+
+model RadarMonitorado {
+  id            String   @id @default(cuid())
+  candidateId   String
+  tipo          String
+  nome          String
+  rssUrl        String?
+  twitterQuery  String?
+  plataformas   String[]
+  ativo         Boolean  @default(true)
+  ultimaColeta  DateTime?
+  createdAt     DateTime @default(now())
+
+  candidate  Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  resultados RadarResultado[]
+
+  @@index([candidateId, ativo])
+}
+
+model RadarResultado {
+  id            String          @id @default(cuid())
+  radarId       String
+  candidateId   String
+  plataforma    String
+  tipo          String
+  titulo        String?
+  texto         String          @db.Text
+  url           String?
+  autor         String?
+  engajamento   Int?
+  sentimento    String?
+  relevancia    Int             @default(0)
+  lido          Boolean         @default(false)
+  alertaGerado  Boolean         @default(false)
+  coletadoEm   DateTime        @default(now())
+
+  radar     RadarMonitorado @relation(fields: [radarId], references: [id], onDelete: Cascade)
+  candidate Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([radarId, lido])
+  @@index([candidateId, relevancia])
+  @@index([coletadoEm])
+}
+
+model ResumoRadar {
+  id               String   @id @default(cuid())
+  candidateId      String
+  periodoInicio    DateTime
+  periodoFim       DateTime
+  tipo             String
+  resumoTexto      String   @db.Text
+  principaisAlertas Json
+  sugestaoAcao     String?  @db.Text
+  enviado          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, tipo])
 }

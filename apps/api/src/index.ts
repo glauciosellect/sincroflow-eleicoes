@@ -41,6 +41,7 @@ import { factCheckRoutes } from './modules/factcheck/factcheck.routes'
 import { portalRoutes, portalPublicRoutes } from './modules/portal/portal.routes'
 import { coordenadorAuthRoutes, coordenadorRoutes, coordenadorPainelRoutes } from './modules/coordenador/coordenador.routes'
 import { conteudoRoutes } from './modules/conteudo/conteudo.routes'
+import { radarRoutes } from './modules/radar/radar.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
@@ -150,6 +151,7 @@ async function bootstrap() {
   await app.register(coordenadorRoutes)
   await app.register(coordenadorPainelRoutes)
   await app.register(conteudoRoutes)
+  await app.register(radarRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)
