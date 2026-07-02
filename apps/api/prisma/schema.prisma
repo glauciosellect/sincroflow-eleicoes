@@ -824,6 +824,7 @@ model MetaOrcamento {
   candidateId String   @unique
   totalPrevisto Decimal @db.Decimal(12, 2) @default(0)
   alertaPercentual Int  @default(80) // alerta quando gastar X% do orçamento
+  checklistPrestacao Int[] @default([]) // IDs das etapas concluídas pelo candidato
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

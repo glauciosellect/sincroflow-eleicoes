@@ -1,0 +1,1 @@
+ALTER TABLE "MetaOrcamento" ADD COLUMN IF NOT EXISTS "checklistPrestacao" INTEGER[] NOT NULL DEFAULT '{}';

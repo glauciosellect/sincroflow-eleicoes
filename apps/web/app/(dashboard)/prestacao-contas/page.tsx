@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, AlertCircle, ExternalLink,
-  Download, FileText, Users, Wallet, ClipboardList, BookOpen, Info,
+  Download, FileText, Users, Wallet, ClipboardList, BookOpen, Info, Loader2,
 } from 'lucide-react'
+import api from '@/lib/api'
 
 interface Step {
   id: number
@@ -130,9 +131,28 @@ const CORRESPONDENCIA = [
 export default function PrestacaoContasPage() {
   const [expandido, setExpandido] = useState<number | null>(1)
   const [concluidos, setConcluidos] = useState<number[]>([])
+  const [loadingChecklist, setLoadingChecklist] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    api.get('/financeiro/checklist')
+      .then(res => setConcluidos(res.data.concluidos ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingChecklist(false))
+  }, [])
+
+  const salvarChecklist = useCallback(async (lista: number[]) => {
+    setSalvando(true)
+    await api.put('/financeiro/checklist', { concluidos: lista }).catch(() => {})
+    setSalvando(false)
+  }, [])
 
   const toggleConcluido = (id: number) => {
-    setConcluidos(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setConcluidos(prev => {
+      const nova = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      salvarChecklist(nova)
+      return nova
+    })
   }
 
   const progresso = Math.round((concluidos.length / ETAPAS_PARCIAL.length) * 100)
@@ -163,13 +183,25 @@ export default function PrestacaoContasPage() {
       <div className="bg-white rounded-2xl border p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-gray-700">Seu progresso no checklist</span>
-          <span className="text-sm font-bold text-[#009C3B]">{concluidos.length} / {ETAPAS_PARCIAL.length} etapas</span>
+          <div className="flex items-center gap-2">
+            {loadingChecklist
+              ? <Loader2 className="w-4 h-4 animate-spin text-gray-300" />
+              : salvando
+                ? <span className="text-xs text-gray-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />salvando...</span>
+                : <span className="text-xs text-green-600">✓ salvo</span>
+            }
+            <span className="text-sm font-bold text-[#009C3B]">{concluidos.length} / {ETAPAS_PARCIAL.length} etapas</span>
+          </div>
         </div>
         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
           <div className="h-full bg-[#009C3B] rounded-full transition-all duration-500"
-            style={{ width: `${progresso}%` }} />
+            style={{ width: loadingChecklist ? 0 : progresso + '%' }} />
         </div>
-        <p className="text-xs text-gray-400 mt-2">Marque cada etapa como concluída conforme for avançando na prestação.</p>
+        <p className="text-xs text-gray-400 mt-2">
+          {progresso === 100
+            ? '✓ Todas as etapas concluídas! Lembre-se de guardar o protocolo do Conta+JE.'
+            : 'Marque cada etapa como concluída conforme for avançando na prestação. O progresso é salvo automaticamente.'}
+        </p>
       </div>
 
       {/* Etapas */}

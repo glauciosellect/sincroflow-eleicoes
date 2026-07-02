@@ -333,4 +333,25 @@ export async function financeiroRoutes(app: FastifyInstance) {
       totalLancamentos: lancamentos.length,
     })
   })
+
+  // GET /financeiro/checklist — busca etapas concluídas pelo candidato
+  app.get('/financeiro/checklist', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const meta = await prisma.metaOrcamento.findUnique({ where: { candidateId }, select: { checklistPrestacao: true } })
+    return reply.send({ concluidos: meta?.checklistPrestacao ?? [] })
+  })
+
+  // PUT /financeiro/checklist — salva etapas concluídas
+  app.put('/financeiro/checklist', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { concluidos } = z.object({ concluidos: z.array(z.number().int()) }).parse(req.body)
+    await prisma.metaOrcamento.upsert({
+      where: { candidateId },
+      create: { candidateId, totalPrevisto: 0, alertaPercentual: 80, checklistPrestacao: concluidos },
+      update: { checklistPrestacao: concluidos },
+    })
+    return reply.send({ ok: true })
+  })
 }
