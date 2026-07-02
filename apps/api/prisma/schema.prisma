@@ -126,6 +126,9 @@ model Candidate {
   resumosRadar         ResumoRadar[]
   lancamentosFinanceiros LancamentoFinanceiro[]
   metaOrcamento        MetaOrcamento?
+  audiencias           Audiencia[]
+  projetosLei          ProjetoLei[]
+  protocolosAtendimento ProtocoloAtendimento[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -821,4 +824,75 @@ model MetaOrcamento {
   updatedAt   DateTime @updatedAt
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+// ─── Gabinete 360 — M7 ───────────────────────────────────────────────────────
+
+model Audiencia {
+  id           String   @id @default(cuid())
+  candidateId  String
+  titulo       String
+  solicitante  String
+  telefone     String?
+  email        String?
+  assunto      String
+  descricao    String?  @db.Text
+  dataHora     DateTime
+  local        String?
+  status       String   @default("agendada") // agendada | realizada | cancelada | reagendada
+  prioridade   String   @default("normal")   // normal | alta | urgente
+  encaminhamento String? @db.Text
+  resultado    String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, status])
+  @@index([candidateId, dataHora])
+}
+
+model ProjetoLei {
+  id           String   @id @default(cuid())
+  candidateId  String
+  numero       String?
+  titulo       String
+  ementa       String   @db.Text
+  tipo         String   // pl | pec | requerimento | indicacao | mocao | outro
+  status       String   @default("rascunho") // rascunho | protocolado | tramitando | aprovado | rejeitado | arquivado
+  dataProtocolo DateTime?
+  dataVotacao  DateTime?
+  resultado    String?
+  linkOficial  String?
+  temas        String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, status])
+  @@index([candidateId, tipo])
+}
+
+model ProtocoloAtendimento {
+  id           String   @id @default(cuid())
+  candidateId  String
+  numero       String
+  solicitante  String
+  telefone     String?
+  assunto      String
+  descricao    String?  @db.Text
+  status       String   @default("aberto") // aberto | em_andamento | resolvido | arquivado
+  prioridade   String   @default("normal")
+  responsavel  String?
+  resposta     String?  @db.Text
+  resolvidoEm  DateTime?
+  prazo        DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, status])
+  @@index([candidateId, createdAt])
 }

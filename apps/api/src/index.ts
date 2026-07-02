@@ -43,6 +43,7 @@ import { coordenadorAuthRoutes, coordenadorRoutes, coordenadorPainelRoutes } fro
 import { conteudoRoutes } from './modules/conteudo/conteudo.routes'
 import { radarRoutes } from './modules/radar/radar.routes'
 import { financeiroRoutes } from './modules/financeiro/financeiro.routes'
+import { gabineteRoutes } from './modules/gabinete/gabinete.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
@@ -154,6 +155,7 @@ async function bootstrap() {
   await app.register(conteudoRoutes)
   await app.register(radarRoutes)
   await app.register(financeiroRoutes)
+  await app.register(gabineteRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)
