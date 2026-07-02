@@ -1,601 +1,495 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { useAuthStore } from '@/store/auth.store'
+import { useEffect, useState } from 'react'
+import { Plus, X, Loader2, AlertCircle, CalendarDays, FileText, ClipboardList, LayoutDashboard, ChevronRight, GripVertical } from 'lucide-react'
 import api from '@/lib/api'
-import { cn } from '@/lib/utils'
-import {
-  Building2, Calendar, FileText, ClipboardList, Plus, X,
-  AlertTriangle, Clock, CheckCircle2, Ban, ChevronRight,
-  Phone, Mail, MapPin, Tag, Link as LinkIcon, Search,
-} from 'lucide-react'
 
-const PRIORIDADE_COLOR: Record<string, string> = {
-  normal: 'bg-blue-100 text-blue-700',
-  alta: 'bg-amber-100 text-amber-700',
-  urgente: 'bg-red-100 text-red-700',
-}
+// ── Tipos ────────────────────────────────────────────────────────────────────
 
-const STATUS_AUDIENCIA: Record<string, { label: string; color: string }> = {
-  agendada: { label: 'Agendada', color: 'text-blue-600' },
-  realizada: { label: 'Realizada', color: 'text-green-600' },
-  cancelada: { label: 'Cancelada', color: 'text-red-500' },
-  reagendada: { label: 'Reagendada', color: 'text-amber-500' },
-}
-
-const STATUS_PROTOCOLO: Record<string, { label: string; icon: typeof Clock }> = {
-  aberto: { label: 'Aberto', icon: Clock },
-  em_andamento: { label: 'Em andamento', icon: ChevronRight },
-  resolvido: { label: 'Resolvido', icon: CheckCircle2 },
-  arquivado: { label: 'Arquivado', icon: Ban },
-}
-
-const STATUS_PROJETO: Record<string, { label: string; color: string }> = {
-  rascunho: { label: 'Rascunho', color: 'text-muted-foreground' },
-  protocolado: { label: 'Protocolado', color: 'text-blue-600' },
-  tramitando: { label: 'Tramitando', color: 'text-amber-600' },
-  aprovado: { label: 'Aprovado', color: 'text-green-600' },
-  rejeitado: { label: 'Rejeitado', color: 'text-red-500' },
-  arquivado: { label: 'Arquivado', color: 'text-muted-foreground' },
-}
-
-const TIPO_PROJETO: Record<string, string> = {
-  pl: 'Projeto de Lei', pec: 'PEC', requerimento: 'Requerimento',
-  indicacao: 'Indicação', mocao: 'Moção', outro: 'Outro',
-}
-
-function dtBr(iso: string) {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-function dtSoBr(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR')
-}
-
-interface Resumo {
+interface DashData {
   audienciasHoje: number; audienciasSemana: number; audienciasUrgentes: number
   protocolosAbertos: number; protocolosUrgentes: number; projetosTramitando: number
 }
 
-const FORM_AUDIENCIA = {
-  titulo: '', solicitante: '', telefone: '', email: '', assunto: '',
-  descricao: '', dataHora: '', local: '', prioridade: 'normal',
+interface Projeto {
+  id: string; titulo: string; tipo: string; numero?: string; ementa: string
+  status: string; temas: string[]; dataProtocolo?: string; linkOficial?: string
 }
-const FORM_PROJETO = {
-  numero: '', titulo: '', ementa: '', tipo: 'pl', status: 'rascunho',
-  dataProtocolo: '', temas: '', linkOficial: '',
+
+interface Protocolo {
+  id: string; numero: string; solicitante: string; assunto: string
+  descricao?: string; prioridade: string; status: string
+  responsavel?: string; createdAt: string
 }
-const FORM_PROTOCOLO = {
-  solicitante: '', telefone: '', assunto: '', descricao: '',
-  prioridade: 'normal', responsavel: '', prazo: '',
+
+interface Audiencia {
+  id: string; solicitante: string; pauta: string; dataHora: string
+  local?: string; status: string; prioridade: string; observacao?: string
 }
+
+// ── Kanban cols ───────────────────────────────────────────────────────────────
+
+const COLS_PROJETOS = [
+  { key: 'rascunho', label: 'Rascunho', color: 'bg-gray-100 text-gray-600' },
+  { key: 'protocolado', label: 'Protocolado', color: 'bg-blue-100 text-blue-700' },
+  { key: 'tramitando', label: 'Tramitando', color: 'bg-amber-100 text-amber-700' },
+  { key: 'aprovado', label: 'Aprovado', color: 'bg-green-100 text-green-700' },
+  { key: 'rejeitado', label: 'Rejeitado', color: 'bg-red-100 text-red-600' },
+  { key: 'arquivado', label: 'Arquivado', color: 'bg-gray-100 text-gray-400' },
+]
+
+const COLS_PROTOCOLOS = [
+  { key: 'aberto', label: 'Aberto', color: 'bg-blue-100 text-blue-700' },
+  { key: 'em_andamento', label: 'Em andamento', color: 'bg-amber-100 text-amber-700' },
+  { key: 'resolvido', label: 'Resolvido', color: 'bg-green-100 text-green-700' },
+  { key: 'arquivado', label: 'Arquivado', color: 'bg-gray-100 text-gray-400' },
+]
+
+const TIPO_LABEL: Record<string, string> = {
+  pl: 'PL', pec: 'PEC', requerimento: 'Req.', indicacao: 'Ind.', mocao: 'Moção', outro: 'Outro'
+}
+const PRIORIDADE_COLOR: Record<string, string> = {
+  urgente: 'bg-red-100 text-red-600', alta: 'bg-orange-100 text-orange-600',
+  normal: 'bg-gray-100 text-gray-500', baixa: 'bg-blue-50 text-blue-400',
+}
+
+const fmtDateTime = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR')
+
+// ── Formulários vazios ────────────────────────────────────────────────────────
+
+const emptyProjeto = { titulo: '', tipo: 'pl', numero: '', ementa: '', status: 'rascunho', temas: '', dataProtocolo: '', linkOficial: '' }
+const emptyProtocolo = { solicitante: '', assunto: '', descricao: '', prioridade: 'normal', responsavel: '' }
+const emptyAudiencia = { solicitante: '', pauta: '', dataHora: '', local: '', prioridade: 'normal', observacao: '' }
+
+// ── Componente ────────────────────────────────────────────────────────────────
 
 export default function GabinetePage() {
-  const { token } = useAuthStore()
-  const [tab, setTab] = useState<'dashboard' | 'audiencias' | 'projetos' | 'protocolos'>('dashboard')
-  const [resumo, setResumo] = useState<Resumo | null>(null)
-  const [audiencias, setAudiencias] = useState<any[]>([])
-  const [projetos, setProjetos] = useState<any[]>([])
-  const [protocolos, setProtocolos] = useState<any[]>([])
-  const [modal, setModal] = useState<'audiencia' | 'projeto' | 'protocolo' | null>(null)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [formA, setFormA] = useState(FORM_AUDIENCIA)
-  const [formP, setFormP] = useState(FORM_PROJETO)
-  const [formProt, setFormProt] = useState(FORM_PROTOCOLO)
+  const [tab, setTab] = useState<'painel' | 'projetos' | 'protocolos' | 'audiencias'>('painel')
+  const [dash, setDash] = useState<DashData | null>(null)
+  const [projetos, setProjetos] = useState<Projeto[]>([])
+  const [protocolos, setProtocolos] = useState<Protocolo[]>([])
+  const [audiencias, setAudiencias] = useState<Audiencia[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formProjeto, setFormProjeto] = useState(emptyProjeto)
+  const [formProtocolo, setFormProtocolo] = useState(emptyProtocolo)
+  const [formAudiencia, setFormAudiencia] = useState(emptyAudiencia)
   const [saving, setSaving] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('')
-  const [q, setQ] = useState('')
+  const [erro, setErro] = useState('')
+  const [dragging, setDragging] = useState<{ id: string; tipo: 'projeto' | 'protocolo' } | null>(null)
 
-  const h = { Authorization: `Bearer ${token}` }
+  const loadDash = async () => { const r = await api.get('/gabinete/dashboard'); setDash(r.data) }
+  const loadProjetos = async () => { const r = await api.get('/gabinete/projetos', { params: { page: 1 } }); setProjetos(r.data.items) }
+  const loadProtocolos = async () => { const r = await api.get('/gabinete/protocolos', { params: { page: 1 } }); setProtocolos(r.data.items) }
+  const loadAudiencias = async () => { const r = await api.get('/gabinete/audiencias', { params: { page: 1 } }); setAudiencias(r.data.items) }
 
-  const loadResumo = useCallback(async () => {
-    try { const r = await api.get('/gabinete/resumo', { headers: h }); setResumo(r.data) } catch {}
-  }, [token])
+  useEffect(() => {
+    setLoading(true)
+    loadDash().finally(() => setLoading(false))
+  }, [])
 
-  const loadAudiencias = useCallback(async () => {
-    const params = new URLSearchParams()
-    if (statusFilter) params.set('status', statusFilter)
-    const r = await api.get(`/gabinete/audiencias?${params}&take=50`, { headers: h })
-    setAudiencias(r.data.items)
-  }, [token, statusFilter])
+  useEffect(() => {
+    if (tab === 'projetos') loadProjetos()
+    if (tab === 'protocolos') loadProtocolos()
+    if (tab === 'audiencias') loadAudiencias()
+  }, [tab])
 
-  const loadProjetos = useCallback(async () => {
-    const params = new URLSearchParams()
-    if (statusFilter) params.set('status', statusFilter)
-    const r = await api.get(`/gabinete/projetos?${params}&take=50`, { headers: h })
-    setProjetos(r.data.items)
-  }, [token, statusFilter])
-
-  const loadProtocolos = useCallback(async () => {
-    const params = new URLSearchParams()
-    if (statusFilter) params.set('status', statusFilter)
-    if (q) params.set('q', q)
-    const r = await api.get(`/gabinete/protocolos?${params}&take=50`, { headers: h })
-    setProtocolos(r.data.items)
-  }, [token, statusFilter, q])
-
-  useEffect(() => { loadResumo() }, [loadResumo])
-  useEffect(() => { if (tab === 'audiencias') loadAudiencias() }, [tab, loadAudiencias])
-  useEffect(() => { if (tab === 'projetos') loadProjetos() }, [tab, loadProjetos])
-  useEffect(() => { if (tab === 'protocolos') loadProtocolos() }, [tab, loadProtocolos])
-
-  function fecharModal() { setModal(null); setEditId(null); setFormA(FORM_AUDIENCIA); setFormP(FORM_PROJETO); setFormProt(FORM_PROTOCOLO) }
-
-  async function salvarAudiencia() {
-    if (!formA.titulo || !formA.solicitante || !formA.assunto || !formA.dataHora) return
-    setSaving(true)
+  // Drag & drop Kanban — move card entre colunas
+  const onDrop = async (status: string, tipo: 'projeto' | 'protocolo') => {
+    if (!dragging || dragging.tipo !== tipo) return
+    const { id } = dragging
+    setDragging(null)
     try {
-      const body = { ...formA, dataHora: new Date(formA.dataHora).toISOString() }
-      if (editId) await api.patch(`/gabinete/audiencias/${editId}`, body, { headers: h })
-      else await api.post('/gabinete/audiencias', body, { headers: h })
-      fecharModal(); loadAudiencias(); loadResumo()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Erro') } finally { setSaving(false) }
-  }
-
-  async function salvarProjeto() {
-    if (!formP.titulo || !formP.ementa) return
-    setSaving(true)
-    try {
-      const body = {
-        ...formP,
-        temas: formP.temas.split(',').map(t => t.trim()).filter(Boolean),
-        ...(formP.dataProtocolo ? { dataProtocolo: new Date(formP.dataProtocolo).toISOString() } : {}),
+      if (tipo === 'projeto') {
+        await api.patch(`/gabinete/projetos/${id}`, { status })
+        setProjetos(ps => ps.map(p => p.id === id ? { ...p, status } : p))
+      } else {
+        await api.patch(`/gabinete/protocolos/${id}`, { status })
+        setProtocolos(ps => ps.map(p => p.id === id ? { ...p, status } : p))
       }
-      if (editId) await api.patch(`/gabinete/projetos/${editId}`, body, { headers: h })
-      else await api.post('/gabinete/projetos', body, { headers: h })
-      fecharModal(); loadProjetos(); loadResumo()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Erro') } finally { setSaving(false) }
+    } catch { }
   }
 
-  async function salvarProtocolo() {
-    if (!formProt.solicitante || !formProt.assunto) return
-    setSaving(true)
+  const salvarProjeto = async () => {
+    setErro(''); setSaving(true)
     try {
-      const body = { ...formProt, ...(formProt.prazo ? { prazo: new Date(formProt.prazo).toISOString() } : {}) }
-      if (editId) await api.patch(`/gabinete/protocolos/${editId}`, body, { headers: h })
-      else await api.post('/gabinete/protocolos', body, { headers: h })
-      fecharModal(); loadProtocolos(); loadResumo()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Erro') } finally { setSaving(false) }
+      await api.post('/gabinete/projetos', {
+        ...formProjeto,
+        temas: formProjeto.temas ? formProjeto.temas.split(',').map(t => t.trim()).filter(Boolean) : [],
+        numero: formProjeto.numero || undefined,
+        dataProtocolo: formProjeto.dataProtocolo || undefined,
+        linkOficial: formProjeto.linkOficial || undefined,
+      })
+      setShowForm(false); setFormProjeto(emptyProjeto); loadProjetos(); loadDash()
+    } catch (e: any) { setErro(e.response?.data?.error ?? 'Erro ao salvar') }
+    finally { setSaving(false) }
   }
 
-  async function mudarStatusAudiencia(id: string, status: string) {
-    await api.patch(`/gabinete/audiencias/${id}`, { status }, { headers: h })
-    loadAudiencias(); loadResumo()
+  const salvarProtocolo = async () => {
+    setErro(''); setSaving(true)
+    try {
+      await api.post('/gabinete/protocolos', { ...formProtocolo, descricao: formProtocolo.descricao || undefined, responsavel: formProtocolo.responsavel || undefined })
+      setShowForm(false); setFormProtocolo(emptyProtocolo); loadProtocolos(); loadDash()
+    } catch (e: any) { setErro(e.response?.data?.error ?? 'Erro ao salvar') }
+    finally { setSaving(false) }
   }
 
-  async function mudarStatusProtocolo(id: string, status: string) {
-    await api.patch(`/gabinete/protocolos/${id}`, { status }, { headers: h })
-    loadProtocolos(); loadResumo()
+  const salvarAudiencia = async () => {
+    setErro(''); setSaving(true)
+    try {
+      await api.post('/gabinete/audiencias', { ...formAudiencia, local: formAudiencia.local || undefined, observacao: formAudiencia.observacao || undefined })
+      setShowForm(false); setFormAudiencia(emptyAudiencia); loadAudiencias(); loadDash()
+    } catch (e: any) { setErro(e.response?.data?.error ?? 'Erro ao salvar') }
+    finally { setSaving(false) }
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-full mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Building2 className="w-6 h-6" /> Gabinete 360</h1>
-          <p className="text-sm text-muted-foreground mt-1">Audiências, projetos de lei e protocolos de atendimento</p>
+          <h1 className="text-2xl font-bold text-gray-900">Gabinete</h1>
+          <p className="text-sm text-gray-500">Audiências, projetos de lei e protocolos de atendimento</p>
         </div>
-        {tab === 'audiencias' && (
-          <button onClick={() => { setModal('audiencia'); setEditId(null); setFormA(FORM_AUDIENCIA) }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-[#009C3B] text-white rounded-lg hover:bg-[#007d2f] transition-colors">
-            <Plus className="w-4 h-4" /> Nova Audiência
-          </button>
-        )}
-        {tab === 'projetos' && (
-          <button onClick={() => { setModal('projeto'); setEditId(null); setFormP(FORM_PROJETO) }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-[#002776] text-white rounded-lg hover:bg-[#001855] transition-colors">
-            <Plus className="w-4 h-4" /> Novo Projeto
-          </button>
-        )}
-        {tab === 'protocolos' && (
-          <button onClick={() => { setModal('protocolo'); setEditId(null); setFormProt(FORM_PROTOCOLO) }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
-            <Plus className="w-4 h-4" /> Novo Protocolo
+        {tab !== 'painel' && (
+          <button onClick={() => { setShowForm(true); setErro('') }}
+            className="flex items-center gap-2 bg-[#002776] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#001f5e] transition-colors">
+            <Plus className="w-4 h-4" />
+            {tab === 'projetos' ? 'Novo projeto' : tab === 'protocolos' ? 'Novo protocolo' : 'Nova audiência'}
           </button>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b overflow-x-auto">
         {[
-          { key: 'dashboard', label: 'Painel', icon: Building2 },
-          { key: 'audiencias', label: 'Audiências', icon: Calendar },
+          { key: 'painel', label: 'Painel', icon: LayoutDashboard },
+          { key: 'audiencias', label: 'Audiências', icon: CalendarDays },
           { key: 'projetos', label: 'Projetos de Lei', icon: FileText },
           { key: 'protocolos', label: 'Protocolos', icon: ClipboardList },
         ].map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key as any); setStatusFilter('') }}
-            className={cn('flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-              tab === t.key ? 'border-[#009C3B] text-[#009C3B]' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            <t.icon className="w-4 h-4" /> {t.label}
+          <button key={t.key} onClick={() => setTab(t.key as any)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.key ? 'border-[#009C3B] text-[#009C3B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            <t.icon className="w-4 h-4" />{t.label}
           </button>
         ))}
       </div>
 
-      {/* ── DASHBOARD ── */}
-      {tab === 'dashboard' && resumo && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {[
-            { label: 'Audiências hoje', value: resumo.audienciasHoje, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', onClick: () => { setTab('audiencias') } },
-            { label: 'Audiências na semana', value: resumo.audienciasSemana, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', onClick: () => setTab('audiencias') },
-            { label: 'Audiências urgentes', value: resumo.audienciasUrgentes, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50', onClick: () => setTab('audiencias') },
-            { label: 'Protocolos abertos', value: resumo.protocolosAbertos, icon: ClipboardList, color: 'text-amber-600', bg: 'bg-amber-50', onClick: () => setTab('protocolos') },
-            { label: 'Protocolos urgentes', value: resumo.protocolosUrgentes, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50', onClick: () => setTab('protocolos') },
-            { label: 'Projetos tramitando', value: resumo.projetosTramitando, icon: FileText, color: 'text-green-600', bg: 'bg-green-50', onClick: () => setTab('projetos') },
-          ].map(kpi => (
-            <button key={kpi.label} onClick={kpi.onClick}
-              className="text-left rounded-xl border bg-card p-4 space-y-2 hover:shadow-sm transition-shadow">
-              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', kpi.bg)}>
-                <kpi.icon className={cn('w-5 h-5', kpi.color)} />
+      {/* ── PAINEL ── */}
+      {tab === 'painel' && (
+        loading ? <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div> :
+        !dash ? null : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { label: 'Audiências hoje', value: dash.audienciasHoje, color: 'text-blue-600', bg: 'bg-blue-50', icon: CalendarDays, onClick: () => setTab('audiencias') },
+              { label: 'Audiências na semana', value: dash.audienciasSemana, color: 'text-purple-600', bg: 'bg-purple-50', icon: CalendarDays, onClick: () => setTab('audiencias') },
+              { label: 'Audiências urgentes', value: dash.audienciasUrgentes, color: 'text-red-500', bg: 'bg-red-50', icon: AlertCircle, onClick: () => setTab('audiencias') },
+              { label: 'Protocolos abertos', value: dash.protocolosAbertos, color: 'text-amber-600', bg: 'bg-amber-50', icon: ClipboardList, onClick: () => setTab('protocolos') },
+              { label: 'Protocolos urgentes', value: dash.protocolosUrgentes, color: 'text-red-500', bg: 'bg-red-50', icon: AlertCircle, onClick: () => setTab('protocolos') },
+              { label: 'Projetos tramitando', value: dash.projetosTramitando, color: 'text-green-600', bg: 'bg-green-50', icon: FileText, onClick: () => setTab('projetos') },
+            ].map(c => (
+              <button key={c.label} onClick={c.onClick}
+                className="bg-white rounded-2xl border p-5 shadow-sm text-left hover:border-gray-300 hover:shadow-md transition-all group">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${c.bg}`}>
+                    <c.icon className={`w-5 h-5 ${c.color}`} />
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 ml-auto group-hover:text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-500 mb-1">{c.label}</p>
+                <p className={`text-3xl font-bold ${c.color}`}>{c.value}</p>
+              </button>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ── KANBAN PROJETOS ── */}
+      {tab === 'projetos' && (
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-4 min-w-max">
+            {COLS_PROJETOS.map(col => (
+              <div key={col.key} className="w-72 flex-shrink-0"
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => onDrop(col.key, 'projeto')}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${col.color}`}>{col.label}</span>
+                  <span className="text-xs text-gray-400">{projetos.filter(p => p.status === col.key).length}</span>
+                </div>
+                <div className="space-y-2 min-h-[120px]">
+                  {projetos.filter(p => p.status === col.key).map(p => (
+                    <div key={p.id} draggable
+                      onDragStart={() => setDragging({ id: p.id, tipo: 'projeto' })}
+                      onDragEnd={() => setDragging(null)}
+                      className="bg-white rounded-xl border p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow">
+                      <div className="flex items-start gap-2 mb-2">
+                        <GripVertical className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono">{TIPO_LABEL[p.tipo]}</span>
+                            {p.numero && <span className="text-xs text-gray-400">#{p.numero}</span>}
+                          </div>
+                          <p className="text-sm font-medium text-gray-900 line-clamp-2">{p.titulo}</p>
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">{p.ementa}</p>
+                        </div>
+                      </div>
+                      {p.temas.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {p.temas.slice(0, 3).map(t => (
+                            <span key={t} className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      {p.dataProtocolo && <p className="text-xs text-gray-400 mt-2">{fmtDate(p.dataProtocolo)}</p>}
+                    </div>
+                  ))}
+                  {projetos.filter(p => p.status === col.key).length === 0 && (
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl h-20 flex items-center justify-center">
+                      <p className="text-xs text-gray-300">Arraste aqui</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">{kpi.label}</p>
-              <p className={cn('text-2xl font-bold', kpi.color)}>{kpi.value}</p>
-            </button>
-          ))}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── KANBAN PROTOCOLOS ── */}
+      {tab === 'protocolos' && (
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-4 min-w-max">
+            {COLS_PROTOCOLOS.map(col => (
+              <div key={col.key} className="w-72 flex-shrink-0"
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => onDrop(col.key, 'protocolo')}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${col.color}`}>{col.label}</span>
+                  <span className="text-xs text-gray-400">{protocolos.filter(p => p.status === col.key).length}</span>
+                </div>
+                <div className="space-y-2 min-h-[120px]">
+                  {protocolos.filter(p => p.status === col.key).map(p => (
+                    <div key={p.id} draggable
+                      onDragStart={() => setDragging({ id: p.id, tipo: 'protocolo' })}
+                      onDragEnd={() => setDragging(null)}
+                      className="bg-white rounded-xl border p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow">
+                      <div className="flex items-start gap-2">
+                        <GripVertical className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-mono text-gray-500">#{p.numero}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${PRIORIDADE_COLOR[p.prioridade] ?? 'bg-gray-100 text-gray-500'}`}>{p.prioridade}</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{p.assunto}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{p.solicitante}</p>
+                          {p.responsavel && <p className="text-xs text-blue-500 mt-1">→ {p.responsavel}</p>}
+                          <p className="text-xs text-gray-300 mt-1">{fmtDate(p.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {protocolos.filter(p => p.status === col.key).length === 0 && (
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl h-20 flex items-center justify-center">
+                      <p className="text-xs text-gray-300">Arraste aqui</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* ── AUDIÊNCIAS ── */}
       {tab === 'audiencias' && (
-        <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            {['', 'agendada', 'realizada', 'cancelada', 'reagendada'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={cn('px-3 py-1.5 text-sm rounded-full border transition-colors',
-                  statusFilter === s ? 'bg-[#009C3B] text-white border-[#009C3B]' : 'hover:bg-muted')}>
-                {s === '' ? 'Todas' : STATUS_AUDIENCIA[s]?.label ?? s}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {audiencias.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">Nenhuma audiência encontrada</div>
-            ) : audiencias.map(a => (
-              <div key={a.id} className="rounded-xl border bg-card p-4 space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold truncate">{a.titulo}</h3>
-                      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', PRIORIDADE_COLOR[a.prioridade])}>
-                        {a.prioridade}
-                      </span>
-                      <span className={cn('text-xs font-medium', STATUS_AUDIENCIA[a.status]?.color)}>
-                        {STATUS_AUDIENCIA[a.status]?.label}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{a.assunto}</p>
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {dtBr(a.dataHora)}
-                  </div>
-                </div>
-                <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {a.solicitante}</span>
-                  {a.local && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.local}</span>}
-                </div>
-                {a.status === 'agendada' && (
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => mudarStatusAudiencia(a.id, 'realizada')}
-                      className="text-xs px-3 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
-                      Marcar realizada
-                    </button>
-                    <button onClick={() => mudarStatusAudiencia(a.id, 'cancelada')}
-                      className="text-xs px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
-                      Cancelar
-                    </button>
-                  </div>
-                )}
+        <div className="space-y-3">
+          {audiencias.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Nenhuma audiência agendada</div>
+          ) : audiencias.map(a => (
+            <div key={a.id} className="bg-white rounded-2xl border p-4 shadow-sm flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-blue-50 flex flex-col items-center justify-center shrink-0">
+                <span className="text-lg font-bold text-blue-700">{new Date(a.dataHora).getDate()}</span>
+                <span className="text-xs text-blue-500">{new Date(a.dataHora).toLocaleString('pt-BR', { month: 'short' })}</span>
               </div>
-            ))}
-          </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-semibold text-gray-900">{a.solicitante}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${PRIORIDADE_COLOR[a.prioridade] ?? 'bg-gray-100 text-gray-500'}`}>{a.prioridade}</span>
+                </div>
+                <p className="text-sm text-gray-600">{a.pauta}</p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                  <span>{fmtDateTime(a.dataHora)}</span>
+                  {a.local && <span>· {a.local}</span>}
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${
+                a.status === 'agendada' ? 'bg-blue-100 text-blue-700' :
+                a.status === 'realizada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+              }`}>{a.status}</span>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ── PROJETOS ── */}
-      {tab === 'projetos' && (
-        <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            {['', 'rascunho', 'protocolado', 'tramitando', 'aprovado', 'rejeitado', 'arquivado'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={cn('px-3 py-1.5 text-sm rounded-full border transition-colors',
-                  statusFilter === s ? 'bg-[#002776] text-white border-[#002776]' : 'hover:bg-muted')}>
-                {s === '' ? 'Todos' : STATUS_PROJETO[s]?.label ?? s}
+      {/* ── MODAIS ── */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="font-semibold text-gray-900">
+                {tab === 'projetos' ? 'Novo Projeto de Lei' : tab === 'protocolos' ? 'Novo Protocolo' : 'Nova Audiência'}
+              </h2>
+              <button onClick={() => { setShowForm(false); setErro('') }} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <X className="w-4 h-4 text-gray-500" />
               </button>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {projetos.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">Nenhum projeto encontrado</div>
-            ) : projetos.map(p => (
-              <div key={p.id} className="rounded-xl border bg-card p-4 space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {p.numero && <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{p.numero}</span>}
-                      <span className="text-xs text-muted-foreground">{TIPO_PROJETO[p.tipo] ?? p.tipo}</span>
-                      <span className={cn('text-xs font-medium', STATUS_PROJETO[p.status]?.color)}>
-                        {STATUS_PROJETO[p.status]?.label}
-                      </span>
-                    </div>
-                    <h3 className="font-semibold mt-1">{p.titulo}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{p.ementa}</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* FORM PROJETO */}
+              {tab === 'projetos' && (<>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tipo *</label>
+                    <select value={formProjeto.tipo} onChange={e => setFormProjeto(f => ({ ...f, tipo: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                      <option value="pl">Projeto de Lei (PL)</option>
+                      <option value="pec">PEC</option>
+                      <option value="requerimento">Requerimento</option>
+                      <option value="indicacao">Indicação</option>
+                      <option value="mocao">Moção</option>
+                      <option value="outro">Outro</option>
+                    </select>
                   </div>
-                  {p.linkOficial && (
-                    <a href={p.linkOficial} target="_blank" rel="noopener noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground transition-colors">
-                      <LinkIcon className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-                {p.temas?.length > 0 && (
-                  <div className="flex gap-1.5 flex-wrap">
-                    {p.temas.map((t: string) => (
-                      <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-muted">{t}</span>
-                    ))}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Número</label>
+                    <input value={formProjeto.numero} onChange={e => setFormProjeto(f => ({ ...f, numero: e.target.value }))}
+                      placeholder="Ex: 2545" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                   </div>
-                )}
-                {p.dataProtocolo && (
-                  <p className="text-xs text-muted-foreground">Protocolado em {dtSoBr(p.dataProtocolo)}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── PROTOCOLOS ── */}
-      {tab === 'protocolos' && (
-        <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap items-center">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-              <input placeholder="Buscar solicitante..." value={q} onChange={e => setQ(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg bg-background" />
-            </div>
-            {['', 'aberto', 'em_andamento', 'resolvido', 'arquivado'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={cn('px-3 py-1.5 text-sm rounded-full border transition-colors',
-                  statusFilter === s ? 'bg-amber-600 text-white border-amber-600' : 'hover:bg-muted')}>
-                {s === '' ? 'Todos' : STATUS_PROTOCOLO[s]?.label ?? s}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {protocolos.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">Nenhum protocolo encontrado</div>
-            ) : protocolos.map(p => {
-              const stConf = STATUS_PROTOCOLO[p.status]
-              const StIcon = stConf?.icon ?? Clock
-              return (
-                <div key={p.id} className="rounded-xl border bg-card p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{p.numero}</span>
-                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', PRIORIDADE_COLOR[p.prioridade])}>
-                          {p.prioridade}
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <StIcon className="w-3.5 h-3.5" /> {stConf?.label}
-                        </span>
-                      </div>
-                      <h3 className="font-semibold mt-1 truncate">{p.assunto}</h3>
-                      <p className="text-sm text-muted-foreground">{p.solicitante}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground whitespace-nowrap">{dtSoBr(p.createdAt)}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Título *</label>
+                  <input value={formProjeto.titulo} onChange={e => setFormProjeto(f => ({ ...f, titulo: e.target.value }))}
+                    placeholder="Título do projeto" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Ementa *</label>
+                  <textarea rows={3} value={formProjeto.ementa} onChange={e => setFormProjeto(f => ({ ...f, ementa: e.target.value }))}
+                    placeholder="Descrição resumida do projeto" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776] resize-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                    <select value={formProjeto.status} onChange={e => setFormProjeto(f => ({ ...f, status: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                      {COLS_PROJETOS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
                   </div>
-                  {p.status !== 'resolvido' && p.status !== 'arquivado' && (
-                    <div className="flex gap-2 pt-1">
-                      {p.status === 'aberto' && (
-                        <button onClick={() => mudarStatusProtocolo(p.id, 'em_andamento')}
-                          className="text-xs px-3 py-1 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors">
-                          Iniciar atendimento
-                        </button>
-                      )}
-                      <button onClick={() => mudarStatusProtocolo(p.id, 'resolvido')}
-                        className="text-xs px-3 py-1 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors">
-                        Marcar resolvido
-                      </button>
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Data protocolo</label>
+                    <input type="date" value={formProjeto.dataProtocolo} onChange={e => setFormProjeto(f => ({ ...f, dataProtocolo: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Temas (separados por vírgula)</label>
+                  <input value={formProjeto.temas} onChange={e => setFormProjeto(f => ({ ...f, temas: e.target.value }))}
+                    placeholder="saúde, educação, infraestrutura" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Link oficial (opcional)</label>
+                  <input value={formProjeto.linkOficial} onChange={e => setFormProjeto(f => ({ ...f, linkOficial: e.target.value }))}
+                    placeholder="https://camara.jf.mg.gov.br/..." className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                </div>
+              </>)}
 
-      {/* ── MODAL AUDIÊNCIA ── */}
-      {modal === 'audiencia' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="font-semibold text-lg">Nova Audiência</h2>
-              <button onClick={fecharModal} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Título *</label>
-                  <input value={formA.titulo} onChange={e => setFormA(f => ({ ...f, titulo: e.target.value }))}
-                    placeholder="Ex: Reunião com lideranças do bairro" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+              {/* FORM PROTOCOLO */}
+              {tab === 'protocolos' && (<>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Solicitante *</label>
+                  <input value={formProtocolo.solicitante} onChange={e => setFormProtocolo(f => ({ ...f, solicitante: e.target.value }))}
+                    placeholder="Nome do cidadão" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Solicitante *</label>
-                  <input value={formA.solicitante} onChange={e => setFormA(f => ({ ...f, solicitante: e.target.value }))}
-                    placeholder="Nome do solicitante" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Assunto *</label>
+                  <input value={formProtocolo.assunto} onChange={e => setFormProtocolo(f => ({ ...f, assunto: e.target.value }))}
+                    placeholder="Ex: Buraco na Rua XV de Novembro" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Telefone</label>
-                  <input value={formA.telefone} onChange={e => setFormA(f => ({ ...f, telefone: e.target.value }))}
-                    placeholder="(00) 00000-0000" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Descrição</label>
+                  <textarea rows={3} value={formProtocolo.descricao} onChange={e => setFormProtocolo(f => ({ ...f, descricao: e.target.value }))}
+                    placeholder="Detalhes da solicitação" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776] resize-none" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">E-mail</label>
-                  <input type="email" value={formA.email} onChange={e => setFormA(f => ({ ...f, email: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Prioridade</label>
+                    <select value={formProtocolo.prioridade} onChange={e => setFormProtocolo(f => ({ ...f, prioridade: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                      <option value="baixa">Baixa</option>
+                      <option value="normal">Normal</option>
+                      <option value="alta">Alta</option>
+                      <option value="urgente">Urgente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Responsável</label>
+                    <input value={formProtocolo.responsavel} onChange={e => setFormProtocolo(f => ({ ...f, responsavel: e.target.value }))}
+                      placeholder="Nome do responsável" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                  </div>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Assunto *</label>
-                  <input value={formA.assunto} onChange={e => setFormA(f => ({ ...f, assunto: e.target.value }))}
-                    placeholder="Motivo da audiência" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Data e hora *</label>
-                  <input type="datetime-local" value={formA.dataHora} onChange={e => setFormA(f => ({ ...f, dataHora: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Prioridade</label>
-                  <select value={formA.prioridade} onChange={e => setFormA(f => ({ ...f, prioridade: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm">
-                    <option value="normal">Normal</option>
-                    <option value="alta">Alta</option>
-                    <option value="urgente">Urgente</option>
-                  </select>
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Local</label>
-                  <input value={formA.local} onChange={e => setFormA(f => ({ ...f, local: e.target.value }))}
-                    placeholder="Gabinete / Endereço" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Descrição</label>
-                  <textarea value={formA.descricao} onChange={e => setFormA(f => ({ ...f, descricao: e.target.value }))}
-                    rows={2} className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none" />
-                </div>
-              </div>
-            </div>
-            <div className="p-5 border-t flex gap-3 justify-end">
-              <button onClick={fecharModal} className="px-4 py-2 text-sm border rounded-lg hover:bg-muted">Cancelar</button>
-              <button onClick={salvarAudiencia} disabled={saving || !formA.titulo || !formA.solicitante || !formA.dataHora}
-                className="px-4 py-2 text-sm bg-[#009C3B] text-white rounded-lg hover:bg-[#007d2f] disabled:opacity-60 transition-colors">
-                {saving ? 'Salvando...' : 'Agendar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </>)}
 
-      {/* ── MODAL PROJETO ── */}
-      {modal === 'projeto' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="font-semibold text-lg">Novo Projeto de Lei</h2>
-              <button onClick={fecharModal} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Tipo *</label>
-                  <select value={formP.tipo} onChange={e => setFormP(f => ({ ...f, tipo: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm">
-                    {Object.entries(TIPO_PROJETO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+              {/* FORM AUDIÊNCIA */}
+              {tab === 'audiencias' && (<>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Solicitante *</label>
+                  <input value={formAudiencia.solicitante} onChange={e => setFormAudiencia(f => ({ ...f, solicitante: e.target.value }))}
+                    placeholder="Nome do solicitante" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Número</label>
-                  <input value={formP.numero} onChange={e => setFormP(f => ({ ...f, numero: e.target.value }))}
-                    placeholder="Ex: PL 001/2026" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Pauta *</label>
+                  <input value={formAudiencia.pauta} onChange={e => setFormAudiencia(f => ({ ...f, pauta: e.target.value }))}
+                    placeholder="Assunto da audiência" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Título *</label>
-                  <input value={formP.titulo} onChange={e => setFormP(f => ({ ...f, titulo: e.target.value }))}
-                    placeholder="Título do projeto" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Data e hora *</label>
+                    <input type="datetime-local" value={formAudiencia.dataHora} onChange={e => setFormAudiencia(f => ({ ...f, dataHora: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Prioridade</label>
+                    <select value={formAudiencia.prioridade} onChange={e => setFormAudiencia(f => ({ ...f, prioridade: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-[#002776]">
+                      <option value="baixa">Baixa</option>
+                      <option value="normal">Normal</option>
+                      <option value="alta">Alta</option>
+                      <option value="urgente">Urgente</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Ementa *</label>
-                  <textarea value={formP.ementa} onChange={e => setFormP(f => ({ ...f, ementa: e.target.value }))}
-                    rows={3} placeholder="Descreva o objeto do projeto..." className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Local</label>
+                  <input value={formAudiencia.local} onChange={e => setFormAudiencia(f => ({ ...f, local: e.target.value }))}
+                    placeholder="Ex: Gabinete, Câmara, Online" className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776]" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Status</label>
-                  <select value={formP.status} onChange={e => setFormP(f => ({ ...f, status: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm">
-                    {Object.entries(STATUS_PROJETO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                  </select>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Observação</label>
+                  <textarea rows={2} value={formAudiencia.observacao} onChange={e => setFormAudiencia(f => ({ ...f, observacao: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#002776] resize-none" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Data protocolo</label>
-                  <input type="date" value={formP.dataProtocolo} onChange={e => setFormP(f => ({ ...f, dataProtocolo: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Temas (separados por vírgula)</label>
-                  <input value={formP.temas} onChange={e => setFormP(f => ({ ...f, temas: e.target.value }))}
-                    placeholder="saúde, educação, mobilidade" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Link oficial</label>
-                  <input value={formP.linkOficial} onChange={e => setFormP(f => ({ ...f, linkOficial: e.target.value }))}
-                    placeholder="https://..." className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-              </div>
-            </div>
-            <div className="p-5 border-t flex gap-3 justify-end">
-              <button onClick={fecharModal} className="px-4 py-2 text-sm border rounded-lg hover:bg-muted">Cancelar</button>
-              <button onClick={salvarProjeto} disabled={saving || !formP.titulo || !formP.ementa}
-                className="px-4 py-2 text-sm bg-[#002776] text-white rounded-lg hover:bg-[#001855] disabled:opacity-60 transition-colors">
-                {saving ? 'Salvando...' : 'Criar Projeto'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </>)}
 
-      {/* ── MODAL PROTOCOLO ── */}
-      {modal === 'protocolo' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="font-semibold text-lg">Novo Protocolo de Atendimento</h2>
-              <button onClick={fecharModal} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Solicitante *</label>
-                  <input value={formProt.solicitante} onChange={e => setFormProt(f => ({ ...f, solicitante: e.target.value }))}
-                    placeholder="Nome do cidadão" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+              {erro && (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl p-3">
+                  <AlertCircle className="w-4 h-4 shrink-0" />{erro}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Telefone</label>
-                  <input value={formProt.telefone} onChange={e => setFormProt(f => ({ ...f, telefone: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Prioridade</label>
-                  <select value={formProt.prioridade} onChange={e => setFormProt(f => ({ ...f, prioridade: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm">
-                    <option value="normal">Normal</option>
-                    <option value="alta">Alta</option>
-                    <option value="urgente">Urgente</option>
-                  </select>
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Assunto *</label>
-                  <input value={formProt.assunto} onChange={e => setFormProt(f => ({ ...f, assunto: e.target.value }))}
-                    placeholder="Descreva o assunto do atendimento" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium">Descrição detalhada</label>
-                  <textarea value={formProt.descricao} onChange={e => setFormProt(f => ({ ...f, descricao: e.target.value }))}
-                    rows={3} className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Responsável</label>
-                  <input value={formProt.responsavel} onChange={e => setFormProt(f => ({ ...f, responsavel: e.target.value }))}
-                    placeholder="Membro da equipe" className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Prazo</label>
-                  <input type="datetime-local" value={formProt.prazo} onChange={e => setFormProt(f => ({ ...f, prazo: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
-                </div>
-              </div>
-            </div>
-            <div className="p-5 border-t flex gap-3 justify-end">
-              <button onClick={fecharModal} className="px-4 py-2 text-sm border rounded-lg hover:bg-muted">Cancelar</button>
-              <button onClick={salvarProtocolo} disabled={saving || !formProt.solicitante || !formProt.assunto}
-                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-60 transition-colors">
-                {saving ? 'Salvando...' : 'Abrir Protocolo'}
+              )}
+
+              <button
+                onClick={tab === 'projetos' ? salvarProjeto : tab === 'protocolos' ? salvarProtocolo : salvarAudiencia}
+                disabled={saving}
+                className="w-full py-3 rounded-xl bg-[#002776] text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Salvar
               </button>
             </div>
           </div>
