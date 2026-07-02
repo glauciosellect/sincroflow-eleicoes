@@ -118,6 +118,7 @@ model Candidate {
   broadcasts       Broadcast[]
   voteSurveys      VoteSurveyResponse[]
   factChecks       FactCheck[]
+  portalEleitor    PortalEleitor?
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -608,4 +609,46 @@ model VoteSurveyResponse {
   @@index([candidateId, createdAt])
   @@index([candidateId, intention])
   @@index([candidateId, collectedById])
+}
+
+// ─── Portal do Eleitor — M1 ───────────────────────────────────────────────────
+
+model PortalEleitor {
+  id             String   @id @default(cuid())
+  candidateId    String   @unique
+  slug           String   @unique
+  titulo         String
+  subtitulo      String?
+  descricao      String?  @db.Text
+  fotoUrl        String?
+  corPrimaria    String   @default("#002776")
+  ativo          Boolean  @default(true)
+  totalCadastros Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  candidate Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  cadastros CadastroPortal[]
+
+  @@index([slug])
+}
+
+model CadastroPortal {
+  id       String        @id @default(cuid())
+  portalId String
+  nome     String
+  telefone String
+  email    String?
+  cidade   String?
+  bairro   String?
+  assunto  String?
+  mensagem String?       @db.Text
+  status   String        @default("novo")
+  origemIp String?
+  createdAt DateTime     @default(now())
+
+  portal PortalEleitor @relation(fields: [portalId], references: [id], onDelete: Cascade)
+
+  @@index([portalId, status])
+  @@index([portalId, createdAt])
 }

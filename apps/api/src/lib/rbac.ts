@@ -13,13 +13,14 @@ export type Module =
   | 'settings' // Configurações
   | 'team' // Equipe
   | 'field_agent' // Meu Desempenho (Agente de Campo)
+  | 'portal' // Portal do Eleitor
 
 // Tabela fixa de acesso por role (seção 4.10 da spec) — Administrador tem acesso
 // total; os demais roles têm um conjunto fixo e não-configurável de módulos.
 // AGENTE_CAMPO só acessa a própria tela de desempenho — não atende chat, não vê
 // contatos completos, não configura nada.
 const ROLE_MODULES: Record<string, Module[]> = {
-  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent'],
+  ADMINISTRADOR: ['story', 'platform', 'chat', 'contacts', 'agenda', 'reports', 'settings', 'team', 'field_agent', 'portal'],
   ATENDIMENTO: ['chat', 'contacts', 'agenda'],
   CONTEUDO: ['story', 'platform', 'agenda'],
   RELATORIOS: ['contacts', 'reports'],
