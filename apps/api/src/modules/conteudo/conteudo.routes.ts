@@ -200,4 +200,115 @@ export async function conteudoRoutes(app: FastifyInstance) {
       Object.entries(TEMAS).map(([id, label]) => ({ id, label }))
     )
   })
+
+  // POST /conteudo/discurso — gera discurso de palanque com contexto das propostas
+  app.post('/conteudo/discurso', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const { temas, duracao, tom } = z.object({
+      temas:   z.array(z.string()).min(1).max(6),
+      duracao: z.enum(['10', '15', '20', '30']).default('15'),
+      tom:     z.enum(['formal', 'proximo', 'emotivo']).default('emotivo'),
+    }).parse(req.body)
+
+    // Busca dados do candidato + propostas dos temas escolhidos
+    const [candidate, agentConfig, platformTopics] = await Promise.all([
+      prisma.candidate.findUnique({
+        where: { id: candidateId },
+        select: { name: true, position: true, party: true, state: true, city: true },
+      }),
+      prisma.agentConfig.findUnique({
+        where: { candidateId },
+        select: { story: true },
+      }),
+      prisma.platformTopic.findMany({
+        where: { candidateId, topicKey: { in: temas } },
+        select: { topicKey: true, topicName: true, content: true },
+      }),
+    ])
+
+    const duracaoMin = parseInt(duracao)
+    const palavrasAlvo = Math.round(duracaoMin * 130) // ~130 palavras/minuto de discurso
+    const temasLabels = temas.map(t => TEMAS[t] ?? t).join(', ')
+    const tomLabel = TOM_LABEL[tom] ?? tom
+
+    // Monta contexto das propostas para a IA
+    const propostasCtx = platformTopics.length > 0
+      ? platformTopics.map(t => `## ${t.topicName}\n${(t.content ?? '').slice(0, 800)}`).join('\n\n')
+      : 'Nenhuma proposta específica cadastrada — use argumentos gerais baseados no cargo e perfil do candidato.'
+
+    const historiaCtx = agentConfig?.story
+      ? `\n\nHISTÓRIA E CONTEXTO DO CANDIDATO:\n${agentConfig.story.slice(0, 600)}`
+      : ''
+
+    const systemPrompt = `Você é um redator de discursos políticos brasileiro de elite, especialista em retórica, oratória e comunicação eleitoral.
+
+CANDIDATO: ${candidate?.name ?? 'Candidato'}
+CARGO: ${candidate?.position ?? 'não informado'}
+PARTIDO: ${candidate?.party ?? 'não informado'}
+LOCAL: ${candidate?.city ?? ''} - ${candidate?.state ?? 'Brasil'}
+${historiaCtx}
+
+PROPOSTAS DO CANDIDATO SOBRE OS TEMAS ESCOLHIDOS:
+${propostasCtx}
+
+INSTRUÇÕES DO DISCURSO:
+- Tom: ${tomLabel}
+- Duração alvo: ${duracaoMin} minutos (~${palavrasAlvo} palavras)
+- Temas: ${temasLabels}
+- É um discurso de PALANQUE: precisa ser falado, emocionante, com pausas marcadas, aplausos provocados
+- Use técnicas de retórica: tricolon, anáfora, pergunta retórica, narrativa pessoal, chamada à ação
+- Estruture com: abertura impactante → conexão com o povo → desenvolvimento por tema → clímax emocional → encerramento memorável
+- PROIBIDO: ataques a adversários, promessas impossíveis, linguagem técnica fria
+- OBRIGATÓRIO: mencionar o número eleitoral ao final, convocar para o voto
+
+FORMATO DE SAÍDA — JSON válido:
+{
+  "titulo": "título do discurso",
+  "duracao_estimada": "${duracaoMin} minutos",
+  "secoes": [
+    { "nome": "Abertura", "texto": "...", "dica": "dica de oratória para esta seção" },
+    { "nome": "Tema X", "texto": "...", "dica": "..." },
+    ...
+    { "nome": "Encerramento", "texto": "...", "dica": "..." }
+  ],
+  "resumo_executivo": "3 frases-chave do discurso para memorização rápida"
+}`
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 6000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: `Gere o discurso completo de palanque sobre: ${temasLabels}` }],
+    })
+
+    const raw = (message.content[0] as { type: string; text: string }).text
+    let parsed: { titulo: string; duracao_estimada: string; secoes: Array<{ nome: string; texto: string; dica: string }>; resumo_executivo: string }
+
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/)
+      if (!match) throw { statusCode: 500, message: 'IA retornou resposta inválida' }
+      parsed = JSON.parse(match[0])
+    }
+
+    // Salva no histórico como conteúdo com plataforma "discurso"
+    const textoCompleto = parsed.secoes.map(s => `## ${s.nome}\n\n${s.texto}`).join('\n\n---\n\n')
+    const record = await prisma.conteudoIA.create({
+      data: {
+        candidateId,
+        tema: temas[0],
+        temaCustomizado: temasLabels,
+        plataforma: 'discurso',
+        tom,
+        textoGerado: textoCompleto,
+        hashtags: [],
+        tokensUsados: message.usage.input_tokens + message.usage.output_tokens,
+      },
+    })
+
+    return reply.status(201).send({ id: record.id, ...parsed, textoCompleto })
+  })
 }
