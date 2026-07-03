@@ -72,20 +72,44 @@ export default function CreativeEditor({
     canvas.add(stripe)
 
     // Foto do candidato (se existir)
-    if (candidatePhoto) {
-      await new Promise<void>(resolve => {
-        fabric.Image.fromURL(candidatePhoto, (img: any) => {
-          const scale = Math.min((fmt.w * 0.7) / img.width!, (fmt.h * 0.7) / img.height!)
-          img.set({
-            left: fmt.w / 2 - (img.width! * scale) / 2,
-            top: fmt.h * 0.03,
-            scaleX: scale, scaleY: scale,
-            selectable: true,
-          })
-          canvas.add(img)
-          resolve()
-        }, { crossOrigin: 'anonymous' })
-      })
+    // Remove cache-bust (?t=...) pois quebra CORS no Supabase
+    const photoUrl = candidatePhoto ? candidatePhoto.split('?')[0] : null
+    if (photoUrl) {
+      try {
+        // Carrega via HTMLImageElement para evitar problemas de CORS com o Fabric
+        const htmlImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image()
+          el.crossOrigin = 'anonymous'
+          el.onload = () => resolve(el)
+          el.onerror = reject
+          setTimeout(() => reject(new Error('timeout')), 8000)
+          el.src = photoUrl
+        })
+        const img = new fabric.Image(htmlImg as any)
+        const scale = Math.min((fmt.w * 0.7) / htmlImg.naturalWidth, (fmt.h * 0.7) / htmlImg.naturalHeight)
+        img.set({
+          left: fmt.w / 2 - (htmlImg.naturalWidth * scale) / 2,
+          top: fmt.h * 0.03,
+          scaleX: scale, scaleY: scale,
+          selectable: true,
+        })
+        canvas.add(img)
+      } catch {
+        // fallback placeholder se CORS/timeout
+        const photoRect = new fabric.Rect({
+          left: fmt.w * 0.15, top: fmt.h * 0.05,
+          width: fmt.w * 0.7, height: fmt.h * 0.6,
+          fill: '#dddddd', rx: 8, ry: 8,
+          selectable: false, evented: false,
+        })
+        const photoLabel = new fabric.Text('Foto não carregada', {
+          left: fmt.w / 2, top: fmt.h * 0.35,
+          originX: 'center', originY: 'center',
+          fontSize: Math.round(fmt.w * 0.035),
+          fill: '#999999', selectable: false, evented: false,
+        })
+        canvas.add(photoRect, photoLabel)
+      }
     } else {
       // Placeholder da foto
       const photoRect = new fabric.Rect({
