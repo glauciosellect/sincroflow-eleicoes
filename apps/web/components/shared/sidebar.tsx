@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
@@ -51,6 +51,7 @@ const navItems = [
 
   { section: 'CAMPANHA', items: [
     { href: '/equipe', label: 'Equipe de Campanha', icon: UserCheck, module: 'equipe' },
+    { href: '/equipe/coordenadores', label: 'Coordenadores de Campo', icon: Network, module: 'equipe' },
     { href: '/financeiro', label: 'Financeiro', icon: Wallet, module: 'financeiro' },
     { href: '/prestacao-contas', label: 'Prestação de Contas', icon: Scale, module: 'prestacao' },
     { href: '/gabinete', label: 'Gabinete', icon: Building2, module: 'gabinete' },
