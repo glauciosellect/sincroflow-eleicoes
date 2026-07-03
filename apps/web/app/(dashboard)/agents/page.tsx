@@ -677,11 +677,13 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
             </div>
             <div className="p-6">
               <CreativeEditor
-                candidateName={candidate?.name}
-                candidateNumber={candidate?.candidateNumber ?? undefined}
-                candidatePosition={candidate?.position ?? undefined}
-                candidateParty={candidate?.party ?? undefined}
-                candidatePhoto={candidate?.photoUrl ?? null}
+                name={candidate?.name}
+                number={candidate?.candidateNumber ?? undefined}
+                position={candidate?.position ?? undefined}
+                party={candidate?.party ?? undefined}
+                photo={candidate?.photoUrl ?? null}
+                city={candidate?.city ?? undefined}
+                state={candidate?.state ?? undefined}
                 onExport={async (dataUrl, filename) => {
                   // Converte dataUrl para File e faz upload para a biblioteca
                   const res = await fetch(dataUrl)
