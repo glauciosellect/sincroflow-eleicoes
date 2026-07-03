@@ -88,9 +88,9 @@ export default function CreativeEditor({
 
   const buildTemplate = useCallback(async (canvas: any, fabric: any) => {
     canvas.clear()
-    canvas.setWidth(fmt.w)
-    canvas.setHeight(fmt.h)
-    canvas.setBackgroundColor(bgColor, canvas.renderAll.bind(canvas))
+    // Fabric v6: setWidth/setHeight → setDimensions
+    canvas.setDimensions({ width: fmt.w, height: fmt.h })
+    canvas.set('backgroundColor', bgColor)
 
     // Faixa inferior de destaque
     const stripe = new fabric.Rect({
@@ -169,13 +169,15 @@ export default function CreativeEditor({
       if (!canvasRef.current) return
 
       if (fabricRef.current) {
-        fabricRef.current.dispose()
+        try { fabricRef.current.dispose() } catch {}
+        fabricRef.current = null
       }
 
-      canvas = new Canvas(canvasRef.current!, {
+      // Fabric v6: passa o id do elemento ou o próprio elemento
+      canvasRef.current.id = 'fabric-canvas-editor'
+      canvas = new Canvas('fabric-canvas-editor', {
         width: fmt.w,
         height: fmt.h,
-        selection: true,
       })
       fabricRef.current = canvas
 
@@ -184,7 +186,10 @@ export default function CreativeEditor({
       canvas.on('selection:cleared', () => setSelectedObj(null))
 
       const fabric = { Canvas, Rect, Text, IText, Image: FabricImage }
-      buildTemplate(canvas, fabric).then(() => setLoading(false))
+      buildTemplate(canvas, fabric).then(() => {
+        canvas.renderAll()
+        setLoading(false)
+      })
     })
 
     return () => {
@@ -224,7 +229,7 @@ export default function CreativeEditor({
     const canvas = fabricRef.current
     if (!canvas) return
     // Render em alta resolução (2x)
-    const dataUrl = canvas.toDataURL({ format: 'png', multiplier: 2 })
+    const dataUrl = canvas.toDataURL({ format: 'png', multiplier: 2, enableRetinaScaling: false })
     const filename = `criativo-${format}-${Date.now()}.png`
     if (onExport) {
       onExport(dataUrl, filename)
