@@ -256,12 +256,22 @@ export default function ConteudoPage() {
       temas: temasSelecionados,
       duracao,
       tom,
-    }).then(r => r.data),
+    }, { timeout: 120000 }).then(r => r.data),
     onSuccess: (data: Discurso) => {
       setDiscurso(data)
       qc.invalidateQueries({ queryKey: ['conteudo'] })
     },
-    onError: () => toast({ title: 'Erro ao gerar discurso', description: 'Tente novamente.', variant: 'destructive' }),
+    onError: (err: any) => {
+      console.error('[discurso] erro completo:', err)
+      console.error('[discurso] response:', err?.response?.status, err?.response?.data)
+      const status = err?.response?.status
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || ''
+      let desc = msg || 'Erro desconhecido.'
+      if (status === 504 || status === 502 || err?.code === 'ECONNABORTED') {
+        desc = 'A IA demorou mais que o esperado. Tente com menos temas ou duração menor.'
+      }
+      toast({ title: 'Erro ao gerar discurso', description: desc, variant: 'destructive' })
+    },
   })
 
   const regenerarMutation = useMutation({
@@ -413,7 +423,12 @@ export default function ConteudoPage() {
                       return (
                         <button key={p.id} onClick={() => {
                           setPlataforma(p.id)
-                          if (!isDiscursoOpt) setTemasSelecionados([])
+                          if (isDiscursoOpt) {
+                            // Migra tema single-select para multi-select ao escolher Discurso
+                            if (tema && temasSelecionados.length === 0) setTemasSelecionados([tema])
+                          } else {
+                            setTemasSelecionados([])
+                          }
                         }}
                           className={`p-4 rounded-xl border flex items-center gap-3 transition-all text-left ${plataforma === p.id ? (isDiscursoOpt ? 'border-amber-500 bg-amber-50' : 'border-[#002776] bg-[#002776]/5') : 'border-gray-200 hover:border-gray-300'} ${isDiscursoOpt ? 'col-span-2 sm:col-span-1' : ''}`}>
                           <Icon className={`w-5 h-5 shrink-0 ${p.color}`} />

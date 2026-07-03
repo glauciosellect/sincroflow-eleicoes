@@ -203,6 +203,7 @@ export async function conteudoRoutes(app: FastifyInstance) {
 
   // POST /conteudo/discurso — gera discurso de palanque com contexto das propostas
   app.post('/conteudo/discurso', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+    try {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
@@ -276,39 +277,69 @@ FORMATO DE SAÍDA — JSON válido:
   "resumo_executivo": "3 frases-chave do discurso para memorização rápida"
 }`
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 6000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: `Gere o discurso completo de palanque sobre: ${temasLabels}` }],
-    })
+    let message: Awaited<ReturnType<typeof anthropic.messages.create>>
+    try {
+      message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: `Gere o discurso completo de palanque sobre: ${temasLabels}` }],
+      })
+    } catch (aiErr: any) {
+      throw { statusCode: 502, message: `Erro ao contatar IA: ${aiErr?.message ?? 'desconhecido'}` }
+    }
 
-    const raw = (message.content[0] as { type: string; text: string }).text
+    const textBlock = message.content.find((b: any) => b.type === 'text') as { type: string; text: string } | undefined
+    if (!textBlock?.text) {
+      console.error('[discurso] content vazio ou sem bloco text:', JSON.stringify(message.content))
+      throw { statusCode: 500, message: 'IA retornou resposta vazia — tente novamente' }
+    }
+    const raw = textBlock.text
     let parsed: { titulo: string; duracao_estimada: string; secoes: Array<{ nome: string; texto: string; dica: string }>; resumo_executivo: string }
 
     try {
       parsed = JSON.parse(raw)
     } catch {
       const match = raw.match(/\{[\s\S]*\}/)
-      if (!match) throw { statusCode: 500, message: 'IA retornou resposta inválida' }
-      parsed = JSON.parse(match[0])
+      if (!match) throw { statusCode: 500, message: 'IA retornou resposta inválida — tente novamente' }
+      try {
+        parsed = JSON.parse(match[0])
+      } catch {
+        throw { statusCode: 500, message: 'IA retornou JSON incompleto — tente novamente' }
+      }
+    }
+
+    if (!parsed.secoes || !Array.isArray(parsed.secoes) || parsed.secoes.length === 0) {
+      throw { statusCode: 500, message: 'IA não gerou seções no discurso — tente novamente' }
     }
 
     // Salva no histórico como conteúdo com plataforma "discurso"
     const textoCompleto = parsed.secoes.map(s => `## ${s.nome}\n\n${s.texto}`).join('\n\n---\n\n')
-    const record = await prisma.conteudoIA.create({
-      data: {
-        candidateId,
-        tema: temas[0],
-        temaCustomizado: temasLabels,
-        plataforma: 'discurso',
-        tom,
-        textoGerado: textoCompleto,
-        hashtags: [],
-        tokensUsados: message.usage.input_tokens + message.usage.output_tokens,
-      },
-    })
+    let record: { id: string }
+    try {
+      record = await prisma.conteudoIA.create({
+        data: {
+          candidateId,
+          tema: temas[0],
+          temaCustomizado: temasLabels,
+          plataforma: 'discurso',
+          tom,
+          textoGerado: textoCompleto,
+          hashtags: [],
+          tokensUsados: message.usage.input_tokens + message.usage.output_tokens,
+        },
+      })
+    } catch (dbErr: any) {
+      // Discurso gerado com sucesso, apenas falhou ao salvar — retorna sem id
+      return reply.status(201).send({ id: null, ...parsed, textoCompleto })
+    }
 
     return reply.status(201).send({ id: record.id, ...parsed, textoCompleto })
+    } catch (err: any) {
+      console.error('[discurso] ERRO CAPTURADO:', err)
+      const statusCode = err?.statusCode ?? 500
+      const message = err?.message ?? 'Erro interno ao gerar discurso'
+      return reply.status(statusCode).send({ message, error: message })
+    }
   })
 }
