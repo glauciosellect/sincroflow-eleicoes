@@ -325,10 +325,11 @@ model Contact {
   optedOutAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @default(now()) @updatedAt
-  candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  channel           Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  candidate         Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  channel           Channel          @relation(fields: [channelId], references: [id], onDelete: Cascade)
   conversations     Conversation[]
   requests          Request[]
+  cadastrosPortal   CadastroPortal[]
 
   @@unique([candidateId, channelId, externalId])
   @@index([candidateId, createdAt])
@@ -520,6 +521,7 @@ enum ChannelType {
   FACEBOOK
   TELEGRAM
   EMAIL
+  PORTAL
 }
 
 enum ContactType {
@@ -657,11 +659,13 @@ model CadastroPortal {
   bairro   String?
   assunto  String?
   mensagem String?       @db.Text
-  status   String        @default("novo")
-  origemIp String?
-  createdAt DateTime     @default(now())
+  status    String        @default("novo")
+  origemIp  String?
+  contactId String?       // preenchido ao sincronizar com Contatos
+  createdAt DateTime      @default(now())
 
-  portal PortalEleitor @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  portal  PortalEleitor @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  contact Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   @@index([portalId, status])
   @@index([portalId, createdAt])

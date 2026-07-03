@@ -3,6 +3,7 @@ import { z } from 'zod'
 import crypto from 'crypto'
 import { prisma } from '../../lib/prisma'
 import { sendEmail, teamInviteEmail } from '../../lib/mailer'
+import { uploadCandidatePhoto } from '../../lib/storage'
 
 async function getCandidateForUser(userId: string) {
   const membership = await prisma.teamMember.findFirst({
@@ -48,6 +49,30 @@ export async function candidateRoutes(app: FastifyInstance) {
     }).parse(req.body)
     const updated = await prisma.candidate.update({ where: { id: candidate.id }, data })
     return reply.send(updated)
+  })
+
+  // POST /candidates/me/photo — upload de foto via multipart
+  app.post('/candidates/me/photo', async (req, reply) => {
+    const { sub } = req.user as { sub: string }
+    const { candidate, role } = await getCandidateForUser(sub)
+    if (!requireAdmin(role, reply)) return
+
+    const file = await req.file()
+    if (!file) return reply.status(400).send({ error: 'Nenhum arquivo enviado' })
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.mimetype)) {
+      return reply.status(400).send({ error: 'Formato inválido. Use JPG, PNG ou WEBP.' })
+    }
+
+    const buffer = await file.toBuffer()
+    if (buffer.length > 5 * 1024 * 1024) {
+      return reply.status(400).send({ error: 'Arquivo muito grande. Máximo 5 MB.' })
+    }
+
+    const photoUrl = await uploadCandidatePhoto(candidate.id, buffer, file.mimetype)
+    const updated = await prisma.candidate.update({ where: { id: candidate.id }, data: { photoUrl } })
+    return reply.send({ photoUrl: updated.photoUrl })
   })
 
   // —— Equipe ————————————————————————————————————————————————————————

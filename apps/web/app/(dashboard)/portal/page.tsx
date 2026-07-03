@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import {
   Globe, Settings, Users, Download, ExternalLink, Copy, CheckCircle2,
-  ChevronLeft, ChevronRight, Loader2, Search, Trash2, Phone, Mail, MapPin
+  ChevronLeft, ChevronRight, Loader2, Search, Trash2, Phone, Mail, MapPin,
+  UserPlus, RefreshCw
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -36,7 +37,7 @@ interface Portal {
 interface Cadastro {
   id: string; nome: string; telefone: string; email?: string
   cidade?: string; bairro?: string; assunto?: string; mensagem?: string
-  status: string; createdAt: string
+  status: string; createdAt: string; contactId?: string | null
 }
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
@@ -96,6 +97,30 @@ export default function PortalPage() {
     mutationFn: (id: string) => api.delete(`/portal/cadastros/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portal-cadastros'] }),
   })
+
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+  const syncOne = async (id: string) => {
+    setSyncingId(id)
+    try {
+      await api.post(`/portal/cadastros/${id}/sync-contact`)
+      qc.invalidateQueries({ queryKey: ['portal-cadastros'] })
+      toast({ title: 'Contato sincronizado!' })
+    } catch (e: any) {
+      toast({ title: 'Erro ao sincronizar', description: e.response?.data?.error, variant: 'destructive' })
+    } finally { setSyncingId(null) }
+  }
+
+  const [syncingAll, setSyncingAll] = useState(false)
+  const syncAll = async () => {
+    setSyncingAll(true)
+    try {
+      const { data } = await api.post('/portal/cadastros/sync-all')
+      qc.invalidateQueries({ queryKey: ['portal-cadastros'] })
+      toast({ title: `${data.synced} contato(s) sincronizado(s) de ${data.total} pendente(s).` })
+    } catch (e: any) {
+      toast({ title: 'Erro ao sincronizar', description: e.response?.data?.error, variant: 'destructive' })
+    } finally { setSyncingAll(false) }
+  }
 
   const copyLink = () => {
     if (!portal) return
@@ -246,6 +271,10 @@ export default function PortalPage() {
                 <Button variant="outline" size="sm" onClick={exportCsv} className="gap-2 shrink-0">
                   <Download className="w-4 h-4" />Exportar CSV
                 </Button>
+                <Button variant="outline" size="sm" onClick={syncAll} disabled={syncingAll} className="gap-2 shrink-0">
+                  {syncingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Sincronizar todos
+                </Button>
               </div>
 
               {cadastrosLoading ? (
@@ -282,6 +311,20 @@ export default function PortalPage() {
                             <p className="text-xs text-gray-400">{formatDate(c.createdAt)}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            {c.contactId ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />Contato
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => syncOne(c.id)}
+                                disabled={syncingId === c.id}
+                                title="Adicionar aos Contatos"
+                                className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+                              >
+                                {syncingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                              </button>
+                            )}
                             <select
                               value={c.status}
                               onChange={e => statusMutation.mutate({ id: c.id, status: e.target.value })}

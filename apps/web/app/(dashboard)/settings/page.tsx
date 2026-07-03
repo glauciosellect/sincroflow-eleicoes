@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/utils'
 import {
   Plus, Trash2, Loader2, KeyRound,
   User, Radio, Save, Copy, ShieldAlert, ShieldCheck, AlertTriangle, Wallet,
+  Camera, ImageIcon,
 } from 'lucide-react'
 import { channelLabel, cn } from '@/lib/utils'
 import { ChannelIcon } from '@/components/channel-icon'
@@ -27,7 +28,10 @@ function ProfileTab() {
   const { toast } = useToast()
   const router = useRouter()
   const qc = useQueryClient()
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState(user?.name || '')
+  const [photoPreview, setPhotoPreview] = useState<string | null>(candidate?.photoUrl || null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [form, setForm] = useState({
     name: candidate?.name || '',
     candidateNumber: candidate?.candidateNumber || '',
@@ -72,6 +76,24 @@ function ProfileTab() {
   })
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { toast({ title: 'Arquivo muito grande. Máximo 5 MB.', variant: 'destructive' }); return }
+    setPhotoPreview(URL.createObjectURL(file))
+    setUploadingPhoto(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await api.post('/candidates/me/photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setCandidate({ ...candidate!, photoUrl: res.data.photoUrl })
+      toast({ title: 'Foto atualizada!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao enviar foto', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
+      setPhotoPreview(candidate?.photoUrl || null)
+    } finally { setUploadingPhoto(false) }
+  }
+
   const userMutation = useMutation({
     mutationFn: () => api.patch('/auth/me', { name }),
     onSuccess: (res) => { setUser({ name: res.data.name }); toast({ title: 'Perfil atualizado!' }) },
@@ -113,6 +135,33 @@ function ProfileTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Dados da campanha</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          {/* Foto do candidato */}
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Foto do candidato" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="w-8 h-8 text-gray-300" />
+                )}
+              </div>
+              {uploadingPhoto && (
+                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Foto do candidato</p>
+              <p className="text-xs text-gray-400 mt-0.5">JPG, PNG ou WEBP · máx 5 MB · usada nos criativos</p>
+              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoChange} />
+              <Button size="sm" variant="outline" className="mt-2 text-xs" onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto}>
+                <Camera className="w-3 h-3 mr-1.5" />
+                {photoPreview ? 'Trocar foto' : 'Enviar foto'}
+              </Button>
+            </div>
+          </div>
+
           <div>
             <Label>Nome completo do candidato</Label>
             <Input className="mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />

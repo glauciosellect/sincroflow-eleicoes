@@ -9,25 +9,37 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SE
   realtime: { transport: ws as any },
 })
 
-const BUCKET = 'creatives'
+const BUCKET_CREATIVES = 'creatives'
+const BUCKET_CANDIDATES = 'candidates'
 
 /** Sobe um criativo para o Supabase Storage e retorna a URL pública. */
 export async function uploadCreative(candidateId: string, fileBuffer: Buffer, filename: string, mimeType: string): Promise<string> {
   const path = `${candidateId}/${Date.now()}-${filename}`
-  const { error } = await supabase.storage.from(BUCKET).upload(path, fileBuffer, { contentType: mimeType, upsert: false })
+  const { error } = await supabase.storage.from(BUCKET_CREATIVES).upload(path, fileBuffer, { contentType: mimeType, upsert: false })
   if (error) throw new Error(`Falha ao subir criativo: ${error.message}`)
-
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  const { data } = supabase.storage.from(BUCKET_CREATIVES).getPublicUrl(path)
   return data.publicUrl
 }
 
-/** Remove o arquivo do bucket — best-effort, não lança erro se falhar. */
+/** Remove o arquivo do bucket creatives — best-effort. */
 export async function deleteCreativeFile(fileUrl: string): Promise<void> {
   try {
-    const path = fileUrl.split(`/${BUCKET}/`)[1]
+    const path = fileUrl.split(`/${BUCKET_CREATIVES}/`)[1]
     if (!path) return
-    await supabase.storage.from(BUCKET).remove([path])
+    await supabase.storage.from(BUCKET_CREATIVES).remove([path])
   } catch (err) {
     console.error('[STORAGE] Erro ao remover arquivo do bucket (ignorado):', err)
   }
+}
+
+/** Sobe a foto do candidato e retorna a URL pública. Substitui a anterior se existir. */
+export async function uploadCandidatePhoto(candidateId: string, fileBuffer: Buffer, mimeType: string): Promise<string> {
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${candidateId}/photo.${ext}`
+  // upsert: true → substitui o arquivo se já existe
+  const { error } = await supabase.storage.from(BUCKET_CANDIDATES).upload(path, fileBuffer, { contentType: mimeType, upsert: true })
+  if (error) throw new Error(`Falha ao subir foto: ${error.message}`)
+  // Adiciona timestamp para forçar cache-bust no browser
+  const { data } = supabase.storage.from(BUCKET_CANDIDATES).getPublicUrl(path)
+  return `${data.publicUrl}?t=${Date.now()}`
 }

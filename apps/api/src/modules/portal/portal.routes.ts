@@ -237,4 +237,86 @@ export async function portalRoutes(app: FastifyInstance) {
     reply.header('Content-Disposition', `attachment; filename="portal-${portal.slug}-${new Date().toISOString().slice(0, 10)}.csv"`)
     return reply.send('﻿' + header + rows)
   })
+
+  // POST /portal/cadastros/:id/sync-contact — adiciona cadastro aos Contatos
+  app.post('/portal/cadastros/:id/sync-contact', { onRequest: [requireModule('portal')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { id } = req.params as { id: string }
+
+    const portal = await prisma.portalEleitor.findUnique({ where: { candidateId }, select: { id: true } })
+    if (!portal) return reply.status(404).send({ error: 'Portal não configurado' })
+
+    const cadastro = await prisma.cadastroPortal.findFirst({ where: { id, portalId: portal.id } })
+    if (!cadastro) return reply.status(404).send({ error: 'Cadastro não encontrado' })
+
+    if (cadastro.contactId) return reply.send({ contactId: cadastro.contactId, alreadySynced: true })
+
+    // Garante que existe um canal PORTAL para este candidato
+    let channel = await prisma.channel.findFirst({ where: { candidateId, type: 'PORTAL' } })
+    if (!channel) {
+      channel = await prisma.channel.create({
+        data: { candidateId, type: 'PORTAL', name: 'Portal do Eleitor', isActive: true, config: {} },
+      })
+    }
+
+    // Upsert contact pelo telefone
+    const phone = cadastro.telefone.replace(/\D/g, '')
+    const contact = await prisma.contact.upsert({
+      where: { candidateId_channelId_externalId: { candidateId, channelId: channel.id, externalId: phone } },
+      update: {
+        name: cadastro.nome,
+        email: cadastro.email ?? undefined,
+        neighborhood: cadastro.bairro ?? undefined,
+        lastContactAt: new Date(),
+      },
+      create: {
+        candidateId, channelId: channel.id,
+        externalId: phone, phone: cadastro.telefone,
+        name: cadastro.nome, email: cadastro.email ?? undefined,
+        neighborhood: cadastro.bairro ?? undefined,
+        contactType: 'VOTER',
+      },
+    })
+
+    await prisma.cadastroPortal.update({ where: { id }, data: { contactId: contact.id } })
+
+    return reply.send({ contactId: contact.id, alreadySynced: false })
+  })
+
+  // POST /portal/cadastros/sync-all — sincroniza todos os cadastros de uma vez
+  app.post('/portal/cadastros/sync-all', { onRequest: [requireModule('portal')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const portal = await prisma.portalEleitor.findUnique({ where: { candidateId }, select: { id: true } })
+    if (!portal) return reply.status(404).send({ error: 'Portal não configurado' })
+
+    let channel = await prisma.channel.findFirst({ where: { candidateId, type: 'PORTAL' } })
+    if (!channel) {
+      channel = await prisma.channel.create({
+        data: { candidateId, type: 'PORTAL', name: 'Portal do Eleitor', isActive: true, config: {} },
+      })
+    }
+
+    const pendentes = await prisma.cadastroPortal.findMany({
+      where: { portalId: portal.id, contactId: null },
+    })
+
+    let synced = 0
+    for (const cadastro of pendentes) {
+      try {
+        const phone = cadastro.telefone.replace(/\D/g, '')
+        const contact = await prisma.contact.upsert({
+          where: { candidateId_channelId_externalId: { candidateId, channelId: channel.id, externalId: phone } },
+          update: { name: cadastro.nome, email: cadastro.email ?? undefined, neighborhood: cadastro.bairro ?? undefined, lastContactAt: new Date() },
+          create: { candidateId, channelId: channel.id, externalId: phone, phone: cadastro.telefone, name: cadastro.nome, email: cadastro.email ?? undefined, neighborhood: cadastro.bairro ?? undefined, contactType: 'VOTER' },
+        })
+        await prisma.cadastroPortal.update({ where: { id: cadastro.id }, data: { contactId: contact.id } })
+        synced++
+      } catch { /* ignora duplicata */ }
+    }
+
+    return reply.send({ synced, total: pendentes.length })
+  })
 }
