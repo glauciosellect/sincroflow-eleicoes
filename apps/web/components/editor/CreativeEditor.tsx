@@ -1,7 +1,8 @@
 'use client'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Download, ChevronUp, ChevronDown, Upload, ImageIcon, Sparkles, X } from 'lucide-react'
+import { Loader2, Download, ChevronUp, ChevronDown, Upload, Sparkles, X, Wand2 } from 'lucide-react'
+import api from '@/lib/api'
 
 /* ─── Tipos ──────────────────────────────────────────────────────────────── */
 type Format = 'santinho' | 'story' | 'banner'
@@ -43,7 +44,7 @@ const PALETTES: Array<{ key: string; label: string } & Colors> = [
 function buildHTML(
   fmt: { w: number; h: number },
   c: Colors,
-  photo: string | null,
+  photoOrAiBg: string | null,   // pode ser foto do candidato OU fundo IA
   name: string,
   number: string,
   position: string,
@@ -56,8 +57,7 @@ function buildHTML(
   const { w, h } = fmt
   const isLandscape = w > h
 
-  // Escapa aspas no src para evitar quebrar o HTML inline
-  const safePhoto = photo ? photo.replace(/"/g, '&quot;') : null
+  const safePhoto = photoOrAiBg ? photoOrAiBg.replace(/"/g, '&quot;') : null
 
   const photoEl = safePhoto
     ? `<img src="${safePhoto}" style="width:100%;height:100%;object-fit:cover;object-position:center ${photoY}%;display:block;" crossorigin="anonymous" />`
@@ -200,9 +200,12 @@ export default function CreativeEditor({ name, number, position, party, photo, c
   const [loadingPhoto,  setLoadingPhoto]  = useState(false)
 
   // UI
-  const [exporting,   setExporting]   = useState(false)
-  const [showColors,  setShowColors]  = useState(false)
-  const [html,        setHtml]        = useState('')
+  const [exporting,     setExporting]     = useState(false)
+  const [showColors,    setShowColors]    = useState(false)
+  const [html,          setHtml]          = useState('')
+  const [aiPrompt,      setAiPrompt]      = useState('')
+  const [generatingAI,  setGeneratingAI]  = useState(false)
+  const [aiBgB64,       setAiBgB64]       = useState<string | null>(null)
 
   // Sync props → estado
   useEffect(() => { setNameEdit(name || '') },   [name])
@@ -259,11 +262,25 @@ export default function CreativeEditor({ name, number, position, party, photo, c
     setColors({ ...PALETTES[idx] })
   }
 
-  // Rebuild HTML
+  // Gera fundo com IA
+  const generateAIBackground = useCallback(async () => {
+    if (!aiPrompt.trim()) return
+    setGeneratingAI(true)
+    try {
+      const { data } = await api.post('/creatives/generate-bg', { prompt: aiPrompt, format })
+      setAiBgB64(data.base64)
+    } catch (e: any) {
+      console.error('Erro ao gerar fundo IA:', e)
+    } finally {
+      setGeneratingAI(false)
+    }
+  }, [aiPrompt, format])
+
+  // Rebuild HTML (usa aiBgB64 como fundo se disponível)
   useEffect(() => {
     const fmt = FORMATS[format]
-    setHtml(buildHTML(fmt, colors, photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum))
-  }, [format, colors, photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum])
+    setHtml(buildHTML(fmt, colors, aiBgB64 ?? photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum))
+  }, [format, colors, aiBgB64, photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum])
 
   const exportPng = useCallback(async () => {
     const el = containerRef.current?.querySelector('[data-tpl]') as HTMLElement
@@ -346,6 +363,41 @@ export default function CreativeEditor({ name, number, position, party, photo, c
           {!uploadedB64 && photo && (
             <p className="text-[10px] text-gray-400 mt-1">Usando foto do perfil · <button className="underline" onClick={() => fileInputRef.current?.click()}>usar outra</button></p>
           )}
+        </div>
+
+        {/* Fundo com IA */}
+        <div className="rounded-xl border-2 border-dashed border-purple-200 bg-purple-50 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <p className="text-xs font-bold text-purple-700 uppercase tracking-widest">Fundo com IA</p>
+            {aiBgB64 && (
+              <button onClick={() => setAiBgB64(null)}
+                className="ml-auto text-[10px] text-red-500 hover:underline flex items-center gap-0.5">
+                <X className="w-3 h-3" />remover
+              </button>
+            )}
+          </div>
+          <textarea
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            rows={3}
+            placeholder="Descreva o cenário do fundo...&#10;Ex: Pôr do sol sobre a cidade de Juiz de Fora, cores azul e dourado, estilo moderno"
+            className="w-full border border-purple-200 rounded-lg px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+          />
+          <Button onClick={generateAIBackground} disabled={generatingAI || !aiPrompt.trim()}
+            className="w-full gap-2 bg-purple-600 hover:bg-purple-700 text-white text-xs py-2">
+            {generatingAI
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Gerando (~15s)...</>
+              : <><Wand2 className="w-3.5 h-3.5" />Gerar fundo com IA</>}
+          </Button>
+          {aiBgB64 && (
+            <div className="flex items-center gap-2 text-[10px] text-purple-600 bg-purple-100 rounded-lg px-2 py-1.5">
+              <span>✓ Fundo IA aplicado — ajuste posição e cores acima</span>
+            </div>
+          )}
+          <p className="text-[9px] text-purple-400 leading-tight">
+            Powered by Stable Diffusion XL · ~$0,02/imagem · Só o fundo é gerado, dados do candidato são sobrepostos
+          </p>
         </div>
 
         {/* Cores */}
