@@ -1,64 +1,70 @@
 'use client'
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { useAuthStore } from '@/store/auth.store'
 import {
   Sparkles, Copy, CheckCircle2, RefreshCw, Trash2, Archive,
   Loader2, ChevronLeft, ChevronRight, Hash, Clock, Send,
-  Instagram, Facebook, Linkedin, MessageSquare, Twitter, Video
+  Instagram, Facebook, Linkedin, MessageSquare, Twitter, Video,
+  ImageIcon, X, Download, Wand2
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+
+const CreativeEditor = dynamic(() => import('@/components/editor/CreativeEditor'), { ssr: false })
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const TEMAS = [
-  { id: 'saude', label: 'Saúde', icon: '🏥' },
-  { id: 'educacao', label: 'Educação', icon: '📚' },
-  { id: 'seguranca', label: 'Segurança', icon: '🛡️' },
-  { id: 'infraestrutura', label: 'Infraestrutura', icon: '🏗️' },
-  { id: 'meio_ambiente', label: 'Meio Ambiente', icon: '🌿' },
-  { id: 'emprego', label: 'Emprego', icon: '💼' },
-  { id: 'cultura', label: 'Cultura', icon: '🎭' },
-  { id: 'esporte', label: 'Esporte', icon: '⚽' },
-  { id: 'transporte', label: 'Transporte', icon: '🚌' },
-  { id: 'assistencia_social', label: 'Assistência Social', icon: '🤝' },
-  { id: 'tecnologia', label: 'Tecnologia', icon: '💡' },
-  { id: 'juventude', label: 'Juventude', icon: '🧑' },
-  { id: 'terceira_idade', label: 'Terceira Idade', icon: '👴' },
-  { id: 'mulheres', label: 'Mulheres', icon: '♀️' },
-  { id: 'lgbtqia', label: 'LGBTQIA+', icon: '🏳️‍🌈' },
-  { id: 'personalizado', label: 'Personalizado', icon: '✏️' },
+  { id: 'saude',           label: 'Saúde',            icon: '🏥', slogan: 'Saúde de qualidade para todos!' },
+  { id: 'educacao',        label: 'Educação',          icon: '📚', slogan: 'Educação transforma vidas!' },
+  { id: 'seguranca',       label: 'Segurança',         icon: '🛡️', slogan: 'Mais segurança, mais paz!' },
+  { id: 'infraestrutura',  label: 'Infraestrutura',    icon: '🏗️', slogan: 'Obras que fazem a diferença!' },
+  { id: 'meio_ambiente',   label: 'Meio Ambiente',     icon: '🌿', slogan: 'Pelo futuro do nosso planeta!' },
+  { id: 'emprego',         label: 'Emprego',           icon: '💼', slogan: 'Mais empregos, mais dignidade!' },
+  { id: 'cultura',         label: 'Cultura',           icon: '🎭', slogan: 'Cultura que une o povo!' },
+  { id: 'esporte',         label: 'Esporte',           icon: '⚽', slogan: 'Esporte e saúde para todos!' },
+  { id: 'transporte',      label: 'Transporte',        icon: '🚌', slogan: 'Mobilidade urbana de qualidade!' },
+  { id: 'assistencia_social', label: 'Assistência Social', icon: '🤝', slogan: 'Cuidando de quem mais precisa!' },
+  { id: 'tecnologia',      label: 'Tecnologia',        icon: '💡', slogan: 'Inovação a serviço do povo!' },
+  { id: 'juventude',       label: 'Juventude',         icon: '🧑', slogan: 'O futuro é dos jovens!' },
+  { id: 'terceira_idade',  label: 'Terceira Idade',    icon: '👴', slogan: 'Respeito e dignidade para os idosos!' },
+  { id: 'mulheres',        label: 'Mulheres',          icon: '♀️', slogan: 'Força e respeito para as mulheres!' },
+  { id: 'lgbtqia',         label: 'LGBTQIA+',          icon: '🏳️‍🌈', slogan: 'Igualdade e respeito para todos!' },
+  { id: 'personalizado',   label: 'Personalizado',     icon: '✏️', slogan: 'Sua voz, nossa força!' },
 ]
 
 const PLATAFORMAS = [
-  { id: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-500', limite: 2200 },
-  { id: 'facebook', label: 'Facebook', icon: Facebook, color: 'text-blue-600', limite: 63206 },
-  { id: 'tiktok', label: 'TikTok', icon: Video, color: 'text-gray-900', limite: 2200 },
-  { id: 'telegram', label: 'Telegram', icon: MessageSquare, color: 'text-sky-500', limite: 4096 },
-  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', limite: 3000 },
-  { id: 'x', label: 'X (Twitter)', icon: Twitter, color: 'text-gray-800', limite: 280 },
+  { id: 'instagram', label: 'Instagram',  icon: Instagram,    color: 'text-pink-500',  limite: 2200 },
+  { id: 'facebook',  label: 'Facebook',   icon: Facebook,     color: 'text-blue-600',  limite: 63206 },
+  { id: 'tiktok',    label: 'TikTok',     icon: Video,        color: 'text-gray-900',  limite: 2200 },
+  { id: 'telegram',  label: 'Telegram',   icon: MessageSquare, color: 'text-sky-500',  limite: 4096 },
+  { id: 'linkedin',  label: 'LinkedIn',   icon: Linkedin,     color: 'text-blue-700',  limite: 3000 },
+  { id: 'x',         label: 'X (Twitter)',icon: Twitter,      color: 'text-gray-800',  limite: 280 },
 ]
 
 const TONS = [
-  { id: 'proximo', label: 'Próximo', desc: 'Acessível, coloquial, humanizado' },
-  { id: 'formal', label: 'Formal', desc: 'Institucional, respeitoso, técnico' },
-  { id: 'emotivo', label: 'Emotivo', desc: 'Inspirador, tocante, apelo à emoção' },
+  { id: 'proximo',  label: 'Próximo',  desc: 'Acessível, coloquial, humanizado' },
+  { id: 'formal',   label: 'Formal',   desc: 'Institucional, respeitoso, técnico' },
+  { id: 'emotivo',  label: 'Emotivo',  desc: 'Inspirador, tocante, apelo à emoção' },
 ]
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  rascunho: { label: 'Rascunho', color: 'bg-gray-100 text-gray-700' },
-  agendado: { label: 'Agendado', color: 'bg-amber-100 text-amber-700' },
-  enviado: { label: 'Enviado', color: 'bg-green-100 text-green-700' },
+  rascunho:  { label: 'Rascunho',  color: 'bg-gray-100 text-gray-700' },
+  agendado:  { label: 'Agendado',  color: 'bg-amber-100 text-amber-700' },
+  enviado:   { label: 'Enviado',   color: 'bg-green-100 text-green-700' },
   arquivado: { label: 'Arquivado', color: 'bg-slate-100 text-slate-600' },
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function ConteudoPage() {
+  const { candidate } = useAuthStore()
   const [tab, setTab] = useState<'criar' | 'historico'>('criar')
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [tema, setTema] = useState('')
@@ -71,13 +77,20 @@ export default function ConteudoPage() {
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [santinhoOpen, setSantinhoOpen] = useState(false)
   const { toast } = useToast()
   const qc = useQueryClient()
 
   const limite = PLATAFORMAS.find(p => p.id === plataforma)?.limite ?? 2200
+  const temaAtual = TEMAS.find(t => t.id === tema)
 
   const gerarMutation = useMutation({
-    mutationFn: () => api.post('/conteudo/gerar', { tema, temaCustomizado: tema === 'personalizado' ? temaCustomizado : undefined, plataforma, tom }).then(r => r.data),
+    mutationFn: () => api.post('/conteudo/gerar', {
+      tema,
+      temaCustomizado: tema === 'personalizado' ? temaCustomizado : undefined,
+      plataforma,
+      tom,
+    }).then(r => r.data),
     onSuccess: (data) => {
       setResultado(data)
       setTextoEditado(data.texto)
@@ -125,10 +138,32 @@ export default function ConteudoPage() {
     setTimeout(() => setCopiedHash(null), 1500)
   }
 
-  const resetCriador = () => { setStep(1); setTema(''); setPlataforma(''); setTom('proximo'); setResultado(null); setTextoEditado('') }
+  const resetCriador = () => {
+    setStep(1); setTema(''); setPlataforma(''); setTom('proximo')
+    setResultado(null); setTextoEditado(''); setSantinhoOpen(false)
+  }
+
+  const handleExportSantinho = async (dataUrl: string, filename: string) => {
+    // Upload para biblioteca de criativos
+    try {
+      const res = await fetch(dataUrl)
+      const blob = await res.blob()
+      const form = new FormData()
+      form.append('file', blob, filename)
+      form.append('name', `Santinho ${temaAtual?.label ?? ''} — ${candidate?.name ?? ''}`)
+      form.append('type', 'post')
+      form.append('platform', 'all')
+      await api.post('/creatives', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast({ title: '✅ Santinho salvo na biblioteca de criativos!' })
+    } catch {
+      toast({ title: 'Santinho criado!', description: 'Download iniciado (não foi possível salvar na biblioteca).' })
+    }
+    // Download local sempre
+    const a = document.createElement('a'); a.href = dataUrl; a.download = filename; a.click()
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Criação de Conteúdo com IA</h1>
@@ -159,7 +194,9 @@ export default function ConteudoPage() {
                     {s < 3 && <div className={`h-0.5 w-8 transition-colors ${step > s ? 'bg-[#002776]' : 'bg-gray-100'}`} />}
                   </div>
                 ))}
-                <span className="ml-2 text-sm text-gray-500">{step === 1 ? 'Tema' : step === 2 ? 'Plataforma' : 'Tom'}</span>
+                <span className="ml-2 text-sm text-gray-500">
+                  {step === 1 ? 'Tema' : step === 2 ? 'Plataforma' : 'Tom'}
+                </span>
               </div>
 
               {/* Passo 1 — Tema */}
@@ -229,13 +266,15 @@ export default function ConteudoPage() {
                   </div>
                   <Button onClick={() => gerarMutation.mutate()} disabled={gerarMutation.isPending}
                     className="w-full bg-[#002776] hover:bg-[#001f5e] gap-2 py-3">
-                    {gerarMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando com IA...</> : <><Sparkles className="w-4 h-4" />Gerar conteúdo</>}
+                    {gerarMutation.isPending
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />Gerando com IA...</>
+                      : <><Sparkles className="w-4 h-4" />Gerar conteúdo</>}
                   </Button>
                 </div>
               )}
             </>
           ) : (
-            /* Resultado */
+            /* ── Resultado ── */
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900">Post gerado</h2>
@@ -247,7 +286,10 @@ export default function ConteudoPage() {
                   {/* Plataforma badge */}
                   <div className="flex items-center gap-2">
                     {(() => { const p = PLATAFORMAS.find(x => x.id === resultado.plataforma); const Icon = p?.icon; return Icon ? <Icon className={`w-4 h-4 ${p?.color}`} /> : null })()}
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{PLATAFORMAS.find(p => p.id === resultado.plataforma)?.label}</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {PLATAFORMAS.find(p => p.id === resultado.plataforma)?.label}
+                    </span>
+                    {temaAtual && <span className="text-xs text-gray-400">{temaAtual.icon} {temaAtual.label}</span>}
                     <span className={`ml-auto text-xs font-mono ${textoEditado.length > limite ? 'text-red-500' : 'text-gray-400'}`}>
                       {textoEditado.length}/{limite}
                     </span>
@@ -257,8 +299,8 @@ export default function ConteudoPage() {
                   <textarea
                     value={textoEditado}
                     onChange={e => setTextoEditado(e.target.value)}
-                    rows={10}
-                    className="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#002776] resize-none font-sans leading-relaxed"
+                    rows={6}
+                    className="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#002776] resize-y font-sans leading-relaxed"
                   />
 
                   {/* Hashtags */}
@@ -274,8 +316,8 @@ export default function ConteudoPage() {
                     </div>
                   )}
 
-                  {/* Ações */}
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  {/* Ações do post */}
+                  <div className="flex flex-wrap gap-2 pt-1 items-center">
                     <Button variant="outline" size="sm" onClick={copiarTexto} className="gap-2">
                       {copiedTexto ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                       {copiedTexto ? 'Copiado!' : 'Copiar texto'}
@@ -288,9 +330,46 @@ export default function ConteudoPage() {
                       {salvarMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
                       Salvar rascunho
                     </Button>
+                    <Button size="sm" onClick={() => setSantinhoOpen(v => !v)}
+                      className="gap-2 ml-auto bg-gradient-to-r from-[#002776] to-[#009C3B] hover:opacity-90 text-white font-bold shadow-md">
+                      <Wand2 className="w-4 h-4" />
+                      {santinhoOpen ? 'Fechar editor' : '✦ Criar Santinho'}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* ── Editor Santinho (abre ao clicar no botão da linha de ações) ── */}
+              {santinhoOpen && (
+                <div className="rounded-2xl border-2 border-[#002776] bg-white p-5">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#002776] to-[#009C3B] flex items-center justify-center">
+                        <Wand2 className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Editor de Santinho</p>
+                        <p className="text-xs text-gray-500">Tema: {temaAtual?.icon} {temaAtual?.label}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setSantinhoOpen(false)}
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <CreativeEditor
+                    name={candidate?.name ?? ''}
+                    number={candidate?.candidateNumber ?? ''}
+                    position={candidate?.position ?? ''}
+                    party={candidate?.party ?? ''}
+                    photo={candidate?.photoUrl ?? null}
+                    city={candidate?.city ?? ''}
+                    state={candidate?.state ?? ''}
+                    slogan={temaAtual?.slogan ?? 'Sua voz, nossa força!'}
+                    onExport={handleExportSantinho}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -320,7 +399,7 @@ export default function ConteudoPage() {
               {historico.items.map((item: any) => {
                 const plat = PLATAFORMAS.find(p => p.id === item.plataforma)
                 const Icon = plat?.icon
-                const tema = TEMAS.find(t => t.id === item.tema)
+                const t = TEMAS.find(t => t.id === item.tema)
                 return (
                   <Card key={item.id} className="hover:shadow-sm transition-shadow">
                     <CardContent className="pt-4">
@@ -329,7 +408,7 @@ export default function ConteudoPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             {Icon && <Icon className={`w-4 h-4 ${plat?.color}`} />}
                             <span className="text-xs font-medium text-gray-500">{plat?.label}</span>
-                            {tema && <span className="text-xs text-gray-500">{tema.icon} {tema.label}</span>}
+                            {t && <span className="text-xs text-gray-500">{t.icon} {t.label}</span>}
                             <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[item.status]?.color}`}>
                               {STATUS_CONFIG[item.status]?.label}
                             </span>
