@@ -44,7 +44,8 @@ const PALETTES: Array<{ key: string; label: string } & Colors> = [
 function buildHTML(
   fmt: { w: number; h: number },
   c: Colors,
-  photoOrAiBg: string | null,   // pode ser foto do candidato OU fundo IA
+  photo: string | null,    // foto do candidato (sempre sobreposta)
+  aiBg: string | null,     // fundo gerado por IA (fica ATRÁS de tudo)
   name: string,
   number: string,
   position: string,
@@ -57,16 +58,26 @@ function buildHTML(
   const { w, h } = fmt
   const isLandscape = w > h
 
-  const safePhoto = photoOrAiBg ? photoOrAiBg.replace(/"/g, '&quot;') : null
+  const safePhoto = photo ? photo.replace(/"/g, '&quot;') : null
+  const safeAiBg  = aiBg  ? aiBg.replace(/"/g, '&quot;')  : null
+
+  // Fundo: imagem IA se disponível, senão gradiente de cor
+  const bgStyle = safeAiBg
+    ? `background:url("${safeAiBg}") center/cover no-repeat;`
+    : `background:linear-gradient(180deg,${c.bg1} 0%,${c.bg2} 100%);`
+
+  // Overlay escuro sobre fundo IA para garantir legibilidade do texto
+  const aiBgOverlay = safeAiBg
+    ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0.65) 100%);pointer-events:none;z-index:1;"></div>`
+    : ''
 
   const photoEl = safePhoto
     ? `<img src="${safePhoto}" style="width:100%;height:100%;object-fit:cover;object-position:center ${photoY}%;display:block;" crossorigin="anonymous" />`
-    : `<div style="width:100%;height:100%;background:#9ca3af;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;">
-         <svg width="48" height="48" viewBox="0 0 24 24" fill="#fff" opacity="0.6"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-         <span style="color:white;font-size:11px;opacity:0.7;font-family:Arial;">Sem foto</span>
+    : `<div style="width:100%;height:100%;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;">
+         <svg width="48" height="48" viewBox="0 0 24 24" fill="#fff" opacity="0.5"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+         <span style="color:white;font-size:11px;opacity:0.6;font-family:Arial;">Sem foto</span>
        </div>`
 
-  // Converte \n do slogan em <br>
   const sloganHtml = slogan.replace(/\n/g, '<br>')
 
   if (!isLandscape) {
@@ -84,44 +95,46 @@ function buildHTML(
       loc:    Math.round(w * 0.028),
     }
     const pad = Math.round(w * 0.05)
+    // Cor da área inferior: transparente se tiver fundo IA (overlay já escurece), cor sólida senão
+    const infoBg = safeAiBg ? 'background:transparent;' : ''
 
-    return `<div style="width:${w}px;height:${h}px;background:linear-gradient(180deg,${c.bg1} 0%,${c.bg2} 100%);position:relative;overflow:hidden;font-family:Arial,sans-serif;box-sizing:border-box;">
+    return `<div style="width:${w}px;height:${h}px;${bgStyle}position:relative;overflow:hidden;font-family:Arial,sans-serif;box-sizing:border-box;">
 
-  <!-- Decoração de fundo -->
-  <div style="position:absolute;width:${w*1.3}px;height:${w*1.3}px;border-radius:50%;background:${c.accent};opacity:0.05;top:-${w*0.45}px;right:-${w*0.45}px;pointer-events:none;"></div>
-  <div style="position:absolute;width:${w*0.9}px;height:${w*0.9}px;border-radius:50%;background:${c.accent};opacity:0.04;bottom:-${w*0.25}px;left:-${w*0.25}px;pointer-events:none;"></div>
+  ${aiBgOverlay}
+
+  <!-- Decoração (só sem fundo IA) -->
+  ${!safeAiBg ? `
+  <div style="position:absolute;width:${w*1.3}px;height:${w*1.3}px;border-radius:50%;background:${c.accent};opacity:0.05;top:-${w*0.45}px;right:-${w*0.45}px;pointer-events:none;z-index:0;"></div>
+  <div style="position:absolute;width:${w*0.9}px;height:${w*0.9}px;border-radius:50%;background:${c.accent};opacity:0.04;bottom:-${w*0.25}px;left:-${w*0.25}px;pointer-events:none;z-index:0;"></div>` : ''}
 
   <!-- Barra topo com número -->
   <div style="position:absolute;top:0;left:0;right:0;height:${topBarH}px;background:${c.accent};display:flex;align-items:center;justify-content:center;z-index:10;">
     <span style="font-size:${fs.vote}px;font-weight:900;color:${c.numTxt};letter-spacing:5px;font-family:'Arial Black',Arial,sans-serif;">▶ VOTE ${number} ◀</span>
   </div>
 
-  <!-- Foto -->
-  <div style="position:absolute;top:${topBarH}px;left:0;right:0;height:${photoH}px;overflow:hidden;">
+  <!-- Foto do candidato -->
+  <div style="position:absolute;top:${topBarH}px;left:0;right:0;height:${photoH}px;overflow:hidden;z-index:2;">
     ${photoEl}
-    <div style="position:absolute;bottom:0;left:0;right:0;height:${Math.round(photoH*0.5)}px;background:linear-gradient(transparent,${c.bg1});pointer-events:none;"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;height:${Math.round(photoH*0.5)}px;background:linear-gradient(transparent,${safeAiBg ? 'rgba(0,0,0,0.8)' : c.bg1});pointer-events:none;"></div>
   </div>
 
   <!-- Divisor brilhante -->
   <div style="position:absolute;top:${infoTop-2}px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 0%,${c.accent} 30%,${c.accent} 70%,transparent 100%);z-index:5;"></div>
 
   <!-- Bloco de informações -->
-  <div style="position:absolute;top:${infoTop+4}px;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:${Math.round(infoH*0.03)}px ${pad}px ${Math.round(infoH*0.04)}px;box-sizing:border-box;gap:${Math.round(infoH*0.02)}px;">
+  <div style="position:absolute;top:${infoTop+4}px;left:0;right:0;bottom:0;${infoBg}display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:${Math.round(infoH*0.03)}px ${pad}px ${Math.round(infoH*0.04)}px;box-sizing:border-box;gap:${Math.round(infoH*0.02)}px;z-index:5;">
 
-    <!-- Nome + cargo -->
     <div style="text-align:center;line-height:1.05;width:100%;">
-      <div style="font-size:${fs.name}px;font-weight:900;color:${c.text};letter-spacing:0.3px;font-family:'Arial Black',Arial,sans-serif;text-shadow:0 2px 8px rgba(0,0,0,0.6);word-break:break-word;">${name}</div>
-      <div style="font-size:${fs.sub}px;font-weight:700;color:${c.sub};letter-spacing:2px;margin-top:4px;font-family:Arial,sans-serif;text-transform:uppercase;">${position}${party ? ' · ' + party : ''}</div>
-      ${location ? `<div style="font-size:${fs.loc}px;color:${c.text};opacity:0.55;margin-top:3px;font-family:Arial,sans-serif;">📍 ${location}</div>` : ''}
+      <div style="font-size:${fs.name}px;font-weight:900;color:${c.text};letter-spacing:0.3px;font-family:'Arial Black',Arial,sans-serif;text-shadow:0 2px 8px rgba(0,0,0,0.7);word-break:break-word;">${name}</div>
+      <div style="font-size:${fs.sub}px;font-weight:700;color:${c.sub};letter-spacing:2px;margin-top:4px;font-family:Arial,sans-serif;text-transform:uppercase;text-shadow:0 1px 4px rgba(0,0,0,0.5);">${position}${party ? ' · ' + party : ''}</div>
+      ${location ? `<div style="font-size:${fs.loc}px;color:${c.text};opacity:0.7;margin-top:3px;font-family:Arial,sans-serif;">📍 ${location}</div>` : ''}
     </div>
 
-    <!-- Slogan -->
     <div style="text-align:center;border-top:2px solid ${c.accent};border-bottom:2px solid ${c.accent};padding:${Math.round(infoH*0.035)}px ${pad}px;width:88%;box-sizing:border-box;">
-      <div style="font-size:${fs.slogan}px;font-weight:700;font-style:italic;color:${c.text};line-height:1.3;font-family:Arial,sans-serif;">"${sloganHtml}"</div>
+      <div style="font-size:${fs.slogan}px;font-weight:700;font-style:italic;color:${c.text};line-height:1.3;font-family:Arial,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,0.5);">"${sloganHtml}"</div>
     </div>
 
-    <!-- Número grande -->
-    ${showNumber ? `<div style="background:${c.numBg};color:${c.numTxt};font-size:${fs.num}px;font-weight:900;padding:${Math.round(infoH*0.022)}px ${Math.round(w*0.07)}px;border-radius:10px;letter-spacing:6px;font-family:'Arial Black',Arial,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.4);">${number}</div>` : ''}
+    ${showNumber ? `<div style="background:${c.numBg};color:${c.numTxt};font-size:${fs.num}px;font-weight:900;padding:${Math.round(infoH*0.022)}px ${Math.round(w*0.07)}px;border-radius:10px;letter-spacing:6px;font-family:'Arial Black',Arial,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.5);">${number}</div>` : ''}
 
   </div>
 </div>`
@@ -138,36 +151,36 @@ function buildHTML(
     }
     const padH = Math.round(h * 0.07)
     const padV = Math.round(h * 0.06)
+    const bannerBg = safeAiBg
+      ? `background:url("${safeAiBg}") center/cover no-repeat;`
+      : `background:linear-gradient(135deg,${c.bg1} 0%,${c.bg2} 100%);`
 
-    return `<div style="width:${w}px;height:${h}px;background:linear-gradient(135deg,${c.bg1} 0%,${c.bg2} 100%);position:relative;overflow:hidden;font-family:Arial,sans-serif;display:flex;align-items:stretch;">
+    return `<div style="width:${w}px;height:${h}px;${bannerBg}position:relative;overflow:hidden;font-family:Arial,sans-serif;display:flex;align-items:stretch;">
 
-  <!-- Decoração -->
-  <div style="position:absolute;width:${h*1.2}px;height:${h*1.2}px;border-radius:50%;background:${c.accent};opacity:0.04;top:-${h*0.4}px;right:${photoW - h*0.2}px;pointer-events:none;"></div>
+  ${safeAiBg ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:1;pointer-events:none;"></div>` : ''}
+  ${!safeAiBg ? `<div style="position:absolute;width:${h*1.2}px;height:${h*1.2}px;border-radius:50%;background:${c.accent};opacity:0.04;top:-${h*0.4}px;right:${photoW - h*0.2}px;pointer-events:none;"></div>` : ''}
 
-  <!-- Faixa topo -->
   <div style="position:absolute;top:0;left:0;right:0;height:6px;background:${c.accent};z-index:10;"></div>
-  <!-- Faixa rodapé -->
   <div style="position:absolute;bottom:0;left:0;right:0;height:6px;background:${c.accent};z-index:10;"></div>
 
-  <!-- Foto esquerda -->
-  <div style="width:${photoW}px;flex-shrink:0;position:relative;overflow:hidden;">
+  <!-- Foto candidato esquerda -->
+  <div style="width:${photoW}px;flex-shrink:0;position:relative;overflow:hidden;z-index:2;">
     ${photoEl}
-    <div style="position:absolute;top:0;right:0;bottom:0;width:50%;background:linear-gradient(90deg,transparent,${c.bg1});pointer-events:none;"></div>
+    <div style="position:absolute;top:0;right:0;bottom:0;width:50%;background:linear-gradient(90deg,transparent,${safeAiBg ? 'rgba(0,0,0,0.7)' : c.bg1});pointer-events:none;"></div>
   </div>
 
-  <!-- Divisor vertical -->
-  <div style="width:4px;background:${c.accent};flex-shrink:0;"></div>
+  <div style="width:4px;background:${c.accent};flex-shrink:0;z-index:2;"></div>
 
-  <!-- Conteúdo -->
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:${padV}px ${padH}px;box-sizing:border-box;gap:${Math.round(h*0.018)}px;overflow:hidden;">
-    <div style="font-size:${fs.party}px;font-weight:700;color:${c.sub};letter-spacing:3px;font-family:Arial,sans-serif;text-transform:uppercase;">${party}${party && position ? ' · ' : ''}${position}</div>
-    <div style="font-size:${fs.name}px;font-weight:900;color:${c.text};line-height:1.0;font-family:'Arial Black',Arial,sans-serif;text-shadow:0 2px 10px rgba(0,0,0,0.4);word-break:break-word;">${name}</div>
-    <div style="font-size:${fs.slogan}px;font-weight:600;font-style:italic;color:${c.text};opacity:0.88;font-family:Arial,sans-serif;line-height:1.25;">"${sloganHtml}"</div>
-    ${location ? `<div style="font-size:${fs.loc}px;color:${c.text};opacity:0.5;font-family:Arial,sans-serif;">📍 ${location}</div>` : ''}
+  <!-- Conteúdo texto -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:${padV}px ${padH}px;box-sizing:border-box;gap:${Math.round(h*0.018)}px;overflow:hidden;position:relative;z-index:2;">
+    <div style="font-size:${fs.party}px;font-weight:700;color:${c.sub};letter-spacing:3px;font-family:Arial,sans-serif;text-transform:uppercase;text-shadow:0 1px 4px rgba(0,0,0,0.5);">${party}${party && position ? ' · ' : ''}${position}</div>
+    <div style="font-size:${fs.name}px;font-weight:900;color:${c.text};line-height:1.0;font-family:'Arial Black',Arial,sans-serif;text-shadow:0 2px 10px rgba(0,0,0,0.6);word-break:break-word;">${name}</div>
+    <div style="font-size:${fs.slogan}px;font-weight:600;font-style:italic;color:${c.text};opacity:0.9;font-family:Arial,sans-serif;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,0.5);">"${sloganHtml}"</div>
+    ${location ? `<div style="font-size:${fs.loc}px;color:${c.text};opacity:0.6;font-family:Arial,sans-serif;">📍 ${location}</div>` : ''}
     <div style="display:flex;align-items:center;gap:10px;margin-top:${Math.round(h*0.01)}px;">
       <div style="height:3px;width:24px;background:${c.accent};border-radius:2px;flex-shrink:0;"></div>
-      ${showNumber ? `<div style="background:${c.numBg};color:${c.numTxt};font-size:${fs.num}px;font-weight:900;padding:3px 18px;border-radius:8px;letter-spacing:5px;font-family:'Arial Black',Arial,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.3);">${number}</div>` : ''}
-      <div style="height:3px;flex:1;background:${c.accent};opacity:0.25;border-radius:2px;"></div>
+      ${showNumber ? `<div style="background:${c.numBg};color:${c.numTxt};font-size:${fs.num}px;font-weight:900;padding:3px 18px;border-radius:8px;letter-spacing:5px;font-family:'Arial Black',Arial,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.4);">${number}</div>` : ''}
+      <div style="height:3px;flex:1;background:${c.accent};opacity:0.3;border-radius:2px;"></div>
     </div>
   </div>
 </div>`
@@ -276,11 +289,11 @@ export default function CreativeEditor({ name, number, position, party, photo, c
     }
   }, [aiPrompt, format])
 
-  // Rebuild HTML (usa aiBgB64 como fundo se disponível)
+  // Rebuild HTML — foto e fundo IA sempre separados
   useEffect(() => {
     const fmt = FORMATS[format]
-    setHtml(buildHTML(fmt, colors, aiBgB64 ?? photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum))
-  }, [format, colors, aiBgB64, photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum])
+    setHtml(buildHTML(fmt, colors, photoB64, aiBgB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum))
+  }, [format, colors, photoB64, aiBgB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum])
 
   const exportPng = useCallback(async () => {
     const el = containerRef.current?.querySelector('[data-tpl]') as HTMLElement
