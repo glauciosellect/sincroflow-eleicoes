@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,8 +11,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Send, MessageSquareText, Image as ImageIcon, Upload, Trash2, Megaphone, AlertTriangle, Plus } from 'lucide-react'
+import { Loader2, Send, MessageSquareText, Image as ImageIcon, Upload, Trash2, Megaphone, AlertTriangle, Plus, Wand2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/store/auth.store'
+
+const CreativeEditor = dynamic(() => import('@/components/editor/CreativeEditor'), { ssr: false })
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   VOTER: 'Eleitor',
@@ -341,6 +345,8 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [topicKey, setTopicKey] = useState('')
+  const [editorOpen, setEditorOpen] = useState(false)
+  const { candidate } = useAuthStore()
 
   const { data: creatives, isLoading } = useQuery<Creative[]>({
     queryKey: ['creatives'],
@@ -420,14 +426,24 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-base font-semibold">Biblioteca de criativos</Label>
-            <Button
-              size="sm"
-              onClick={() => setUploadOpen(true)}
-              style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
-              className="text-white"
-            >
-              <Plus className="w-3 h-3 mr-2" />Novo criativo
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditorOpen(true)}
+                className="gap-2"
+              >
+                <Wand2 className="w-3 h-3" />Editor visual
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setUploadOpen(true)}
+                style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
+                className="text-white"
+              >
+                <Plus className="w-3 h-3 mr-2" />Novo criativo
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -643,6 +659,60 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal do Editor Visual */}
+      {editorOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto py-8 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-[#002776]" />Editor Visual de Criativos
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Crie santinhos, stories e banners personalizados com a identidade da sua campanha.</p>
+              </div>
+              <button onClick={() => setEditorOpen(false)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <CreativeEditor
+                candidateName={candidate?.name}
+                candidateNumber={candidate?.candidateNumber ?? undefined}
+                candidatePosition={candidate?.position ?? undefined}
+                candidateParty={candidate?.party ?? undefined}
+                candidatePhoto={candidate?.photoUrl ?? null}
+                onExport={async (dataUrl, filename) => {
+                  // Converte dataUrl para File e faz upload para a biblioteca
+                  const res = await fetch(dataUrl)
+                  const blob = await res.blob()
+                  const pngFile = new File([blob], filename, { type: 'image/png' })
+                  const fd = new FormData()
+                  fd.append('file', pngFile)
+                  fd.append('title', filename.replace('.png', '').replace('criativo-', 'Criativo '))
+                  try {
+                    await api.post('/creatives', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                    qc.invalidateQueries({ queryKey: ['creatives'] })
+                    toast({ title: 'Criativo salvo na biblioteca!' })
+                    // Também faz o download local
+                    const a = document.createElement('a')
+                    a.href = dataUrl
+                    a.download = filename
+                    a.click()
+                  } catch {
+                    // Se falhar o upload, ao menos faz o download
+                    const a = document.createElement('a')
+                    a.href = dataUrl
+                    a.download = filename
+                    a.click()
+                    toast({ title: 'PNG exportado (falha ao salvar na biblioteca)' })
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
