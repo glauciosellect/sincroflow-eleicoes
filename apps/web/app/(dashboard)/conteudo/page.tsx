@@ -79,16 +79,22 @@ interface Discurso {
 
 function exportDiscursoPDF(discurso: Discurso, candidateName: string) {
   const style = `
-    body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; line-height: 1.7; }
-    h1 { font-size: 24px; color: #002776; border-bottom: 3px solid #FFDF00; padding-bottom: 12px; }
-    .meta { color: #666; font-size: 13px; margin-bottom: 32px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; line-height: 1.7; padding: 0 24px; }
+    h1 { font-size: 24px; color: #002776; border-bottom: 3px solid #FFDF00; padding-bottom: 12px; margin-bottom: 8px; }
+    .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
     .resumo { background: #f0f4ff; border-left: 4px solid #002776; padding: 16px 20px; margin: 24px 0; border-radius: 4px; font-style: italic; }
-    .secao { margin: 32px 0; }
-    .secao-titulo { font-size: 18px; font-weight: bold; color: #002776; margin-bottom: 12px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+    .secao { margin: 28px 0; page-break-inside: avoid; }
+    .secao-titulo { font-size: 18px; font-weight: bold; color: #002776; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
     .secao-texto { font-size: 15px; white-space: pre-wrap; }
     .dica { background: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; padding: 10px 14px; margin-top: 12px; font-size: 12px; color: #92400e; }
     .dica::before { content: '🎤 Dica de oratória: '; font-weight: bold; }
-    @media print { .dica { background: #fff8dc; } }
+    @media print {
+      body { margin: 20px auto; }
+      .dica { background: #fff8dc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .resumo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .secao-titulo { color: #002776 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   `
   const sections = discurso.secoes.map(s => `
     <div class="secao">
@@ -105,13 +111,33 @@ function exportDiscursoPDF(discurso: Discurso, candidateName: string) {
     ${sections}
   </body></html>`
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `discurso-${discurso.titulo.toLowerCase().replace(/\s+/g, '-').slice(0, 40)}.html`
-  a.click()
-  URL.revokeObjectURL(url)
+  const w = window.open('', '_blank', 'width=900,height=700')
+  if (!w) return
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => { w.print() }, 500)
+}
+
+function discursoFromHistorico(item: any): Discurso {
+  // Reconstrói o objeto Discurso a partir do textoGerado salvo (formato ## Seção\n\ntexto)
+  const secoes: Secao[] = item.textoGerado
+    .split('\n\n---\n\n')
+    .map((bloco: string) => {
+      const linhas = bloco.split('\n\n')
+      const nome = (linhas[0] ?? '').replace(/^## /, '').trim()
+      const texto = linhas.slice(1).join('\n\n').trim()
+      return { nome, texto, dica: '' }
+    })
+    .filter((s: Secao) => s.nome && s.texto)
+  return {
+    id: item.id,
+    titulo: item.temaCustomizado || item.tema,
+    duracao_estimada: '—',
+    secoes,
+    resumo_executivo: '',
+    textoCompleto: item.textoGerado,
+  }
 }
 
 // ─── Componente ResultadoDiscurso ─────────────────────────────────────────────
@@ -663,10 +689,18 @@ export default function ConteudoPage() {
                           <p className="text-xs text-gray-400">{formatDate(item.createdAt)}</p>
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
-                          <button onClick={() => { navigator.clipboard.writeText(item.textoGerado); toast({ title: 'Copiado!' }) }}
-                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400" title="Copiar">
-                            <Copy className="w-4 h-4" />
-                          </button>
+                          {isDiscItem ? (
+                            <button
+                              onClick={() => { setDiscurso(discursoFromHistorico(item)); setTab('criar') }}
+                              className="p-1.5 rounded hover:bg-amber-50 text-amber-600" title="Abrir discurso">
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button onClick={() => { navigator.clipboard.writeText(item.textoGerado); toast({ title: 'Copiado!' }) }}
+                              className="p-1.5 rounded hover:bg-gray-100 text-gray-400" title="Copiar">
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          )}
                           {item.status !== 'enviado' && item.status !== 'arquivado' && (
                             <button onClick={() => arquivarMutation.mutate(item.id)}
                               className="p-1.5 rounded hover:bg-gray-100 text-gray-400" title="Arquivar">
