@@ -5,6 +5,36 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Download, Type, Trash2, Image as ImageIcon, RotateCcw } from 'lucide-react'
 
+// Converte URL para base64 via fetch — elimina CORS no canvas
+async function urlToBase64(url: string): Promise<string> {
+  const clean = url.split('?')[0]
+  const res = await fetch(clean)
+  if (!res.ok) throw new Error('fetch failed')
+  const blob = await res.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+function addPhotoPlaceholder(canvas: any, fabric: any, fmt: { w: number; h: number }) {
+  const rect = new fabric.Rect({
+    left: fmt.w * 0.15, top: fmt.h * 0.05,
+    width: fmt.w * 0.7, height: fmt.h * 0.6,
+    fill: '#dddddd', rx: 8, ry: 8,
+    selectable: false, evented: false,
+  })
+  const label = new fabric.Text('Foto do candidato', {
+    left: fmt.w / 2, top: fmt.h * 0.35,
+    originX: 'center', originY: 'center',
+    fontSize: Math.round(fmt.w * 0.04),
+    fill: '#888888', selectable: false, evented: false,
+  })
+  canvas.add(rect, label)
+}
+
 type Format = 'santinho' | 'story' | 'banner'
 
 const FORMATS: Record<Format, { label: string; w: number; h: number }> = {
@@ -73,17 +103,15 @@ export default function CreativeEditor({
 
     // Foto do candidato (se existir)
     // Remove cache-bust (?t=...) pois quebra CORS no Supabase
-    const photoUrl = candidatePhoto ? candidatePhoto.split('?')[0] : null
-    if (photoUrl) {
+    if (candidatePhoto) {
       try {
-        // Carrega via HTMLImageElement para evitar problemas de CORS com o Fabric
+        // Converte para base64 via fetch para evitar CORS no canvas
+        const photoBase64 = await urlToBase64(candidatePhoto)
         const htmlImg = await new Promise<HTMLImageElement>((resolve, reject) => {
           const el = new Image()
-          el.crossOrigin = 'anonymous'
           el.onload = () => resolve(el)
           el.onerror = reject
-          setTimeout(() => reject(new Error('timeout')), 8000)
-          el.src = photoUrl
+          el.src = photoBase64
         })
         const img = new fabric.Image(htmlImg as any)
         const scale = Math.min((fmt.w * 0.7) / htmlImg.naturalWidth, (fmt.h * 0.7) / htmlImg.naturalHeight)
@@ -95,36 +123,10 @@ export default function CreativeEditor({
         })
         canvas.add(img)
       } catch {
-        // fallback placeholder se CORS/timeout
-        const photoRect = new fabric.Rect({
-          left: fmt.w * 0.15, top: fmt.h * 0.05,
-          width: fmt.w * 0.7, height: fmt.h * 0.6,
-          fill: '#dddddd', rx: 8, ry: 8,
-          selectable: false, evented: false,
-        })
-        const photoLabel = new fabric.Text('Foto não carregada', {
-          left: fmt.w / 2, top: fmt.h * 0.35,
-          originX: 'center', originY: 'center',
-          fontSize: Math.round(fmt.w * 0.035),
-          fill: '#999999', selectable: false, evented: false,
-        })
-        canvas.add(photoRect, photoLabel)
+        addPhotoPlaceholder(canvas, fabric, fmt)
       }
     } else {
-      // Placeholder da foto
-      const photoRect = new fabric.Rect({
-        left: fmt.w * 0.15, top: fmt.h * 0.05,
-        width: fmt.w * 0.7, height: fmt.h * 0.6,
-        fill: '#cccccc', rx: 8, ry: 8,
-        selectable: false, evented: false,
-      })
-      const photoLabel = new fabric.Text('Foto do candidato', {
-        left: fmt.w / 2, top: fmt.h * 0.35,
-        originX: 'center', originY: 'center',
-        fontSize: Math.round(fmt.w * 0.04),
-        fill: '#888888', selectable: false, evented: false,
-      })
-      canvas.add(photoRect, photoLabel)
+      addPhotoPlaceholder(canvas, fabric, fmt)
     }
 
     // Nome
