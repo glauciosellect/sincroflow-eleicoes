@@ -55,10 +55,11 @@ export default function MapaApoiadoresPage() {
   })
 
   const points = data?.points ?? []
-  const totalApoiador = points.reduce((s: number, p: any) => s + p.apoiador, 0)
-  const totalIndeciso = points.reduce((s: number, p: any) => s + p.indeciso, 0)
-  const totalCritico = points.reduce((s: number, p: any) => s + p.critico, 0)
-  const total = totalApoiador + totalIndeciso + totalCritico
+  // Usa os totais reais do backend (inclui registros sem localização)
+  const totalApoiador = data?.totais?.apoiador ?? points.reduce((s: number, p: any) => s + p.apoiador, 0)
+  const totalIndeciso = data?.totais?.indeciso ?? points.reduce((s: number, p: any) => s + p.indeciso, 0)
+  const totalCritico  = data?.totais?.critico  ?? points.reduce((s: number, p: any) => s + p.critico, 0)
+  const total = data?.totais?.total ?? (totalApoiador + totalIndeciso + totalCritico)
 
   return (
     <div className="space-y-4 h-full flex flex-col max-w-5xl">
@@ -86,8 +87,8 @@ export default function MapaApoiadoresPage() {
         </div>
       </div>
 
-      {/* Totalizadores */}
-      {total > 0 && (
+      {/* Totalizadores — mostra sempre que há dados, mesmo sem localização */}
+      {(total > 0 || data?.totais) && (
         <div className="grid grid-cols-3 gap-3">
           <Card className="border-green-100">
             <CardContent className="pt-4 pb-3 flex items-center gap-3">

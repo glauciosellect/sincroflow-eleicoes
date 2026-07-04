@@ -253,7 +253,15 @@ export async function surveyRoutes(app: FastifyInstance) {
       ? !['Vereador', 'Prefeito'].includes(candidate.position)
       : false
 
-    // Busca contagens por região + intenção
+    // Totais reais (incluindo registros sem localização) — usados nos cards de resumo
+    const totaisReais = await prisma.voteSurveyResponse.groupBy({
+      by: ['intention'],
+      where: { candidateId, createdAt: { gte: sinceDate } },
+      _count: true,
+    })
+    const totaisMap = Object.fromEntries(totaisReais.map(t => [t.intention, t._count]))
+
+    // Busca contagens por região + intenção (só com localização, para o mapa)
     const rows = groupByCity
       ? await prisma.voteSurveyResponse.groupBy({
           by: ['city', 'intention'],
@@ -318,6 +326,12 @@ export async function surveyRoutes(app: FastifyInstance) {
       groupByCity,
       regionLabel: groupByCity ? 'Cidade' : 'Bairro',
       points: geocoded.filter(Boolean),
+      totais: {
+        apoiador: totaisMap['APOIADOR'] ?? 0,
+        indeciso: totaisMap['INDECISO'] ?? 0,
+        critico:  totaisMap['CRITICO']  ?? 0,
+        total:    (totaisMap['APOIADOR'] ?? 0) + (totaisMap['INDECISO'] ?? 0) + (totaisMap['CRITICO'] ?? 0),
+      },
     })
   })
 
