@@ -1,6 +1,5 @@
 'use client'
-import { useState, Component, ReactNode } from 'react'
-import dynamic from 'next/dynamic'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
@@ -13,11 +12,11 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import {
   Loader2, ClipboardList, Plus, ThumbsUp, HelpCircle, ThumbsDown,
-  Map, AlertCircle, CheckCircle2, Users, Phone, Calendar,
+  AlertCircle, CheckCircle2, Users, Phone, Calendar,
 } from 'lucide-react'
 
 type VoteIntention = 'APOIADOR' | 'INDECISO' | 'CRITICO'
-type Tab = 'pesquisar' | 'mapa' | 'resultados'
+type Tab = 'pesquisar' | 'resultados'
 
 const INTENTIONS: { value: VoteIntention; label: string; icon: any; color: string; bg: string; border: string }[] = [
   { value: 'APOIADOR', label: 'Apoiador', icon: ThumbsUp, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-400' },
@@ -32,13 +31,6 @@ const CARGOS = [
   { key: 'prefSenador', label: 'Senador' },
   { key: 'prefGovernador', label: 'Governador' },
   { key: 'prefPresidente', label: 'Presidente' },
-]
-
-const PERIOD_OPTIONS = [
-  { label: '7 dias', days: 7 },
-  { label: '30 dias', days: 30 },
-  { label: '60 dias', days: 60 },
-  { label: '90 dias', days: 90 },
 ]
 
 // ── Termômetro ─────────────────────────────────────────────────────────────────
@@ -177,112 +169,6 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
   )
 }
 
-// ── Mapa ───────────────────────────────────────────────────────────────────────
-class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: ReactNode }) { super(props); this.state = { hasError: false } }
-  static getDerivedStateFromError() { return { hasError: true } }
-  render() {
-    if (this.state.hasError) return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
-        <AlertCircle className="w-10 h-10 text-amber-400" />
-        <p className="text-sm font-medium text-gray-500">Não foi possível carregar o mapa.</p>
-        <button className="text-xs text-[#002776] underline" onClick={() => this.setState({ hasError: false })}>Tentar novamente</button>
-      </div>
-    )
-    return this.props.children
-  }
-}
-
-interface MapPoint { region: string; lat: number; lng: number; dominant: 'APOIADOR' | 'INDECISO' | 'CRITICO'; total: number; apoiador: number; indeciso: number; critico: number }
-
-const MapComponent = dynamic<{ points: MapPoint[]; regionLabel: string }>(
-  () => import('../mapa-apoiadores/MapComponent'),
-  { ssr: false, loading: () => <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg"><Loader2 className="w-6 h-6 animate-spin text-[#002776]" /></div> }
-)
-
-function MapaTab() {
-  const [days, setDays] = useState(30)
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['survey-map', days],
-    queryFn: () => api.get(`/surveys/vote/map?since=${since}`).then(r => r.data),
-    staleTime: 5 * 60 * 1000,
-  })
-  const points = data?.points ?? []
-  const totalApoiador = points.reduce((s: number, p: any) => s + p.apoiador, 0)
-  const totalIndeciso = points.reduce((s: number, p: any) => s + p.indeciso, 0)
-  const totalCritico = points.reduce((s: number, p: any) => s + p.critico, 0)
-  const total = totalApoiador + totalIndeciso + totalCritico
-
-  return (
-    <div className="space-y-4 flex flex-col">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-gray-500">Distribuição geográfica das pesquisas coletadas em campo</p>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {PERIOD_OPTIONS.map(opt => (
-            <button key={opt.days} onClick={() => setDays(opt.days)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${days === opt.days ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {total > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { v: totalApoiador, label: 'Apoiadores', pct: Math.round(totalApoiador / total * 100), color: 'green' },
-            { v: totalIndeciso, label: 'Indecisos', pct: Math.round(totalIndeciso / total * 100), color: 'amber' },
-            { v: totalCritico, label: 'Críticos', pct: Math.round(totalCritico / total * 100), color: 'red' },
-          ].map(c => (
-            <div key={c.label} className={`bg-${c.color}-50 border border-${c.color}-100 rounded-xl p-3 text-center`}>
-              <div className={`text-2xl font-bold text-${c.color}-700`}>{c.v}</div>
-              <div className={`text-xs text-${c.color}-600`}>{c.pct}% {c.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Card className="flex-1 min-h-[480px]">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Map className="w-4 h-4 text-[#002776]" />
-            {data?.regionLabel === 'Cidade' ? 'Por cidade' : 'Por bairro'}
-            {points.length > 0 && <span className="text-xs font-normal text-gray-400 ml-1">· {points.length} {data?.regionLabel === 'Cidade' ? 'cidades' : 'bairros'} com dados</span>}
-          </CardTitle>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-600 inline-block" />Apoiador</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />Indeciso</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-600 inline-block" />Crítico</span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-3 h-[calc(100%-60px)]">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
-              <Loader2 className="w-8 h-8 animate-spin text-[#002776]" />
-              <p className="text-sm">Buscando dados e geocodificando regiões...</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2 text-red-400">
-              <AlertCircle className="w-8 h-8" /><p className="text-sm">Erro ao carregar mapa.</p>
-            </div>
-          ) : points.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-300">
-              <Map className="w-14 h-14 opacity-30" />
-              <p className="text-sm font-medium text-gray-400">Nenhum dado no período selecionado.</p>
-              <p className="text-xs text-gray-400">Registre pesquisas com CEP para visualizar no mapa.</p>
-            </div>
-          ) : (
-            <MapErrorBoundary>
-              <MapComponent points={points} regionLabel={data?.regionLabel} />
-            </MapErrorBoundary>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 // ── Resultados ─────────────────────────────────────────────────────────────────
 function ResultadosTab() {
   const { data: summary, isLoading } = useQuery({
@@ -376,7 +262,6 @@ export default function PesquisaPage() {
 
   const tabs = [
     { key: 'pesquisar', label: 'Realizar Pesquisa', icon: ClipboardList },
-    { key: 'mapa', label: 'Mapa de Apoiadores', icon: Map },
     { key: 'resultados', label: 'Resultados', icon: Users },
   ]
 
@@ -384,7 +269,7 @@ export default function PesquisaPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pesquisa de Voto</h1>
-        <p className="text-sm text-gray-500">Coleta de intenções em campo, mapa de apoiadores e análise de resultados</p>
+        <p className="text-sm text-gray-500">Coleta de intenções de voto em campo e análise de resultados</p>
       </div>
 
       {/* Tabs */}
@@ -418,7 +303,6 @@ export default function PesquisaPage() {
         </div>
       )}
 
-      {tab === 'mapa' && <MapaTab />}
       {tab === 'resultados' && <ResultadosTab />}
     </div>
   )
