@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, AlertCircle, ExternalLink,
-  Download, FileText, Users, Wallet, ClipboardList, BookOpen, Info, Loader2,
+  FileText, Users, Wallet, ClipboardList, BookOpen, Info, Loader2, TrendingUp,
 } from 'lucide-react'
 import api from '@/lib/api'
 
@@ -15,42 +15,50 @@ interface Step {
   prazo?: string
 }
 
-const ETAPAS_PARCIAL: Step[] = [
+const ETAPAS: Step[] = [
   {
     id: 1,
     titulo: 'Abrir conta bancária eleitoral',
     descricao: 'Conta corrente exclusiva para movimentação da campanha (obrigatória pelo TSE).',
     detalhe: [
       'Deve ser aberta em nome do candidato, com CPF e número de candidatura.',
+      'Preferencialmente na Caixa Econômica Federal ou Banco do Brasil; outros bancos com carteira comercial também são aceitos.',
       'Nenhuma receita ou despesa pode passar por conta pessoal.',
-      'Bancos aceitam conta corrente comum — alguns têm modalidade "conta eleitoral".',
-      'Guarde o extrato bancário de todo o período da campanha.',
+      'O extrato bancário de todo o período é documento obrigatório na prestação de contas.',
+      'A conta não pode ter cláusula de sigilo — os dados se tornam públicos na prestação de contas.',
+      'Assinatura eletrônica é aceita para abertura (novidade 2026).',
     ],
-    aviso: 'Movimentar dinheiro de campanha em conta pessoal é infração eleitoral.',
+    aviso: 'Movimentar dinheiro de campanha em conta pessoal é infração eleitoral e pode levar à desaprovação das contas.',
   },
   {
     id: 2,
-    titulo: 'Acessar o sistema Conta+JE (TSE)',
-    descricao: 'Sistema online do TSE que substitui o SPCE a partir de 2026.',
+    titulo: 'Acessar o Conta+JE (sistema oficial TSE 2026)',
+    descricao: 'Nova plataforma 100% online que substitui definitivamente o SPCE. Não instala nada.',
     detalhe: [
-      'Acesse em: https://contaje.tse.jus.br (disponível após o início oficial da campanha).',
-      'Login com o CPF e senha do candidato cadastrado no TSE.',
-      'Não instala nada — é 100% pelo navegador.',
-      'O sistema já conhece seu nome, partido e número de candidatura.',
+      'Acesse em: contaje.tse.jus.br (disponível após início oficial da campanha).',
+      'Login via gov.br ou e-Título — NÃO é mais CPF+senha avulso como no SPCE.',
+      'O sistema já preenche automaticamente: nome, partido, número de candidatura e dados do TSE.',
+      'Documentos são enviados digitalmente e já ficam no Processo Judicial Eletrônico (PJe) — sem envio de mídia física.',
+      'Detecta erros em tempo real antes de você finalizar o envio.',
+      'Integrado ao sistema de candidaturas (Cand) e ao partido (SGIP).',
     ],
+    aviso: 'O SPCE foi definitivamente descontinuado para as eleições de 2026. Apenas o Conta+JE é aceito.',
   },
   {
     id: 3,
     titulo: 'Registrar receitas no Conta+JE',
-    descricao: 'Cada entrada de dinheiro deve ser lançada individualmente.',
+    descricao: 'Cada entrada de dinheiro deve ser lançada individualmente com comprovante.',
     detalhe: [
-      'Recursos próprios: informe valor e data do depósito.',
-      'Doação de pessoa física: nome completo, CPF e valor. Limite: R$ 1.064,10 por doador (10% da renda bruta anual declarada).',
-      'Doação de pessoa jurídica: PROIBIDA pela legislação atual.',
-      'Transferência do partido/comitê: requer comprovante bancário.',
-      'Use o CSV exportado pelo SyncroFlow como rascunho para conferência antes de lançar no Conta+JE.',
+      'Recursos próprios: informe valor e data do depósito na conta eleitoral.',
+      'Doação de pessoa física: nome completo, CPF e valor. Limite máximo: R$ 40.000,00 por doador (Res. TSE 23.752/2026, Art. 27 §3º) — ou 10% da renda bruta anual declarada, o que for menor.',
+      'Pix de doador: não exige mais assinatura do recibo pelo doador — basta o relatório com CPF e valor (novidade 2026).',
+      'Doações via transferência bancária acima de R$ 1.064,10: obrigatoriamente por Pix nominal, TED ou cheque cruzado nominal.',
+      'Doação de pessoa jurídica: PROIBIDA pela legislação vigente.',
+      'FEFC (Fundo Eleitoral) e Fundo Partidário: requer comprovante do partido.',
+      'Financiamento coletivo (vaquinha): apenas por plataformas cadastradas na JE; só pessoa física pode contribuir.',
+      'Criptomoedas: PROIBIDAS como meio de doação.',
     ],
-    aviso: 'Doações acima de R$ 1.064,10 de uma única pessoa física são ilegais.',
+    aviso: 'Doações acima do limite por doador e de pessoa jurídica são ilegais e causam desaprovação automática das contas.',
   },
   {
     id: 4,
@@ -59,9 +67,10 @@ const ETAPAS_PARCIAL: Step[] = [
     detalhe: [
       'Cada despesa precisa de: nota fiscal ou recibo sem rasura, data, valor, CNPJ/CPF do fornecedor.',
       'Pagamento DEVE ser por Pix nominal, transferência ou cheque nominal ao fornecedor.',
-      'Dinheiro em espécie aceito apenas até R$ 759,00 por item (½ salário mínimo de 2026 — Fundo de Caixa).',
-      'Pessoal (cabos eleitorais, coordenadores): lançar com CPF de cada um.',
-      'O lançamento é igual ao que você fez aqui no SyncroFlow — o código TSE (ex: 2.04) já está preenchido.',
+      'Dinheiro em espécie: apenas para despesas do Fundo de Caixa (pequenos gastos do dia a dia da campanha) — consulte o limite do seu TRE.',
+      'Pessoal (cabos eleitorais, coordenadores): lançar com CPF de cada colaborador e contrato assinado.',
+      'Publicidade em redes sociais (impulsionamento): nota fiscal da plataforma obrigatória.',
+      'Use o CSV exportado pelo SyncroFlow como rascunho para conferir antes de lançar no Conta+JE.',
     ],
   },
   {
@@ -69,63 +78,76 @@ const ETAPAS_PARCIAL: Step[] = [
     titulo: 'Anexar documentos comprobatórios',
     descricao: 'Cada lançamento no Conta+JE precisa ter o comprovante em PDF ou imagem.',
     detalhe: [
-      'Receitas: comprovante bancário do depósito ou Pix recebido.',
-      'Despesas: nota fiscal ou recibo, mais comprovante do pagamento (Pix, extrato).',
+      'Receitas: comprovante bancário do depósito, Pix ou TED recebido.',
+      'Despesas: nota fiscal ou recibo + comprovante do pagamento (Pix, extrato).',
       'Pessoal: contrato de prestação de serviços eleitorais assinado + comprovante de pagamento.',
-      'Organize os arquivos por data antes de subir — facilita a revisão do advogado eleitoral.',
+      'No Conta+JE os documentos ficam diretamente vinculados ao PJe — não é necessário envio físico de CD/DVD como no SPCE.',
+      'Organize os arquivos por data antes de subir — facilita revisão do advogado eleitoral.',
     ],
   },
   {
     id: 6,
-    titulo: 'Prestação parcial (se exigida)',
-    descricao: 'Alguns cargos exigem prestação de contas antes do dia da eleição.',
+    titulo: 'Prestação parcial de contas',
+    descricao: 'Obrigatória para alguns cargos — enviada pelo Conta+JE antes da eleição.',
     detalhe: [
+      'Período: 9 a 13 de setembro de 2026 (movimentação até 8 de setembro incluída).',
       'Presidente, Governador e Senador: prestação parcial obrigatória.',
-      'Vereador e Deputados: geralmente só prestação final (confirme com seu TRE).',
-      'Data da parcial: definida pelo TSE no calendário eleitoral oficial.',
-      'Envia pelo Conta+JE, mesmo sistema da prestação final.',
+      'Deputados (estadual e federal): verifique com seu TRE — geralmente só prestação final.',
+      'O sistema Conta+JE já abre o módulo de prestação parcial na data correta.',
+      'Divulgação pública das contas parciais com identificação dos doadores: 15 de setembro de 2026.',
     ],
-    prazo: 'Consultar calendário TSE 2026',
+    prazo: '9 a 13/09/2026',
   },
   {
     id: 7,
     titulo: 'Prestação final de contas',
-    descricao: 'Encerramento oficial da campanha — enviada pelo Conta+JE.',
+    descricao: 'Encerramento oficial da campanha — enviada pelo Conta+JE após a eleição.',
     detalhe: [
-      'Prazo: 30 dias após o dia da eleição (1º turno) ou 30 dias após o 2º turno.',
-      'Todas as receitas e despesas do período devem estar lançadas.',
-      'O sistema gera um número de protocolo após o envio — guarde.',
-      'O TRE analisa e pode pedir complementação de documentos.',
-      'Aprovação final pode levar meses — candidato fica impedido de assumir mandato se reprovado.',
+      '1º turno: até 30 dias após o dia da eleição.',
+      '2º turno: até 20 dias após a segunda votação.',
+      'Todas as receitas e despesas do período devem estar lançadas e com comprovantes.',
+      'O Conta+JE gera número de protocolo após o envio — guarde.',
+      'O TRE analisa e pode pedir complementação de documentos — responda dentro do prazo fixado.',
+      'Candidatos com contas desaprovadas ficam impedidos de assumir mandato.',
     ],
-    aviso: 'Candidatos que não entregam a prestação de contas ficam com contas desaprovadas e podem ter direitos políticos cassados.',
-    prazo: '30 dias após a eleição',
+    aviso: 'Candidatos que não entregam a prestação de contas ficam com direitos políticos suspensos até regularização.',
+    prazo: '30 dias após eleição (1º turno)',
   },
 ]
 
+const TETOS_GASTO = [
+  { cargo: 'Dep. Estadual / Distrital', valor: 'R$ 1,27 milhão', obs: 'Igual para todos os estados' },
+  { cargo: 'Dep. Federal', valor: 'R$ 3,18 milhões', obs: 'Igual para todos os estados' },
+  { cargo: 'Senador', valor: 'Varia por estado', obs: 'Proporcional ao eleitorado — consulte TRE' },
+  { cargo: 'Governador', valor: 'Varia por estado', obs: 'Proporcional ao eleitorado — ex: MT R$ 7,1M' },
+  { cargo: 'Presidente (1º turno)', valor: 'R$ 88,9 milhões', obs: '+R$ 44,4M se for ao 2º turno' },
+]
+
 const DOCS_NECESSARIOS = [
-  { cat: 'Receitas', items: ['Extrato bancário da conta eleitoral', 'Comprovante de Pix/TED recebidos', 'Recibo de doação assinado pelo doador (pessoa física)'] },
-  { cat: 'Despesas gerais', items: ['Nota fiscal ou recibo (sem rasura)', 'Comprovante de pagamento (Pix, TED, cheque)', 'Contrato com fornecedor (se serviço contínuo)'] },
+  { cat: 'Receitas', items: ['Extrato bancário da conta eleitoral', 'Comprovante de Pix/TED recebidos', 'Recibo de doação — obrigatório para transferências, dispensado para Pix (basta relatório CPF+valor)'] },
+  { cat: 'Despesas gerais', items: ['Nota fiscal ou recibo (sem rasura)', 'Comprovante de pagamento (Pix nominal, TED, cheque nominal)', 'Contrato com fornecedor (se serviço contínuo)'] },
   { cat: 'Pessoal (equipe)', items: ['Contrato de Prestação de Serviços Eleitorais assinado', 'CPF de cada colaborador', 'Comprovante de Pix/TED nominal a cada colaborador'] },
-  { cat: 'Material gráfico', items: ['Nota fiscal da gráfica ou fornecedor', 'Prova do material (foto ou arquivo)'] },
-  { cat: 'Impulsionamento digital', items: ['Nota fiscal da plataforma (Google, Meta, etc.)', 'Comprovante de pagamento', 'Print das campanhas impulsionadas'] },
+  { cat: 'Material gráfico', items: ['Nota fiscal da gráfica ou fornecedor', 'Prova do material (foto ou arquivo digital)'] },
+  { cat: 'Impulsionamento digital', items: ['Nota fiscal da plataforma (Google, Meta, etc.)', 'Comprovante de pagamento', 'Print ou relatório das campanhas impulsionadas'] },
 ]
 
 const CORRESPONDENCIA = [
-  { syncro: 'Doação Pessoa Física', tse: '1.02', obs: 'CPF obrigatório' },
+  { syncro: 'Doação Pessoa Física', tse: '1.02', obs: 'CPF obrigatório; limite R$ 40 mil por doador' },
   { syncro: 'Recursos Próprios', tse: '1.01', obs: 'Depósito da conta pessoal na conta eleitoral' },
   { syncro: 'Transferência Partido', tse: '1.03', obs: 'Requer comprovante do partido' },
   { syncro: 'Transferência Comitê', tse: '1.04', obs: '' },
-  { syncro: 'Financiamento Coletivo', tse: '1.05', obs: 'Vaquinha online regulamentada' },
+  { syncro: 'Financiamento Coletivo', tse: '1.05', obs: 'Vaquinha online — plataforma deve estar cadastrada na JE' },
+  { syncro: 'FEFC (Fundo Eleitoral)', tse: '1.06', obs: 'Transferência do partido com comprovante' },
   { syncro: 'Pessoal', tse: '2.01', obs: 'CPF + contrato de cada colaborador' },
   { syncro: 'Publicidade', tse: '2.02', obs: 'NF de agência ou veículo' },
   { syncro: 'Produção de Material', tse: '2.03', obs: 'Gráfica, camisetas, brindes' },
   { syncro: 'Impulsionamento Digital', tse: '2.04', obs: 'Google/Meta Ads — NF obrigatória' },
   { syncro: 'Combustível/Transporte', tse: '2.05', obs: 'Nota do posto ou locadora' },
-  { syncro: 'Alimentação', tse: '2.06', obs: 'Limite do Fundo de Caixa em dinheiro' },
+  { syncro: 'Alimentação', tse: '2.06', obs: 'Fundo de caixa — preferência por NF' },
   { syncro: 'Aluguel de Espaço', tse: '2.07', obs: 'Contrato de locação' },
   { syncro: 'Equipamentos', tse: '2.08', obs: 'NF de compra ou locação' },
-  { syncro: 'Serviços Jurídicos', tse: '2.09', obs: '' },
+  { syncro: 'Serviços Jurídicos', tse: '2.09', obs: 'Advogado eleitoral' },
+  { syncro: 'Segurança', tse: '2.10', obs: 'Inclui prevenção de violência política (novidade 2026)' },
 ]
 
 export default function PrestacaoContasPage() {
@@ -155,27 +177,47 @@ export default function PrestacaoContasPage() {
     })
   }
 
-  const progresso = Math.round((concluidos.length / ETAPAS_PARCIAL.length) * 100)
+  const progresso = Math.round((concluidos.length / ETAPAS.length) * 100)
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
       {/* Cabeçalho */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Prestação de Contas — Guia TSE 2026</h1>
-        <p className="text-sm text-gray-500 mt-1">Passo a passo para usar o Conta+JE e entregar a prestação de contas sem erros</p>
+        <p className="text-sm text-gray-500 mt-1">Baseado na Resolução TSE nº 23.752/2026 e nas regras do Conta+JE</p>
       </div>
 
-      {/* Alerta sistema 2026 */}
+      {/* Alerta Conta+JE */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex gap-4">
         <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800 space-y-1">
-          <p className="font-semibold">Novo sistema em 2026: Conta+JE</p>
-          <p>O TSE substituiu o antigo SPCE (arquivo físico) pelo <strong>Conta+JE</strong>, plataforma 100% online. Não é mais necessário instalar software ou enviar arquivo. Tudo é lançado diretamente no site do TSE.</p>
-          <p className="text-blue-600 flex items-center gap-1 mt-2">
+        <div className="text-sm text-blue-800 space-y-2">
+          <p className="font-semibold">Novo sistema em 2026: Conta+JE — SPCE descontinuado</p>
+          <p>O TSE substituiu definitivamente o SPCE (arquivo físico) pelo <strong>Conta+JE</strong>, plataforma 100% online. Não instala software, não envia mídia física. Login via <strong>gov.br</strong> ou <strong>e-Título</strong>.</p>
+          <p>O sistema preenche automaticamente seus dados de candidatura e integra com o PJe (Processo Judicial Eletrônico).</p>
+          <a href="https://contaje.tse.jus.br" target="_blank" rel="noopener noreferrer"
+            className="text-blue-600 flex items-center gap-1 mt-1 hover:underline w-fit">
             <ExternalLink className="w-3.5 h-3.5" />
             <span className="font-medium">contaje.tse.jus.br</span>
             <span className="text-blue-500">(disponível após início da campanha)</span>
-          </p>
+          </a>
+        </div>
+      </div>
+
+      {/* Alerta teto de gastos */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex gap-4">
+        <TrendingUp className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-amber-800 space-y-1">
+          <p className="font-semibold">Tetos de gasto mantidos iguais a 2022 (TSE, jul/2026)</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+            {TETOS_GASTO.map(t => (
+              <div key={t.cargo} className="bg-white rounded-xl px-3 py-2 border border-amber-100">
+                <p className="text-xs font-bold text-amber-700">{t.cargo}</p>
+                <p className="text-sm font-bold text-amber-900">{t.valor}</p>
+                <p className="text-xs text-amber-600">{t.obs}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-amber-600 mt-2">Ultrapassar o teto gera multa de até 100% do excesso + risco de cassação por abuso de poder econômico.</p>
         </div>
       </div>
 
@@ -190,7 +232,7 @@ export default function PrestacaoContasPage() {
                 ? <span className="text-xs text-gray-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />salvando...</span>
                 : <span className="text-xs text-green-600">✓ salvo</span>
             }
-            <span className="text-sm font-bold text-[#009C3B]">{concluidos.length} / {ETAPAS_PARCIAL.length} etapas</span>
+            <span className="text-sm font-bold text-[#009C3B]">{concluidos.length} / {ETAPAS.length} etapas</span>
           </div>
         </div>
         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
@@ -199,7 +241,7 @@ export default function PrestacaoContasPage() {
         </div>
         <p className="text-xs text-gray-400 mt-2">
           {progresso === 100
-            ? '✓ Todas as etapas concluídas! Lembre-se de guardar o protocolo do Conta+JE.'
+            ? '✓ Todas as etapas concluídas! Guarde o protocolo gerado pelo Conta+JE.'
             : 'Marque cada etapa como concluída conforme for avançando na prestação. O progresso é salvo automaticamente.'}
         </p>
       </div>
@@ -209,7 +251,7 @@ export default function PrestacaoContasPage() {
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-[#002776]" /> Checklist de Prestação de Contas
         </h2>
-        {ETAPAS_PARCIAL.map(step => {
+        {ETAPAS.map(step => {
           const done = concluidos.includes(step.id)
           const open = expandido === step.id
           return (
@@ -336,12 +378,12 @@ export default function PrestacaoContasPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {[
-            { titulo: 'Tipo de contrato', texto: 'Prestação de Serviços Eleitorais — não gera CLT, sem férias ou 13º.' },
-            { titulo: 'Deve ser escrito', texto: 'Contrato assinado com data de início, término, função e valor. O TSE disponibiliza modelo.' },
-            { titulo: 'Pagamento obrigatório', texto: 'Pix nominal, TED ou cheque nominal ao colaborador. Nunca em dinheiro acima de R$ 759,00 (½ salário mínimo de 2026) por pagamento.' },
-            { titulo: 'Limite de pessoal', texto: 'Municípios até 30 mil eleitores: 1% do eleitorado. Acima: +1 por cada 1.000 eleitores excedentes.' },
-            { titulo: 'O que declarar', texto: 'Nome completo, CPF e valor total pago a cada colaborador. Use o Relatório TSE da aba Equipe.' },
-            { titulo: 'INSS', texto: 'O colaborador é contribuinte individual. O candidato não recolhe INSS patronal.' },
+            { titulo: 'Tipo de contrato', texto: 'Prestação de Serviços Eleitorais — não gera vínculo CLT, sem férias ou 13º.' },
+            { titulo: 'Deve ser escrito', texto: 'Contrato assinado (pode ser eletrônico) com data de início, término, função e valor. O TSE disponibiliza modelo.' },
+            { titulo: 'Pagamento obrigatório', texto: 'Pix nominal, TED ou cheque nominal ao colaborador. Dinheiro em espécie: apenas dentro dos limites do Fundo de Caixa do TRE.' },
+            { titulo: 'Cotas obrigatórias (FEFC)', texto: 'Recursos do FEFC: 30% para mulheres, 30% para negros, percentual proporcional para indígenas (Res. 23.752/2026).' },
+            { titulo: 'O que declarar', texto: 'Nome completo, CPF e valor total pago a cada colaborador. Use o Relatório TSE da aba Equipe do SyncroFlow.' },
+            { titulo: 'INSS', texto: 'O colaborador é contribuinte individual. O candidato não recolhe INSS patronal durante a campanha.' },
           ].map(r => (
             <div key={r.titulo} className="bg-gray-50 rounded-xl p-4">
               <p className="text-xs font-bold text-gray-500 uppercase mb-1">{r.titulo}</p>
@@ -376,7 +418,7 @@ export default function PrestacaoContasPage() {
             <ExternalLink className="w-5 h-5 text-amber-600" />
             <div>
               <p className="text-sm font-medium text-gray-900">Acessar Conta+JE</p>
-              <p className="text-xs text-gray-400">Sistema oficial do TSE</p>
+              <p className="text-xs text-gray-400">Sistema oficial TSE — login gov.br</p>
             </div>
           </a>
         </div>
@@ -388,6 +430,7 @@ export default function PrestacaoContasPage() {
         <div className="space-y-1">
           <p className="font-semibold">Recomendação: tenha um advogado eleitoral ou contador na equipe</p>
           <p>A prestação de contas eleitoral tem regras específicas que mudam a cada eleição. Um erro pode levar à desaprovação das contas e à cassação do mandato. O SyncroFlow organiza seus dados — a revisão final deve ser feita por um profissional habilitado.</p>
+          <p className="text-xs mt-2 text-amber-700">Resolução TSE nº 23.752/2026 · Conta+JE substituiu o SPCE definitivamente para eleições 2026.</p>
         </div>
       </div>
     </div>
