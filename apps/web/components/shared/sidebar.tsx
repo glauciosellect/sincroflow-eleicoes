@@ -39,6 +39,7 @@ const navItems = [
 
   { section: 'CAMPO & PESQUISA', items: [
     { href: '/pesquisa', label: 'Pesquisa de Voto', icon: ClipboardList, module: 'field_agent' },
+    { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'field_agent' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
   ] },
