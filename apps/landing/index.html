@@ -331,18 +331,24 @@
     @media (max-width: 800px) { .compliance { grid-template-columns: 1fr; padding: 32px 24px; } }
 
     /* ── PREÇOS ── */
-    .pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; max-width: 760px; margin: 0 auto; }
-    .price-card { border: 2px solid var(--gray-200); border-radius: 20px; padding: 36px; text-align: center; transition: transform 0.25s ease, box-shadow 0.25s ease; }
-    .price-card:hover { transform: translateY(-4px); }
-    .price-card.highlight { border-color: var(--verde); box-shadow: 0 8px 32px rgba(0,156,59,0.15); position: relative; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; max-width: 1060px; margin: 0 auto; }
+    .price-card { border: 2px solid var(--gray-200); border-radius: 20px; padding: 36px 28px; text-align: center; transition: transform 0.25s ease, box-shadow 0.25s ease; position: relative; }
+    .price-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(0,39,118,0.13); }
+    .price-card.highlight { border-color: var(--verde); box-shadow: 0 8px 32px rgba(0,156,59,0.15); }
     .price-card.highlight::before {
       content: 'Mais escolhido'; position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
       background: var(--amarelo); color: var(--azul); font-size: 11px; font-weight: 800;
       padding: 5px 16px; border-radius: 50px; white-space: nowrap;
     }
-    .price-card h3 { font-size: 22px; margin-bottom: 8px; }
-    .price-card .price { font-size: 14px; color: var(--gray-600); margin: 16px 0 24px; }
-    @media (max-width: 700px) { .pricing-grid { grid-template-columns: 1fr; } }
+    .price-card h3 { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+    .price-card .price-value { font-size: 38px; font-weight: 900; color: var(--azul); line-height: 1; margin: 16px 0 4px; }
+    .price-card .price-label { font-size: 13px; color: var(--gray-600); margin-bottom: 20px; }
+    .price-card .price-installments { font-size: 13px; color: var(--gray-600); margin-bottom: 20px; }
+    .price-card .price-desc { font-size: 13.5px; color: var(--gray-600); line-height: 1.5; margin-bottom: 24px; }
+    .price-card .price-features { list-style: none; text-align: left; margin-bottom: 28px; }
+    .price-card .price-features li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; margin-bottom: 8px; color: var(--gray-900); }
+    .price-card .price-features li::before { content: '✓'; color: var(--verde); font-weight: 800; flex-shrink: 0; }
+    @media (max-width: 900px) { .pricing-grid { grid-template-columns: 1fr; max-width: 420px; } }
 
     /* ── INTELIGÊNCIA DE CAMPO — FAIXAS ── */
     .feature-strip {
@@ -796,6 +802,36 @@
         <h3>Consultor de Fatos com IA</h3>
         <p>Agentes verificam boatos e fake news em segundos com fontes públicas — e recebem a resposta certa pronta para usar com o eleitor.</p>
       </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🎙️</div>
+        <h3>Discurso de Palanque com IA</h3>
+        <p>Gere discursos personalizados baseados nas suas propostas: escolha o tema, o tom e o tempo — e receba um roteiro pronto para usar, com exportação em PDF.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">💰</div>
+        <h3>Controle Financeiro</h3>
+        <p>Registre receitas e despesas da campanha, acompanhe o orçamento em tempo real e gere relatórios para prestação de contas ao TSE.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon">🏛️</div>
+        <h3>Gabinete 360°</h3>
+        <p>Para candidatos que já exercem mandato: gerencie audiências, projetos de lei e protocolos de atendimento — tudo integrado à mesma plataforma.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon">🌐</div>
+        <h3>Portal do Eleitor</h3>
+        <p>Página pública personalizada com as propostas e dados do candidato — eleitores podem enviar sugestões e acompanhar o andamento das solicitações.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🎨</div>
+        <h3>Editor de Criativos</h3>
+        <p>Crie artes de campanha diretamente na plataforma: banners, posts para redes sociais e santinhos digitais com a identidade visual da campanha.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">📡</div>
+        <h3>Radar de Notícias</h3>
+        <p>Monitore o que está sendo falado sobre sua campanha e seus adversários em tempo real — fique sempre um passo à frente.</p>
+      </div>
     </div>
   </section>
 
@@ -1060,20 +1096,72 @@
   </section>
 
   <section id="precos">
-    <h2 class="section-title reveal">Preços</h2>
-    <p class="section-subtitle reveal">Planos claros para cada momento da sua campanha.</p>
+    <h2 class="section-title reveal">Investimento por cargo</h2>
+    <p class="section-subtitle reveal">Pagamento único para todo o período eleitoral 2026. Pix à vista ou cartão em até 3x sem juros.</p>
     <div class="pricing-grid">
-      <div class="price-card highlight reveal">
-        <h3>Plano Campanha</h3>
-        <p class="price" style="font-size:15px; line-height:1.5;">Cadastre-se gratuitamente e veja o plano completo com todos os recursos disponíveis para sua campanha.</p>
-        <a href="https://app.syncrofloweleicoes.com.br/register" class="btn-primary" style="width:100%; justify-content:center;">Ver plano e assinar</a>
+
+      <!-- Dep. Estadual -->
+      <div class="price-card reveal">
+        <h3>Dep. Estadual</h3>
+        <div class="price-value">R$&nbsp;4.790</div>
+        <div class="price-installments">ou 3x de R$&nbsp;1.597 sem juros</div>
+        <ul class="price-features">
+          <li>Assistente IA 24/7 no WhatsApp</li>
+          <li>Editor de criativos e santinho digital</li>
+          <li>Pesquisa de voto em campo</li>
+          <li>Mapa de apoiadores</li>
+          <li>Discurso de palanque com IA</li>
+          <li>Gestão de equipe e agentes</li>
+          <li>Relatórios e análises eleitorais</li>
+        </ul>
+        <a href="https://app.syncrofloweleicoes.com.br/register?cargo=DEP_ESTADUAL" class="btn-primary" style="width:100%; justify-content:center; font-size:14px;">
+          Contratar Dep. Estadual
+        </a>
       </div>
-      <div class="price-card reveal reveal-delay-1">
-        <h3>Plano Mandato</h3>
-        <p class="price" style="font-size:15px; line-height:1.5;">Continue com a plataforma após a eleição — gerencie seu mandato com os mesmos dados e contatos da campanha.</p>
-        <span class="btn-disabled" style="width:100%;">Em Breve</span>
+
+      <!-- Dep. Federal — destaque -->
+      <div class="price-card highlight reveal reveal-delay-1">
+        <h3>Dep. Federal</h3>
+        <div class="price-value">R$&nbsp;7.200</div>
+        <div class="price-installments">ou 3x de R$&nbsp;2.400 sem juros</div>
+        <ul class="price-features">
+          <li>Assistente IA 24/7 no WhatsApp</li>
+          <li>Editor de criativos e santinho digital</li>
+          <li>Pesquisa de voto em campo</li>
+          <li>Mapa de apoiadores</li>
+          <li>Discurso de palanque com IA</li>
+          <li>Gestão de equipe e agentes</li>
+          <li>Relatórios e análises eleitorais</li>
+        </ul>
+        <a href="https://app.syncrofloweleicoes.com.br/register?cargo=DEP_FEDERAL" class="btn-primary" style="width:100%; justify-content:center; font-size:14px;">
+          Contratar Dep. Federal
+        </a>
       </div>
+
+      <!-- Senador / Governador -->
+      <div class="price-card reveal reveal-delay-2">
+        <h3>Senador / Governador</h3>
+        <div class="price-value">R$&nbsp;10.800</div>
+        <div class="price-installments">ou 3x de R$&nbsp;3.600 sem juros</div>
+        <ul class="price-features">
+          <li>Assistente IA 24/7 no WhatsApp</li>
+          <li>Editor de criativos e santinho digital</li>
+          <li>Pesquisa de voto em campo</li>
+          <li>Mapa de apoiadores</li>
+          <li>Discurso de palanque com IA</li>
+          <li>Gestão de equipe e agentes</li>
+          <li>Relatórios e análises eleitorais</li>
+        </ul>
+        <a href="https://app.syncrofloweleicoes.com.br/register?cargo=SENADOR_GOV" class="btn-primary" style="width:100%; justify-content:center; font-size:14px;">
+          Contratar Senador/Gov.
+        </a>
+      </div>
+
     </div>
+    <p style="text-align:center; margin-top:28px; font-size:14px; color:var(--gray-600);">
+      Plataforma disponível a partir de <strong>20/07/2026</strong> até 72h antes das eleições, em conformidade com a Resolução TSE nº 23.755/2026.<br>
+      Plano Mandato (pós-eleição) disponível em breve.
+    </p>
   </section>
 
   <footer>

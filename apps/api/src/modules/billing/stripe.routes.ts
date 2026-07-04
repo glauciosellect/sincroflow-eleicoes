@@ -21,20 +21,31 @@ const CHECKOUT_BRANDING = {
   logo: { type: 'url', url: 'https://syncrofloweleicoes.com.br/logo.png' },
 } as const
 
-// TODO: substituir pelos Price IDs reais criados no Stripe do SyncroFlowEleições
-const PLAN_PRICE_IDS: Record<'CAMPAIGN' | 'MANDATE', string | undefined> = {
-  CAMPAIGN: process.env.STRIPE_PRICE_CAMPAIGN,
-  MANDATE: process.env.STRIPE_PRICE_MANDATE,
+// Price IDs por cargo — pagamento único para todo o período eleitoral (eleições 2026).
+// Criar no Stripe Dashboard: 3 produtos (um por cargo), cada um com 1 price avulso (mode: payment).
+// STRIPE_PRICE_DEP_ESTADUAL → R$ 4.790 (479000 centavos)
+// STRIPE_PRICE_DEP_FEDERAL  → R$ 7.200 (720000 centavos)
+// STRIPE_PRICE_SENADOR_GOV  → R$ 10.800 (1080000 centavos)
+// STRIPE_PRICE_MANDATE      → plano mandato (oculto até após eleições)
+const CARGO_PRICE_IDS: Record<string, string | undefined> = {
+  DEP_ESTADUAL: process.env.STRIPE_PRICE_DEP_ESTADUAL,
+  DEP_FEDERAL:  process.env.STRIPE_PRICE_DEP_FEDERAL,
+  SENADOR_GOV:  process.env.STRIPE_PRICE_SENADOR_GOV,
+  MANDATE:      process.env.STRIPE_PRICE_MANDATE,
+}
+
+// Valores totais por cargo em centavos — usados para exibição e info no metadata do Stripe.
+export const CARGO_PRICES: Record<string, { label: string; total: number }> = {
+  DEP_ESTADUAL: { label: 'Deputado(a) Estadual',       total: 479000  },
+  DEP_FEDERAL:  { label: 'Deputado(a) Federal',         total: 720000  },
+  SENADOR_GOV:  { label: 'Senador(a) / Governador(a)', total: 1080000 },
 }
 
 // Recarga avulsa de mensagens ativas — comprada quando o limite do plano se esgota
 export const ACTIVE_MSG_RECHARGE = { amount: 1000, priceId: process.env.STRIPE_PRICE_RECHARGE_1000 }
 
-// Pix/boleto: mesmo valor da mensalidade CAMPAIGN, mas como produto avulso (mode:
-// 'payment'), já que nenhum dos dois suporta recorrência automática madura no Brasil
-// ainda — o candidato paga manualmente todo mês enquanto estiver em CAMPAIGN.
-const CAMPAIGN_ONETIME_PRICE_ID = process.env.STRIPE_PRICE_CAMPAIGN_ONETIME
-const CAMPAIGN_PAYMENT_VALIDITY_DAYS = 30
+// Pagamento único para toda a campanha — sem expiração por período
+const CAMPAIGN_PAYMENT_VALIDITY_DAYS = 9999
 
 // Linha extra de WhatsApp — assinatura recorrente, adicionada como item na subscription
 // principal do candidato (não é um checkout novo, é quantity num price já existente).
@@ -64,60 +75,58 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ version: TERMS_VERSION, text: TERMS_TEXT })
   })
 
-  // ── Passo 2 do registro: checkout do plano de campanha ──────────────────
+  // ── Passo 2 do registro: checkout por cargo ──────────────────────────────
   // O candidato já preencheu o Passo 1 (/auth/register) e recebeu um pendingId.
-  // Este endpoint cria a sessão de pagamento; a conta só é criada de fato
-  // quando o webhook confirmar o pagamento (checkout.session.completed).
+  // Este endpoint cria a sessão de pagamento único (mode: payment) — a conta só é
+  // criada de fato quando o webhook confirmar o pagamento (checkout.session.completed).
+  //
+  // cargo: DEP_ESTADUAL | DEP_FEDERAL | SENADOR_GOV (eleições 2026)
+  // paymentMethod: pix (à vista) | card (1x, 2x ou 3x sem juros)
+  // installments: 1 | 2 | 3 — só para cartão; ignorado para pix
   app.post('/auth/register/checkout', async (req, reply) => {
-    const { pendingId, plan = 'CAMPAIGN', paymentMethod = 'card' } = req.body as {
+    const { pendingId, cargo = 'DEP_ESTADUAL', paymentMethod = 'card', installments = 1 } = req.body as {
       pendingId: string
-      plan?: 'CAMPAIGN' | 'MANDATE'
-      paymentMethod?: 'card' | 'pix' | 'boleto'
+      cargo?: string
+      paymentMethod?: 'card' | 'pix'
+      installments?: 1 | 2 | 3
     }
+
     const pending = await getPendingRegistration(pendingId)
     if (!pending) return reply.status(400).send({ error: 'Cadastro expirado ou inválido. Recomece o registro.' })
 
-    // Pix/boleto só fazem sentido como pagamento avulso mensal durante CAMPAIGN —
-    // Mandato exige recorrência automática (cartão), nenhum dos dois suporta isso
-    // de forma madura no Brasil ainda.
-    if (paymentMethod !== 'card' && plan !== 'CAMPAIGN') {
-      return reply.status(400).send({ error: 'Pix e boleto só estão disponíveis para o Plano Campanha.' })
+    if (!CARGO_PRICE_IDS[cargo]) {
+      return reply.status(400).send({ error: 'Cargo inválido.' })
     }
 
-    await updatePendingRegistrationPayment(pendingId, paymentMethod, plan)
+    const priceId = CARGO_PRICE_IDS[cargo]
+    if (!priceId) return reply.status(500).send({ error: `Preço para ${cargo} não configurado. Contate o suporte.` })
 
-    if (paymentMethod === 'card') {
-      const priceId = PLAN_PRICE_IDS[plan]
-      if (!priceId) return reply.status(500).send({ error: 'Plano não configurado. Contate o suporte.' })
+    await updatePendingRegistrationPayment(pendingId, paymentMethod as any, 'CAMPAIGN')
 
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        mode: 'subscription',
-        customer_email: pending.email,
-        line_items: [{ price: priceId, quantity: 1 }],
-        metadata: { type: 'registration', pendingId, plan },
-        subscription_data: { metadata: { type: 'registration', pendingId, plan } },
-        success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
-        cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
-        branding_settings: CHECKOUT_BRANDING as any,
-      })
+    const validInstallments = paymentMethod === 'card' ? Math.min(3, Math.max(1, installments)) : 1
 
-      return reply.send({ url: session.url })
-    }
-
-    if (!CAMPAIGN_ONETIME_PRICE_ID) return reply.status(500).send({ error: 'Pix/boleto não configurado. Contate o suporte.' })
-
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: any = {
       payment_method_types: [paymentMethod],
       mode: 'payment',
       customer_email: pending.email,
-      line_items: [{ price: CAMPAIGN_ONETIME_PRICE_ID, quantity: 1 }],
-      metadata: { type: 'registration_onetime', pendingId, plan, paymentMethod },
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { type: 'registration_onetime', pendingId, cargo, paymentMethod, installments: String(validInstallments) },
       success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/register?payment=cancelled`,
+      cancel_url: `${process.env.FRONTEND_URL}/register?cargo=${cargo}&payment=cancelled`,
       branding_settings: CHECKOUT_BRANDING as any,
-    })
+    }
 
+    // Parcelamento sem juros via Stripe: disponível apenas para cartão brasileiro.
+    // O Stripe oferece isso via payment_method_options.card.installments.
+    if (paymentMethod === 'card' && validInstallments > 1) {
+      sessionParams.payment_method_options = {
+        card: {
+          installments: { enabled: true },
+        },
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams)
     return reply.send({ url: session.url })
   })
 
@@ -146,32 +155,8 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ url: session.url })
   })
 
-  // Renovação manual mensal via Pix/boleto (candidato já com conta ativa, em CAMPAIGN).
-  // Quem está em MANDATE não pode usar — exige cartão (Subscription) nesse plano.
-  app.post('/billing/checkout-campaign-payment', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
-    const { sub, wid } = req.user as { sub: string; wid?: string }
-    const candidateId = await getWorkspaceId(sub, wid)
-    const { paymentMethod } = z.object({ paymentMethod: z.enum(['pix', 'boleto']) }).parse(req.body)
-
-    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
-    if (candidate?.plan !== 'CAMPAIGN') {
-      return reply.status(400).send({ error: 'Pix e boleto só estão disponíveis para o Plano Campanha. No Mandato, o pagamento é por cartão.' })
-    }
-
-    if (!CAMPAIGN_ONETIME_PRICE_ID) return reply.status(500).send({ error: 'Pix/boleto não configurado. Contate o suporte.' })
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: [paymentMethod],
-      mode: 'payment',
-      line_items: [{ price: CAMPAIGN_ONETIME_PRICE_ID, quantity: 1 }],
-      metadata: { type: 'campaign_subscription_payment', candidateId, paymentMethod },
-      success_url: `${process.env.FRONTEND_URL}/billing?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/billing?payment=cancelled`,
-      branding_settings: CHECKOUT_BRANDING as any,
-    })
-
-    return reply.send({ url: session.url })
-  })
+  // Endpoint legado de renovação manual (não usado no novo fluxo de pagamento único)
+  // Mantido para compatibilidade com candidatos ativados antes da migração de preços.
 
   // Adiciona N linhas extras de WhatsApp à assinatura já ativa do candidato (recorrente,
   // R$ 497/mês cada). O limite (whatsappLineLimit) só sobe quando o webhook confirmar.
@@ -288,16 +273,16 @@ export async function stripeRoutes(app: FastifyInstance) {
           })
         }
 
-        // Pagamento avulso do registro inicial via Pix/boleto aprovado → cria a conta
+        // Pagamento do registro aprovado (Pix ou cartão) → cria a conta
         if (meta.type === 'registration_onetime' && meta.pendingId) {
           const paidUntil = new Date(Date.now() + CAMPAIGN_PAYMENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
           const result = await activatePendingRegistration(
             meta.pendingId,
             session.customer as string,
             null,
-            { method: meta.paymentMethod, paidUntil },
+            { method: (meta.paymentMethod || 'card') as any, paidUntil, cargo: meta.cargo },
           )
-          if (!result) console.error('[STRIPE] Falha ao ativar registro pendente (Pix/boleto):', meta.pendingId)
+          if (!result) console.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
           break
         }
 

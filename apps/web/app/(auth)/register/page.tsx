@@ -1,16 +1,17 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import api from '@/lib/api'
-import { Loader2, ArrowRight, Check } from 'lucide-react'
+import { Loader2, ArrowRight, Check, CreditCard, QrCode } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const accountSchema = z.object({
@@ -32,26 +33,47 @@ const accountSchema = z.object({
 
 type AccountData = z.infer<typeof accountSchema>
 
-const PLANS = [
-  { value: 'CAMPAIGN' as const, label: 'Plano Campanha', desc: 'Para o período eleitoral' },
-  { value: 'MANDATE' as const, label: 'Plano Mandato', desc: 'Para após a eleição (ouvidoria)' },
-]
+const CARGOS = [
+  {
+    value: 'DEP_ESTADUAL',
+    label: 'Deputado(a) Estadual',
+    total: 4790,
+    desc: 'Eleições 2026 — pagamento único',
+  },
+  {
+    value: 'DEP_FEDERAL',
+    label: 'Deputado(a) Federal',
+    total: 7200,
+    desc: 'Eleições 2026 — pagamento único',
+  },
+  {
+    value: 'SENADOR_GOV',
+    label: 'Senador(a) / Governador(a)',
+    total: 10800,
+    desc: 'Eleições 2026 — pagamento único',
+  },
+] as const
 
-// Pix/boleto: pagamento único mensal manual, só disponível no Plano Campanha — o
-// Mandato exige cartão (assinatura recorrente automática).
-const PAYMENT_METHODS = [
-  { value: 'card' as const, label: 'Cartão de crédito', desc: 'Cobrança automática mensal' },
-  { value: 'pix' as const, label: 'Pix', desc: 'Pagamento manual, válido por 30 dias' },
-  { value: 'boleto' as const, label: 'Boleto', desc: 'Pagamento manual, válido por 30 dias' },
-]
+type CargoValue = (typeof CARGOS)[number]['value']
 
-export default function RegisterPage() {
+function formatBRL(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function RegisterForm() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
-  const [plan, setPlan] = useState<'CAMPAIGN' | 'MANDATE'>('CAMPAIGN')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix' | 'boleto'>('card')
+  const [cargo, setCargo] = useState<CargoValue>('DEP_ESTADUAL')
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card')
+  const [installments, setInstallments] = useState<1 | 2 | 3>(1)
   const [pendingId, setPendingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const c = searchParams.get('cargo') as CargoValue | null
+    if (c && CARGOS.find(x => x.value === c)) setCargo(c)
+  }, [searchParams])
 
   const { register, handleSubmit, watch, control, formState: { errors, isValid } } = useForm<AccountData>({
     resolver: zodResolver(accountSchema),
@@ -59,6 +81,15 @@ export default function RegisterPage() {
     defaultValues: { acceptedTerms: false },
   })
   const passwordValue = watch('password', '')
+
+  const selectedCargo = CARGOS.find(c => c.value === cargo)!
+
+  const getInstallmentLabel = (n: 1 | 2 | 3) => {
+    const total = selectedCargo.total
+    if (n === 1) return `1x de ${formatBRL(total)} (à vista)`
+    const parcel = total / n
+    return `${n}x de ${formatBRL(parcel)} sem juros`
+  }
 
   const onSubmitStep1 = async (data: AccountData) => {
     setLoading(true)
@@ -89,7 +120,12 @@ export default function RegisterPage() {
     }
     setLoading(true)
     try {
-      const res = await api.post('/auth/register/checkout', { pendingId, plan, paymentMethod })
+      const res = await api.post('/auth/register/checkout', {
+        pendingId,
+        cargo,
+        paymentMethod,
+        installments: paymentMethod === 'card' ? installments : 1,
+      })
       window.location.href = res.data.url
     } catch (err: any) {
       toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
@@ -225,45 +261,89 @@ export default function RegisterPage() {
       {step === 2 && (
         <div>
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Escolha seu plano</h1>
-            <p className="text-gray-400 mt-1 text-sm">O pagamento confirma seu cadastro. Sua conta é criada automaticamente após a aprovação.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Escolha seu cargo</h1>
+            <p className="text-gray-400 mt-1 text-sm">Pagamento único para todo o período eleitoral. Sua conta é criada após a confirmação.</p>
           </div>
 
+          {/* Seleção de cargo */}
           <div className="space-y-2 mb-6">
-            {PLANS.map((p) => (
+            {CARGOS.map((c) => (
               <button
-                key={p.value}
-                onClick={() => { setPlan(p.value); if (p.value === 'MANDATE') setPaymentMethod('card') }}
+                key={c.value}
+                onClick={() => setCargo(c.value)}
                 className={cn(
                   'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
-                  plan === p.value ? 'border-[#002776] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  cargo === c.value ? 'border-[#002776] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                 )}
               >
-                <div className={cn('text-sm font-semibold', plan === p.value ? 'text-[#002776]' : 'text-gray-800')}>{p.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{p.desc}</div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={cn('text-sm font-semibold', cargo === c.value ? 'text-[#002776]' : 'text-gray-800')}>{c.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{c.desc}</div>
+                  </div>
+                  <div className={cn('text-lg font-bold', cargo === c.value ? 'text-[#002776]' : 'text-gray-700')}>
+                    {formatBRL(c.total)}
+                  </div>
+                </div>
               </button>
             ))}
           </div>
 
+          {/* Forma de pagamento */}
           <Label className="text-sm font-medium text-gray-700">Forma de pagamento</Label>
-          <div className="space-y-2 mt-2 mb-6">
-            {PAYMENT_METHODS.filter((m) => plan === 'CAMPAIGN' || m.value === 'card').map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setPaymentMethod(m.value)}
-                className={cn(
-                  'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
-                  paymentMethod === m.value ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                <div className={cn('text-sm font-semibold', paymentMethod === m.value ? 'text-[#009C3B]' : 'text-gray-800')}>{m.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{m.desc}</div>
-              </button>
-            ))}
-            {plan === 'MANDATE' && (
-              <p className="text-xs text-gray-400 mt-1">O Plano Mandato exige cartão de crédito (cobrança recorrente automática).</p>
-            )}
+          <div className="grid grid-cols-2 gap-2 mt-2 mb-4">
+            <button
+              onClick={() => setPaymentMethod('card')}
+              className={cn(
+                'flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 transition-all',
+                paymentMethod === 'card' ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
+              )}
+            >
+              <CreditCard className={cn('w-5 h-5', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-400')} />
+              <span className={cn('text-sm font-semibold', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-700')}>Cartão</span>
+              <span className="text-xs text-gray-400">até 3x sem juros</span>
+            </button>
+            <button
+              onClick={() => setPaymentMethod('pix')}
+              className={cn(
+                'flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 transition-all',
+                paymentMethod === 'pix' ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
+              )}
+            >
+              <QrCode className={cn('w-5 h-5', paymentMethod === 'pix' ? 'text-[#009C3B]' : 'text-gray-400')} />
+              <span className={cn('text-sm font-semibold', paymentMethod === 'pix' ? 'text-[#009C3B]' : 'text-gray-700')}>Pix</span>
+              <span className="text-xs text-gray-400">à vista</span>
+            </button>
           </div>
+
+          {/* Parcelas (só cartão) */}
+          {paymentMethod === 'card' && (
+            <div className="space-y-2 mb-6">
+              {([1, 2, 3] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setInstallments(n)}
+                  className={cn(
+                    'w-full text-left px-4 py-2.5 rounded-xl border-2 transition-all',
+                    installments === n ? 'border-[#009C3B] bg-green-50' : 'border-gray-100 hover:border-gray-200'
+                  )}
+                >
+                  <span className={cn('text-sm font-medium', installments === n ? 'text-[#009C3B]' : 'text-gray-700')}>
+                    {getInstallmentLabel(n)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {paymentMethod === 'pix' && (
+            <div className="mb-6 px-4 py-3 rounded-xl bg-green-50 border border-green-200">
+              <p className="text-sm text-green-800 font-medium">
+                {formatBRL(selectedCargo.total)} à vista via Pix
+              </p>
+              <p className="text-xs text-green-600 mt-0.5">Aprovação imediata após o pagamento</p>
+            </div>
+          )}
 
           <Button
             onClick={handleCheckout}
@@ -274,8 +354,20 @@ export default function RegisterPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Ir para pagamento
           </Button>
+
+          <p className="text-center text-xs text-gray-400 mt-3">
+            Pagamento processado com segurança via Stripe
+          </p>
         </div>
       )}
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-md animate-pulse" />}>
+      <RegisterForm />
+    </Suspense>
   )
 }
