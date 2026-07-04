@@ -45,6 +45,7 @@ import { radarRoutes } from './modules/radar/radar.routes'
 import { financeiroRoutes } from './modules/financeiro/financeiro.routes'
 import { gabineteRoutes } from './modules/gabinete/gabinete.routes'
 import { equipeRoutes } from './modules/equipe/equipe.routes'
+import { lideresRoutes } from './modules/lideres/lideres.routes'
 import { startAlertsWorker } from './modules/alerts/alerts.worker'
 import { startMessageWorker } from './modules/webhooks/message.worker'
 import { startReminderWorker } from './modules/calendar/reminder.worker'
@@ -158,6 +159,7 @@ async function bootstrap() {
   await app.register(financeiroRoutes)
   await app.register(gabineteRoutes)
   await app.register(equipeRoutes)
+  await app.register(lideresRoutes)
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)

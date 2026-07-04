@@ -131,6 +131,9 @@ model Candidate {
   protocolosAtendimento ProtocoloAtendimento[]
   colaboradoresCampanha ColaboradorCampanha[]
   pagamentosColaborador PagamentoColaborador[]
+  territorios           Territorio[]
+  atividadesLider       AtividadeLider[]
+  metasSemanaLider      MetaSemanaLider[]
 }
 
 // Cadastro aguardando confirmação de pagamento — antes vivia só no Redis com TTL de
@@ -859,6 +862,17 @@ model ColaboradorCampanha {
   supervisorId   String?
   // Vínculo com TeamMember quando o colaborador tem acesso ao SyncroFlow
   teamMemberId   String?  @unique
+  // Gestor de Líderes: territórios e metas
+  bairros        String[] @default([])  // bairros/territórios de atuação
+  metaVotos      Int?                   // meta de votos comprometidos
+  // Score de atividade calculado semanalmente (pesquisas + check-ins + tarefas)
+  scoreAtividade Int      @default(0)
+  // Total de votos comprometidos coletados via pesquisa
+  votosComprometidos Int  @default(0)
+  // Índice de confiabilidade 0-100 (metas cumpridas / total de períodos)
+  confiabilidade Int      @default(100)
+  // Última atividade registrada
+  ultimaAtividade DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -867,10 +881,13 @@ model ColaboradorCampanha {
   supervisor   ColaboradorCampanha?    @relation("Hierarquia", fields: [supervisorId], references: [id], onDelete: SetNull)
   subordinados ColaboradorCampanha[]   @relation("Hierarquia")
   pagamentos   PagamentoColaborador[]
+  atividades   AtividadeLider[]
+  metasSemana  MetaSemanaLider[]
 
   @@index([candidateId, status])
   @@index([candidateId, funcao])
   @@index([supervisorId])
+  @@index([candidateId, scoreAtividade])
 }
 
 model PagamentoColaborador {
@@ -891,6 +908,73 @@ model PagamentoColaborador {
 
   @@index([candidateId, dataPagamento])
   @@index([colaboradorId])
+}
+
+// ─── Gestor de Líderes — M9 ──────────────────────────────────────────────────
+
+// Log de atividades individuais do líder — cada ação registrada gera pontuação
+model AtividadeLider {
+  id            String   @id @default(cuid())
+  candidateId   String
+  colaboradorId String
+  tipo          String   // pesquisa_voto | check_in | evento | tarefa | contato | outro
+  descricao     String?
+  pontos        Int      @default(1) // peso da atividade no score semanal
+  bairro        String?
+  dataAtividade DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  colaborador ColaboradorCampanha @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  candidate   Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([colaboradorId, dataAtividade])
+  @@index([candidateId, tipo])
+  @@index([candidateId, dataAtividade])
+}
+
+
+// Metas semanais por líder — admin/coordenador define, sistema monitora
+model MetaSemanaLider {
+  id            String   @id @default(cuid())
+  candidateId   String
+  colaboradorId String
+  semanaInicio  DateTime // segunda-feira da semana
+  metaPesquisas Int      @default(0)
+  metaCheckIns  Int      @default(0)
+  metaEventos   Int      @default(0)
+  metaContatos  Int      @default(0)
+  realPesquisas Int      @default(0)
+  realCheckIns  Int      @default(0)
+  realEventos   Int      @default(0)
+  realContatos  Int      @default(0)
+  fechada       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  colaborador ColaboradorCampanha @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  candidate   Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([colaboradorId, semanaInicio])
+  @@index([candidateId, semanaInicio])
+}
+
+// Território / zona eleitoral com líder responsável e meta de votos
+model Territorio {
+  id            String   @id @default(cuid())
+  candidateId   String
+  nome          String   // ex: "Centro", "Bairro Novo", "Zona Sul Setor 3"
+  bairros       String[] // lista de bairros que compõem este território
+  metaVotos     Int      @default(0)
+  responsavelId String?  // ColaboradorCampanha.id do líder responsável
+  observacao    String?  @db.Text
+  cor           String?  // cor hex para visualização no mapa
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, ativo])
 }
 
 // ─── Gabinete 360 — M7 ───────────────────────────────────────────────────────
