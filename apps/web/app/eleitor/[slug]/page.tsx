@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -8,7 +8,7 @@ import { z } from 'zod'
 import axios from 'axios'
 import {
   Loader2, CheckCircle2, AlertCircle, Users, MapPin,
-  Phone, Mail, MessageSquare, ChevronDown, Star, Heart
+  Phone, Mail, MessageSquare, ChevronDown, Star, Heart, X
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.syncrofloweleicoes.com.br'
@@ -17,6 +17,7 @@ const cadastroSchema = z.object({
   nome: z.string().min(2, 'Informe seu nome completo'),
   telefone: z.string().min(8, 'Informe um telefone válido'),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
+  cep: z.string().optional(),
   cidade: z.string().optional(),
   bairro: z.string().optional(),
   assunto: z.string().optional(),
@@ -61,6 +62,8 @@ function darken(hex: string, amount = 30): string {
 export default function PortalPublicoPage() {
   const { slug } = useParams() as { slug: string }
   const [submitted, setSubmitted] = useState(false)
+  const [propostaAberta, setPropostaAberta] = useState<Proposta | null>(null)
+  const [buscandoCep, setBuscandoCep] = useState(false)
 
   const { data: portal, isLoading, error } = useQuery<Portal>({
     queryKey: ['portal-pub', slug],
@@ -68,9 +71,24 @@ export default function PortalPublicoPage() {
     retry: false,
   })
 
-  const { register, handleSubmit, formState: { errors } } = useForm<CadastroForm>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<CadastroForm>({
     resolver: zodResolver(cadastroSchema),
   })
+
+  const buscarCep = async (cep: string) => {
+    const digits = cep.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setBuscandoCep(true)
+    try {
+      const res = await axios.get(`https://viacep.com.br/ws/${digits}/json/`)
+      if (!res.data.erro) {
+        setValue('cidade', res.data.localidade ?? '')
+        setValue('bairro', res.data.bairro ?? '')
+      }
+    } catch { /* silencia erro de rede */ } finally {
+      setBuscandoCep(false)
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: (data: CadastroForm) =>
@@ -126,6 +144,51 @@ export default function PortalPublicoPage() {
   const temPropostas = portal.candidate.propostas.length > 0
 
   return (
+    <>
+    {/* Modal de proposta */}
+    {propostaAberta && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={() => setPropostaAberta(null)}
+      >
+        <div
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header do modal */}
+          <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: `${cor}30` }}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{getIcon(propostaAberta.topicKey)}</span>
+              <h3 className="font-bold text-gray-900 text-base">{propostaAberta.topicName}</h3>
+            </div>
+            <button
+              onClick={() => setPropostaAberta(null)}
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Faixa de cor */}
+          <div className="h-1 shrink-0" style={{ background: `linear-gradient(90deg, ${cor}, ${corEscura})` }} />
+          {/* Conteúdo */}
+          <div className="p-5 overflow-y-auto">
+            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+              {propostaAberta.content ?? 'Sem detalhes disponíveis.'}
+            </p>
+          </div>
+          <div className="p-4 border-t bg-gray-50">
+            <button
+              onClick={() => setPropostaAberta(null)}
+              className="w-full py-2.5 rounded-xl text-white text-sm font-semibold"
+              style={{ background: cor }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
@@ -247,16 +310,20 @@ export default function PortalPublicoPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {portal.candidate.propostas.map(p => (
-                <div
+                <button
                   key={p.topicKey}
-                  className="bg-gray-50 rounded-2xl p-5 border border-gray-100 hover:shadow-md transition-shadow"
+                  onClick={() => setPropostaAberta(p)}
+                  className="text-left bg-gray-50 rounded-2xl p-5 border border-gray-100 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all cursor-pointer group"
                 >
                   <div className="text-3xl mb-3">{getIcon(p.topicKey)}</div>
                   <h3 className="font-semibold text-gray-900 text-sm mb-2">{p.topicName}</h3>
                   {p.content && (
-                    <p className="text-gray-600 text-xs leading-relaxed line-clamp-4">{p.content}</p>
+                    <p className="text-gray-500 text-xs leading-relaxed line-clamp-3">{p.content}</p>
                   )}
-                </div>
+                  <p className="text-xs font-medium mt-3 group-hover:underline" style={{ color: cor }}>
+                    Ver mais →
+                  </p>
+                </button>
               ))}
             </div>
           </div>
@@ -330,11 +397,34 @@ export default function PortalPublicoPage() {
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-gray-400" />CEP
+                    <span className="text-gray-400 font-normal">(opcional — preenche cidade e bairro)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      {...register('cep')}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 pr-10"
+                      onChange={e => {
+                        // Máscara CEP
+                        const v = e.target.value.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2')
+                        e.target.value = v
+                        register('cep').onChange(e)
+                        buscarCep(v)
+                      }}
+                    />
+                    {buscandoCep && (
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400" />Cidade
-                    </label>
+                    <label className="text-sm font-medium text-gray-700">Cidade</label>
                     <input
                       {...register('cidade')}
                       placeholder="Sua cidade"
@@ -401,5 +491,6 @@ export default function PortalPublicoPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }
