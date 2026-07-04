@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/use-toast'
 import {
   Globe, Settings, Users, Download, ExternalLink, Copy, CheckCircle2,
   ChevronLeft, ChevronRight, Loader2, Search, Trash2, Phone, Mail, MapPin,
-  UserPlus, RefreshCw
+  UserPlus, RefreshCw, BookOpen, ImageIcon, Link2, Palette, Eye, ArrowRight
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -177,6 +177,108 @@ export default function PortalPage() {
       {/* Config Tab */}
       {tab === 'config' && (
         <form onSubmit={handleSubmit(d => saveMutation.mutate(d))} className="space-y-6">
+
+          {/* Guia passo a passo */}
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                <BookOpen className="w-5 h-5" />
+                Como configurar seu Portal do Eleitor — passo a passo
+              </CardTitle>
+              <p className="text-sm text-blue-700 mt-1">
+                O Portal do Eleitor é uma página pública que você compartilha nas redes sociais, WhatsApp e material impresso. Eleitores se cadastram e ficam na sua base de apoiadores.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+
+              {/* Passo 1 */}
+              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">1</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <Link2 className="w-4 h-4 text-blue-500" />
+                    Escolha o endereço (slug) do seu portal
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    O slug é o final do link que você vai compartilhar. Use seu nome sem espaços ou acentos.
+                    Exemplo: se você se chama <strong>João Silva</strong>, coloque <code className="bg-gray-100 px-1 rounded">joao-silva</code>.
+                    Seu link ficará: <span className="text-blue-700 font-medium">syncrofloweleicoes.com.br/eleitor/joao-silva</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 2 */}
+              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">2</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-blue-500" />
+                    Escreva o título e a mensagem do portal
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    O <strong>Título</strong> é o que aparece em destaque para o eleitor (ex: <em>"Apoie a campanha de João Silva — Deputado Estadual"</em>).
+                    A <strong>Descrição</strong> é a mensagem motivacional abaixo do título — use para contar por que o eleitor deve se cadastrar e apoiar sua candidatura.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 3 */}
+              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">3</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                    Adicione sua foto
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Cole o link direto de uma foto sua (URL terminando em .jpg ou .png).
+                    Dica: faça upload da foto no{' '}
+                    <a href="https://imgbb.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">imgbb.com</a>
+                    {' '}(gratuito, sem cadastro) e copie o "Direct link" gerado.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 4 */}
+              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">4</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <Palette className="w-4 h-4 text-blue-500" />
+                    Escolha a cor da sua campanha
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Clique no campo de cor e selecione a cor principal da sua campanha.
+                    Ela aparecerá no botão e no cabeçalho do portal — use a mesma cor dos seus materiais de campanha para manter a identidade visual.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 5 */}
+              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white text-sm font-bold flex items-center justify-center shrink-0">5</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-green-500" />
+                    Salve, visualize e compartilhe!
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Clique em <strong>"Criar portal"</strong> (ou "Salvar alterações"). Depois clique em <strong>"Ver portal"</strong> no topo da tela para ver como ficou.
+                    Quando estiver satisfeito, clique em <strong>"Copiar link"</strong> e compartilhe nas suas redes sociais, grupos de WhatsApp e material impresso (QR Code).
+                  </p>
+                </div>
+              </div>
+
+              {/* Dica extra */}
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <span className="text-lg shrink-0">💡</span>
+                <p className="text-xs text-amber-800">
+                  <strong>Dica:</strong> Os eleitores que se cadastrarem aparecem automaticamente na aba <strong>Cadastros</strong> desta página. Você pode marcá-los como "Contatado" ou "Convertido" conforme for fazendo o acompanhamento. Use o botão <strong>"Exportar CSV"</strong> para baixar a lista completa e usar em outras ferramentas.
+                </p>
+              </div>
+
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader><CardTitle className="text-base">Identidade do portal</CardTitle></CardHeader>
             <CardContent className="space-y-4">
