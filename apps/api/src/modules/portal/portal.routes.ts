@@ -46,14 +46,38 @@ export async function portalPublicRoutes(app: FastifyInstance) {
         ativo: true,
         totalCadastros: true,
         candidate: {
-          select: { name: true, position: true, party: true, state: true, city: true },
+          select: {
+            name: true, position: true, party: true, state: true, city: true, photoUrl: true,
+            agentConfig: { select: { story: true } },
+            platformTopics: {
+              select: { topicKey: true, topicName: true, content: true },
+              where: { content: { not: null } },
+              take: 6,
+              orderBy: { topicKey: 'asc' },
+            },
+          },
         },
       },
     })
 
     if (!portal || !portal.ativo) return reply.status(404).send({ error: 'Portal não encontrado ou inativo' })
 
-    return reply.send(portal)
+    // Foto: prioriza fotoUrl do portal, depois photoUrl do candidato
+    const fotoFinal = portal.fotoUrl ?? portal.candidate.photoUrl ?? null
+
+    return reply.send({
+      ...portal,
+      fotoUrl: fotoFinal,
+      candidate: {
+        name: portal.candidate.name,
+        position: portal.candidate.position,
+        party: portal.candidate.party,
+        state: portal.candidate.state,
+        city: portal.candidate.city,
+        story: portal.candidate.agentConfig?.story ?? null,
+        propostas: portal.candidate.platformTopics,
+      },
+    })
   })
 
   // POST /portal/p/:slug/cadastro — eleitor se cadastra (sem auth)
