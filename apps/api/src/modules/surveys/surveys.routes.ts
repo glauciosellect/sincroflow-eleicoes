@@ -261,28 +261,40 @@ export async function surveyRoutes(app: FastifyInstance) {
     })
     const totaisMap = Object.fromEntries(totaisReais.map(t => [t.intention, t._count]))
 
-    // Busca contagens por região + intenção (só com localização, para o mapa)
-    const rows = groupByCity
+    // Busca todas as respostas com alguma localização (neighborhood ou city)
+    // Para vereador/prefeito: tenta bairro primeiro, cai para cidade se bairro vazio
+    const rowsRaw = groupByCity
       ? await prisma.voteSurveyResponse.groupBy({
           by: ['city', 'intention'],
           where: { candidateId, city: { not: null }, createdAt: { gte: sinceDate } },
           _count: true,
         })
-      : await prisma.voteSurveyResponse.groupBy({
-          by: ['neighborhood', 'intention'],
-          where: { candidateId, neighborhood: { not: null }, createdAt: { gte: sinceDate } },
-          _count: true,
+      : await prisma.voteSurveyResponse.findMany({
+          where: {
+            candidateId,
+            createdAt: { gte: sinceDate },
+            OR: [{ neighborhood: { not: null } }, { city: { not: null } }],
+          },
+          select: { neighborhood: true, city: true, intention: true },
         })
 
-    // Agrupa por região
+    // Agrupa por região (bairro se existir, senão cidade como fallback)
     const regionMap: Record<string, { apoiador: number; indeciso: number; critico: number }> = {}
-    for (const row of rows as any[]) {
-      const key = groupByCity ? row.city : row.neighborhood
+    for (const row of rowsRaw as any[]) {
+      const key = groupByCity
+        ? row.city
+        : (row.neighborhood?.trim() || row.city?.trim() || null)
       if (!key) continue
       if (!regionMap[key]) regionMap[key] = { apoiador: 0, indeciso: 0, critico: 0 }
-      if (row.intention === 'APOIADOR') regionMap[key].apoiador += row._count
-      if (row.intention === 'INDECISO') regionMap[key].indeciso += row._count
-      if (row.intention === 'CRITICO') regionMap[key].critico += row._count
+      if (groupByCity) {
+        if (row.intention === 'APOIADOR') regionMap[key].apoiador += row._count
+        if (row.intention === 'INDECISO') regionMap[key].indeciso += row._count
+        if (row.intention === 'CRITICO')  regionMap[key].critico  += row._count
+      } else {
+        if (row.intention === 'APOIADOR') regionMap[key].apoiador += 1
+        if (row.intention === 'INDECISO') regionMap[key].indeciso += 1
+        if (row.intention === 'CRITICO')  regionMap[key].critico  += 1
+      }
     }
 
     // Geocodifica cada região via Nominatim (OpenStreetMap) — sem chave, gratuito
