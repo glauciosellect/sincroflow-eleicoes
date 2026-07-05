@@ -4,13 +4,13 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
 
-// Chave Pix do candidato vem de AgentConfig
+// Chave Pix salva como EnvVariable com key='PIX_KEY' — não depende de migration
 async function getPixKey(candidateId: string): Promise<string | null> {
-  const agent = await prisma.agentConfig.findUnique({
-    where: { candidateId },
-    select: { pixKey: true },
+  const env = await prisma.envVariable.findFirst({
+    where: { candidateId, key: 'PIX_KEY' },
+    select: { value: true },
   }).catch(() => null)
-  return agent?.pixKey ?? null
+  return env?.value ?? null
 }
 
 function gerarQRCodePayload(chavePix: string, valor: number, nome: string, cidade: string, txid: string): string {
@@ -76,15 +76,12 @@ export async function doacoesRoutes(app: FastifyInstance) {
     const candidateId = await getWorkspaceId(sub, wid)
     const { pixKey } = req.body as { pixKey: string }
 
-    await prisma.agentConfig.upsert({
-      where: { candidateId },
-      update: { pixKey },
-      create: {
-        candidateId,
-        pixKey,
-        disclaimer: 'Este assistente representa a campanha eleitoral. As informações aqui prestadas têm fins eleitorais.',
-      },
-    })
+    const existing = await prisma.envVariable.findFirst({ where: { candidateId, key: 'PIX_KEY' } })
+    if (existing) {
+      await prisma.envVariable.update({ where: { id: existing.id }, data: { value: pixKey } })
+    } else {
+      await prisma.envVariable.create({ data: { candidateId, key: 'PIX_KEY', value: pixKey } })
+    }
 
     await auditLog({ candidateId, eventType: 'doacoes_config_pix', metadata: { pixKey } })
     return reply.send({ ok: true })
