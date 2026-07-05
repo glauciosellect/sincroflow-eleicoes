@@ -1,8 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
+import path from 'path'
+import fs from 'fs'
+
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'portal')
+fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -183,10 +189,15 @@ export async function portalRoutes(app: FastifyInstance) {
     })
     if (slugConflict) return reply.status(409).send({ error: 'Este slug já está em uso por outro portal.' })
 
+    const portalData = {
+      ...data,
+      trajetoria: data.trajetoria ?? Prisma.JsonNull,
+      depoimentos: data.depoimentos ?? Prisma.JsonNull,
+    }
     const portal = await prisma.portalEleitor.upsert({
       where: { candidateId },
-      create: { candidateId, ...data },
-      update: data,
+      create: { candidateId, ...portalData },
+      update: portalData,
     })
 
     await auditLog({ candidateId, eventType: 'portal_config_updated', metadata: { slug: data.slug } })
@@ -370,5 +381,63 @@ export async function portalRoutes(app: FastifyInstance) {
     }
 
     return reply.send({ synced, total: pendentes.length })
+  })
+
+  // POST /portal/upload/:tipo — upload de foto (hero | sobre)
+  app.post('/portal/upload/:tipo', { onRequest: [requireModule('portal')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { tipo } = req.params as { tipo: string }
+
+    if (!['hero', 'sobre'].includes(tipo)) {
+      return reply.status(400).send({ error: 'Tipo deve ser "hero" ou "sobre"' })
+    }
+
+    const data = await req.file()
+    if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado' })
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedMimes.includes(data.mimetype)) {
+      return reply.status(400).send({ error: 'Apenas imagens JPEG, PNG ou WebP são aceitas' })
+    }
+
+    const ext = data.mimetype === 'image/png' ? 'png' : data.mimetype === 'image/webp' ? 'webp' : 'jpg'
+    const filename = `${candidateId}-${tipo}.${ext}`
+    const filepath = path.join(UPLOADS_DIR, filename)
+
+    const buffer = await data.toBuffer()
+    fs.writeFileSync(filepath, buffer)
+
+    const apiBase = process.env.API_URL || 'https://api.syncrofloweleicoes.com.br'
+    const url = `${apiBase}/uploads/portal/${filename}`
+
+    const updateData = tipo === 'hero' ? { fotoUrl: url } : { fotoSobre: url }
+    await prisma.portalEleitor.upsert({
+      where: { candidateId },
+      create: { candidateId, slug: candidateId, titulo: 'Portal', ...updateData },
+      update: updateData,
+    })
+
+    return reply.send({ url })
+  })
+
+  // DELETE /portal — remove o portal do candidato
+  app.delete('/portal', { onRequest: [requireModule('portal')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const portal = await prisma.portalEleitor.findUnique({ where: { candidateId } })
+    if (!portal) return reply.status(404).send({ error: 'Portal não encontrado' })
+
+    // remove fotos do disco se existirem
+    for (const tipo of ['hero', 'sobre']) {
+      for (const ext of ['jpg', 'png', 'webp']) {
+        const fp = path.join(UPLOADS_DIR, `${candidateId}-${tipo}.${ext}`)
+        if (fs.existsSync(fp)) fs.unlinkSync(fp)
+      }
+    }
+
+    await prisma.portalEleitor.delete({ where: { candidateId } })
+    return reply.status(204).send()
   })
 }

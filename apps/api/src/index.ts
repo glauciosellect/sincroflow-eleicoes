@@ -6,6 +6,8 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import rawBody from 'fastify-raw-body'
 import multipart from '@fastify/multipart'
+import staticFiles from '@fastify/static'
+import path from 'path'
 import { redis } from './lib/redis'
 import { logger } from './lib/logger'
 
@@ -104,6 +106,11 @@ async function bootstrap() {
   // já que o JSON re-serializado pode não ser idêntico ao original.
   await app.register(rawBody, { field: 'rawBody', global: false, runFirst: true })
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } })
+  await app.register(staticFiles, {
+    root: path.join(process.cwd(), 'uploads'),
+    prefix: '/uploads/',
+    decorateReply: false,
+  })
 
   // Rate limit global: 200 req/min por IP
   await app.register(rateLimit, {

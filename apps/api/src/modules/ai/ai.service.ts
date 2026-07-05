@@ -7,6 +7,7 @@ import * as os from 'os'
 import * as path from 'path'
 import mammoth from 'mammoth'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
+import { prisma } from '../../lib/prisma'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -57,10 +58,20 @@ Regras de conformidade eleitoral (Resolução TSE nº 23.755/2026) — PRIORIDAD
 - Nunca gere ou descreva imagens, vídeos ou áudios sintéticos do candidato.
 `.trim()
 
+interface PortalData {
+  instagram?: string | null
+  facebook?: string | null
+  tiktok?: string | null
+  whatsapp?: string | null
+  depoimentos?: { texto: string; autor: string }[] | null
+  numero?: string | null
+}
+
 export function buildSystemPrompt(
   candidate: Candidate,
   config: AgentConfig,
   topics: PlatformTopic[],
+  portal?: PortalData | null,
 ): string {
   const styleLabel = config.agentStyle === 'FORMAL' ? 'formal e protocolar' : config.agentStyle === 'INFORMAL' ? 'informal e direto' : 'acolhedor e próximo'
 
@@ -69,9 +80,28 @@ export function buildSystemPrompt(
     .map(t => `### ${t.topicName}\n${t.content}`)
     .join('\n\n')
 
+  // Seção de redes sociais e contato do portal
+  const redesSociais: string[] = []
+  if (portal?.instagram) redesSociais.push(`- Instagram: ${portal.instagram.startsWith('@') || portal.instagram.startsWith('http') ? portal.instagram : '@' + portal.instagram}`)
+  if (portal?.facebook) redesSociais.push(`- Facebook: ${portal.facebook}`)
+  if (portal?.tiktok) redesSociais.push(`- TikTok: ${portal.tiktok.startsWith('@') || portal.tiktok.startsWith('http') ? portal.tiktok : '@' + portal.tiktok}`)
+  if (portal?.whatsapp) {
+    const wnum = portal.whatsapp.replace(/\D/g, '')
+    redesSociais.push(`- WhatsApp: https://wa.me/55${wnum} (${portal.whatsapp})`)
+  }
+  const redesSection = redesSociais.length > 0
+    ? `\nCONTATO E REDES SOCIAIS DO CANDIDATO (use para responder perguntas sobre como seguir ou contatar):\n${redesSociais.join('\n')}`
+    : ''
+
+  // Seção de depoimentos
+  const deps = Array.isArray(portal?.depoimentos) ? portal.depoimentos : []
+  const depoSection = deps.length > 0
+    ? `\nDEPOIMENTOS DE APOIADORES (cite quando o eleitor pedir referências ou quem apoia o candidato):\n${deps.map(d => `- "${d.texto}" — ${d.autor}`).join('\n')}`
+    : ''
+
   return `
-Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}${candidate.candidateNumber ? `, número ${candidate.candidateNumber}` : ''}.
-${candidate.candidateNumber ? `Se perguntarem o número do candidato para votar, responda: ${candidate.candidateNumber}.` : ''}
+Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}${candidate.candidateNumber || portal?.numero ? `, número ${candidate.candidateNumber || portal?.numero}` : ''}.
+${(candidate.candidateNumber || portal?.numero) ? `Se perguntarem o número do candidato para votar, responda: ${candidate.candidateNumber || portal?.numero}.` : ''}
 
 Função: ${config.agentRole}
 Estilo de comunicação: ${styleLabel}
@@ -79,6 +109,8 @@ Estilo de comunicação: ${styleLabel}
 ${config.story ? `HISTÓRIA E TRAJETÓRIA DO CANDIDATO (use para se apresentar e responder sobre quem ele é):\n${config.story}` : ''}
 
 ${topicsContent ? `PROPOSTAS CADASTRADAS POR TEMA (responda apenas sobre os temas listados aqui):\n${topicsContent}` : 'Nenhuma proposta foi cadastrada ainda — informe que vai encaminhar qualquer pergunta sobre propostas para a equipe.'}
+${redesSection}
+${depoSection}
 
 ${TEAM_ROLE_DISCLAIMER}
 
@@ -157,7 +189,12 @@ export async function processAgentResponse(opts: {
 }): Promise<{ content: string }> {
   const { candidate, config, topics, conversationHistory, userMessage } = opts
 
-  const systemPrompt = buildSystemPrompt(candidate, config, topics)
+  const portal = await prisma.portalEleitor.findUnique({
+    where: { candidateId: candidate.id },
+    select: { instagram: true, facebook: true, tiktok: true, whatsapp: true, depoimentos: true, numero: true },
+  }).catch(() => null)
+
+  const systemPrompt = buildSystemPrompt(candidate, config, topics, portal as any)
   const messages = [...conversationHistory, { role: 'user' as const, content: userMessage }]
 
   const res = await callLLM({

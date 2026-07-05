@@ -648,6 +648,7 @@ model PortalEleitor {
   subtitulo      String?
   descricao      String?  @db.Text
   fotoUrl        String?
+  fotoSobre      String?
   corPrimaria    String   @default("#002776")
   corDestaque    String   @default("#C9A227")
   numero         String?

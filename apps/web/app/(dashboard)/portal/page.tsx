@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast'
 import {
   Globe, Settings, Users, Download, ExternalLink, Copy, CheckCircle2,
   ChevronLeft, ChevronRight, Loader2, Search, Trash2, Phone, Mail, MapPin,
-  UserPlus, RefreshCw, Plus, X, Instagram, Facebook
+  UserPlus, RefreshCw, Plus, X, Instagram, Facebook, Upload, ImageIcon, AlertTriangle
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -67,6 +67,13 @@ export default function PortalPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [uploadingHero, setUploadingHero] = useState(false)
+  const [uploadingSobre, setUploadingSobre] = useState(false)
+  const [heroPreview, setHeroPreview] = useState<string | null>(null)
+  const [sobrePreview, setSobrePreview] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const heroInputRef = useRef<HTMLInputElement>(null)
+  const sobreInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const qc = useQueryClient()
 
@@ -109,8 +116,43 @@ export default function PortalPage() {
         trajetoria: portal.trajetoria?.length ? portal.trajetoria : [{ ano: '', descricao: '' }],
         depoimentos: portal.depoimentos?.length ? portal.depoimentos : [{ texto: '', autor: '' }],
       })
+      if (portal.fotoUrl) setHeroPreview(portal.fotoUrl)
+      if ((portal as any).fotoSobre) setSobrePreview((portal as any).fotoSobre)
     }
   }, [portal, reset])
+
+  const uploadPhoto = async (tipo: 'hero' | 'sobre', file: File) => {
+    const setLoading = tipo === 'hero' ? setUploadingHero : setUploadingSobre
+    setLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post(`/portal/upload/${tipo}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      if (tipo === 'hero') setHeroPreview(data.url)
+      else setSobrePreview(data.url)
+      qc.invalidateQueries({ queryKey: ['portal'] })
+      toast({ title: tipo === 'hero' ? 'Foto de capa enviada!' : 'Foto da história enviada!' })
+    } catch (e: any) {
+      toast({ title: 'Erro ao enviar foto', description: e.response?.data?.error, variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deletePortal = async () => {
+    try {
+      await api.delete('/portal')
+      qc.invalidateQueries({ queryKey: ['portal'] })
+      setConfirmDelete(false)
+      setHeroPreview(null)
+      setSobrePreview(null)
+      toast({ title: 'Portal excluído com sucesso.' })
+    } catch (e: any) {
+      toast({ title: 'Erro ao excluir portal', description: e.response?.data?.error, variant: 'destructive' })
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: (data: ConfigForm) => api.post('/portal', {
@@ -179,6 +221,7 @@ export default function PortalPage() {
   const portalUrl = portal ? `https://app.syncrofloweleicoes.com.br/eleitor/${portal.slug}` : null
 
   return (
+    <>
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -196,6 +239,13 @@ export default function PortalPage() {
                 <ExternalLink className="w-4 h-4" />Ver portal
               </Button>
             </a>
+            <Button
+              variant="outline" size="sm"
+              className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="w-4 h-4" />Excluir portal
+            </Button>
           </div>
         )}
       </div>
@@ -287,11 +337,87 @@ export default function PortalPage() {
                 <Textarea {...register('descricao')} rows={3} placeholder="Escreva por que o eleitor deve te apoiar. Aparece logo abaixo do hero." />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">URL da foto do candidato</label>
-                <Input {...register('fotoUrl')} placeholder="https://..." />
-                <p className="text-xs text-gray-400">Dica: hospede em imgbb.com (gratuito) e cole o "Direct link". Se não preencher, usa a foto já cadastrada no sistema.</p>
-                {errors.fotoUrl && <p className="text-xs text-red-600">{errors.fotoUrl.message}</p>}
+              {/* Fotos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Foto de capa (hero) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Foto de capa (hero)</label>
+                  <p className="text-xs text-gray-400 -mt-1">Aparece no topo da sua página — use uma foto profissional em boa resolução.</p>
+                  <div
+                    className="relative border-2 border-dashed border-gray-200 rounded-xl overflow-hidden cursor-pointer hover:border-[#002776] transition-colors"
+                    style={{ aspectRatio: '4/3' }}
+                    onClick={() => heroInputRef.current?.click()}
+                  >
+                    {heroPreview ? (
+                      <img src={heroPreview} alt="Capa" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-400">
+                        <ImageIcon className="w-8 h-8" />
+                        <span className="text-xs">Clique para enviar foto</span>
+                      </div>
+                    )}
+                    {uploadingHero && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={heroInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto('hero', f) }}
+                  />
+                  <Button
+                    type="button" variant="outline" size="sm" className="w-full gap-2"
+                    onClick={() => heroInputRef.current?.click()}
+                    disabled={uploadingHero}
+                  >
+                    {uploadingHero ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {heroPreview ? 'Trocar foto de capa' : 'Enviar foto de capa'}
+                  </Button>
+                </div>
+
+                {/* Foto da história (sobre) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Foto da história (Sobre)</label>
+                  <p className="text-xs text-gray-400 -mt-1">Aparece na seção "Sobre mim" — pode ser uma foto mais pessoal ou de campanha.</p>
+                  <div
+                    className="relative border-2 border-dashed border-gray-200 rounded-xl overflow-hidden cursor-pointer hover:border-[#002776] transition-colors"
+                    style={{ aspectRatio: '4/3' }}
+                    onClick={() => sobreInputRef.current?.click()}
+                  >
+                    {sobrePreview ? (
+                      <img src={sobrePreview} alt="Sobre" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-400">
+                        <ImageIcon className="w-8 h-8" />
+                        <span className="text-xs">Clique para enviar foto</span>
+                      </div>
+                    )}
+                    {uploadingSobre && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={sobreInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto('sobre', f) }}
+                  />
+                  <Button
+                    type="button" variant="outline" size="sm" className="w-full gap-2"
+                    onClick={() => sobreInputRef.current?.click()}
+                    disabled={uploadingSobre}
+                  >
+                    {uploadingSobre ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {sobrePreview ? 'Trocar foto da história' : 'Enviar foto da história'}
+                  </Button>
+                </div>
               </div>
 
               {/* Paleta de cores */}
@@ -544,5 +670,35 @@ export default function PortalPage() {
         </div>
       )}
     </div>
+
+    {/* Modal de confirmação de exclusão do portal */}
+    {confirmDelete && (
+
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+          <div className="flex items-center gap-3 text-red-600">
+            <AlertTriangle className="w-6 h-6 shrink-0" />
+            <h2 className="text-lg font-bold">Excluir portal?</h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            Esta ação <strong>não pode ser desfeita</strong>. O link público vai parar de funcionar e todos os dados do portal (fotos, depoimentos, trajetória, configurações) serão apagados permanentemente.
+          </p>
+          <p className="text-sm text-gray-500">Os cadastros de eleitores (nomes, telefones) serão mantidos na aba "Cadastros".</p>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={deletePortal}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />Excluir definitivamente
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
