@@ -42,14 +42,27 @@ function LoginContent() {
   const onSubmit = async (data: FormData) => {
     setLoading(true)
     try {
+      // Tenta login de candidato/admin primeiro
       const res = await api.post('/auth/login', data)
       const { user, candidate, role, accessToken, refreshToken } = res.data
       setAuth(user, candidate, accessToken, refreshToken, role)
       router.push('/dashboard')
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Erro ao fazer login'
-      if (msg.includes('2FA') || msg.includes('obrigatório')) setNeeds2FA(true)
-      toast({ title: 'Erro', description: msg, variant: 'destructive' })
+      const msg = err.response?.data?.error || ''
+      if (msg.includes('2FA') || msg.includes('obrigatório')) {
+        setNeeds2FA(true)
+        setLoading(false)
+        return
+      }
+      // Se falhou, tenta como coordenador de campo
+      try {
+        const res2 = await api.post('/coordenador/auth/login', { email: data.email, senha: data.password })
+        localStorage.setItem('coord_token', res2.data.token)
+        localStorage.setItem('coord_info', JSON.stringify(res2.data.coordenador))
+        router.push('/coordenador')
+      } catch {
+        toast({ title: 'Credenciais inválidas', description: 'Email ou senha incorretos.', variant: 'destructive' })
+      }
     } finally {
       setLoading(false)
     }

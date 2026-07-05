@@ -9,7 +9,7 @@ import { sendEmail } from '../../lib/mailer'
 const APP_URL = process.env.FRONTEND_URL || 'https://app.syncrofloweleicoes.com.br'
 
 function boasVindasCoordenadorEmail(nome: string, email: string, senha: string, candidateName: string): string {
-  const loginUrl = `${APP_URL}/coordenador/login`
+  const loginUrl = `${APP_URL}/login`
   return `
     <!DOCTYPE html>
     <html>
