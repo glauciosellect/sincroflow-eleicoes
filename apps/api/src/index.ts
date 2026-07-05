@@ -107,7 +107,7 @@ async function bootstrap() {
   await app.register(rawBody, { field: 'rawBody', global: false, runFirst: true })
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } })
   await app.register(staticFiles, {
-    root: path.join(process.cwd(), 'uploads'),
+    root: process.env.UPLOADS_PATH || '/app/apps/api/uploads',
     prefix: '/uploads/',
     decorateReply: false,
   })

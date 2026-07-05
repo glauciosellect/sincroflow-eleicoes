@@ -7,7 +7,7 @@ import { requireModule, auditLog } from '../../lib/rbac'
 import path from 'path'
 import fs from 'fs'
 
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'portal')
+const UPLOADS_DIR = path.join(process.env.UPLOADS_PATH || '/app/apps/api/uploads', 'portal')
 fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
