@@ -649,6 +649,14 @@ model PortalEleitor {
   descricao      String?  @db.Text
   fotoUrl        String?
   corPrimaria    String   @default("#002776")
+  corDestaque    String   @default("#C9A227")
+  numero         String?
+  instagram      String?
+  facebook       String?
+  tiktok         String?
+  whatsapp       String?
+  trajetoria     Json?
+  depoimentos    Json?
   ativo          Boolean  @default(true)
   totalCadastros Int      @default(0)
   createdAt      DateTime @default(now())

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -8,7 +8,7 @@ import { z } from 'zod'
 import axios from 'axios'
 import {
   Loader2, CheckCircle2, AlertCircle, Users, MapPin,
-  Phone, Mail, MessageSquare, ChevronDown, Star, Heart, X
+  Phone, Mail, MessageSquare, Heart, X, ExternalLink
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.syncrofloweleicoes.com.br'
@@ -26,10 +26,14 @@ const cadastroSchema = z.object({
 type CadastroForm = z.infer<typeof cadastroSchema>
 
 interface Proposta { topicKey: string; topicName: string; content?: string | null }
+interface TrajetoriaItem { ano: string; descricao: string }
+interface DepoimentoItem { texto: string; autor: string }
 
 interface Portal {
   slug: string; titulo: string; subtitulo?: string; descricao?: string
-  fotoUrl?: string; corPrimaria: string; totalCadastros: number
+  fotoUrl?: string; corPrimaria: string; corDestaque: string; totalCadastros: number
+  numero?: string; instagram?: string; facebook?: string; tiktok?: string; whatsapp?: string
+  trajetoria: TrajetoriaItem[]; depoimentos: DepoimentoItem[]
   candidate: {
     name: string; position?: string; party?: string; state?: string; city?: string
     story?: string | null
@@ -37,7 +41,6 @@ interface Portal {
   }
 }
 
-// Ícones por tema de proposta
 const TOPIC_ICONS: Record<string, string> = {
   saude: '🏥', educacao: '📚', seguranca: '🛡️', economia: '💼',
   infraestrutura: '🏗️', meio_ambiente: '🌿', cultura: '🎭',
@@ -45,12 +48,8 @@ const TOPIC_ICONS: Record<string, string> = {
   emprego: '💼', agricultura: '🌾', tecnologia: '💻', esporte: '⚽',
   mulher: '♀️', juventude: '🌟', idosos: '❤️', deficiencia: '♿',
 }
+function getIcon(k: string) { return TOPIC_ICONS[k] ?? '✅' }
 
-function getIcon(topicKey: string) {
-  return TOPIC_ICONS[topicKey] ?? '✅'
-}
-
-// Gera uma cor levemente mais escura para gradiente
 function darken(hex: string, amount = 30): string {
   const num = parseInt(hex.replace('#', ''), 16)
   const r = Math.max(0, (num >> 16) - amount)
@@ -64,6 +63,7 @@ export default function PortalPublicoPage() {
   const [submitted, setSubmitted] = useState(false)
   const [propostaAberta, setPropostaAberta] = useState<Proposta | null>(null)
   const [buscandoCep, setBuscandoCep] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const { data: portal, isLoading, error } = useQuery<Portal>({
     queryKey: ['portal-pub', slug],
@@ -85,9 +85,7 @@ export default function PortalPublicoPage() {
         setValue('cidade', res.data.localidade ?? '')
         setValue('bairro', res.data.bairro ?? '')
       }
-    } catch { /* silencia erro de rede */ } finally {
-      setBuscandoCep(false)
-    }
+    } catch { } finally { setBuscandoCep(false) }
   }
 
   const mutation = useMutation({
@@ -116,7 +114,13 @@ export default function PortalPublicoPage() {
 
   const cor = portal.corPrimaria
   const corEscura = darken(cor, 40)
+  const dest = portal.corDestaque
+  const destEscuro = darken(dest, 30)
   const primeiroNome = portal.candidate.name.split(' ')[0]
+  const temHistoria = !!portal.candidate.story?.trim()
+  const temPropostas = portal.candidate.propostas.length > 0
+  const temTrajetoria = portal.trajetoria?.length > 0
+  const temDepoimentos = portal.depoimentos?.length > 0
 
   if (submitted) {
     return (
@@ -140,189 +144,173 @@ export default function PortalPublicoPage() {
     )
   }
 
-  const temHistoria = !!portal.candidate.story?.trim()
-  const temPropostas = portal.candidate.propostas.length > 0
-
   return (
-    <>
-    {/* Modal de proposta */}
-    {propostaAberta && (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={() => setPropostaAberta(null)}
-      >
+    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#1A1A1A', background: '#F7F8FA' }}>
+
+      {/* ─── Modal de proposta ─── */}
+      {propostaAberta && (
         <div
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
-          onClick={e => e.stopPropagation()}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setPropostaAberta(null)}
         >
-          {/* Header do modal */}
-          <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: `${cor}30` }}>
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{getIcon(propostaAberta.topicKey)}</span>
-              <h3 className="font-bold text-gray-900 text-base">{propostaAberta.topicName}</h3>
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{getIcon(propostaAberta.topicKey)}</span>
+                <h3 className="font-bold text-gray-900 text-base">{propostaAberta.topicName}</h3>
+              </div>
+              <button onClick={() => setPropostaAberta(null)} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <button
-              onClick={() => setPropostaAberta(null)}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          {/* Faixa de cor */}
-          <div className="h-1 shrink-0" style={{ background: `linear-gradient(90deg, ${cor}, ${corEscura})` }} />
-          {/* Conteúdo */}
-          <div className="p-5 overflow-y-auto">
-            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-              {propostaAberta.content ?? 'Sem detalhes disponíveis.'}
-            </p>
-          </div>
-          <div className="p-4 border-t bg-gray-50">
-            <button
-              onClick={() => setPropostaAberta(null)}
-              className="w-full py-2.5 rounded-xl text-white text-sm font-semibold"
-              style={{ background: cor }}
-            >
-              Fechar
-            </button>
+            <div className="h-1 shrink-0" style={{ background: `linear-gradient(90deg, ${dest}, ${destEscuro})` }} />
+            <div className="p-5 overflow-y-auto flex-1">
+              <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{propostaAberta.content ?? 'Sem detalhes disponíveis.'}</p>
+            </div>
+            <div className="p-4 border-t bg-gray-50">
+              <button onClick={() => setPropostaAberta(null)} className="w-full py-2.5 rounded-xl text-white text-sm font-semibold" style={{ background: dest }}>Fechar</button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-
-      {/* ── HERO ──────────────────────────────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)` }}
-      >
-        {/* Padrão decorativo de fundo */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-white -translate-x-1/3 translate-y-1/3" />
-        </div>
-
-        <div className="relative max-w-4xl mx-auto px-6 py-16 text-center">
-          {/* Foto do candidato */}
-          {portal.fotoUrl ? (
-            <div className="mb-6 flex justify-center">
-              <div className="relative">
-                <div className="w-32 h-32 rounded-full border-4 border-white/40 shadow-2xl overflow-hidden">
-                  <img
-                    src={portal.fotoUrl}
-                    alt={portal.candidate.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                {/* Badge de partido */}
-                {portal.candidate.party && (
-                  <div
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg whitespace-nowrap"
-                    style={{ background: corEscura }}
-                  >
-                    {portal.candidate.party}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            // Avatar com inicial quando não há foto
-            <div className="mb-6 flex justify-center">
-              <div className="w-32 h-32 rounded-full border-4 border-white/40 shadow-2xl bg-white/20 flex items-center justify-center text-white text-5xl font-bold">
-                {portal.candidate.name[0]}
-              </div>
-            </div>
-          )}
-
-          {/* Nome e cargo */}
-          <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight mt-6">
-            {portal.titulo}
-          </h1>
-          {portal.subtitulo && (
-            <p className="mt-3 text-lg text-white/85">{portal.subtitulo}</p>
-          )}
-
-          {/* Candidatura */}
-          <div className="mt-4 flex items-center justify-center flex-wrap gap-2 text-white/75 text-sm">
-            {portal.candidate.position && (
-              <span className="bg-white/15 rounded-full px-3 py-1">{portal.candidate.position}</span>
+      {/* ─── HEADER ─── */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800, fontSize: 18, color: cor }}>
+            {portal.numero && (
+              <span style={{ background: cor, color: '#fff', padding: '4px 10px', borderRadius: 6, fontSize: 14 }}>{portal.numero}</span>
             )}
-            {portal.candidate.city && (
-              <span className="bg-white/15 rounded-full px-3 py-1 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />{portal.candidate.city}
-                {portal.candidate.state && ` · ${portal.candidate.state}`}
-              </span>
-            )}
+            {primeiroNome}
           </div>
-
-          {/* Contador de apoiadores */}
-          {portal.totalCadastros > 0 && (
-            <div className="mt-6 inline-flex items-center gap-2 bg-white/20 rounded-full px-5 py-2 text-sm font-medium text-white backdrop-blur-sm">
-              <Users className="w-4 h-4" />
-              {portal.totalCadastros.toLocaleString('pt-BR')} apoiadores cadastrados
-            </div>
-          )}
-
-          {/* CTA scroll */}
-          <a href="#apoiar" className="mt-8 inline-flex flex-col items-center gap-1 text-white/60 text-xs animate-bounce">
-            <span>Quero apoiar</span>
-            <ChevronDown className="w-4 h-4" />
+          <nav style={{ display: 'flex', gap: 24 }} className="hidden-mobile">
+            {temHistoria && <a href="#sobre" style={{ color: '#475569', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Sobre</a>}
+            {temPropostas && <a href="#propostas" style={{ color: '#475569', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Propostas</a>}
+            {temTrajetoria && <a href="#trajetoria" style={{ color: '#475569', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Trajetória</a>}
+            <a href="#apoiar" style={{ color: '#475569', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>Contato</a>
+          </nav>
+          <a
+            href="#apoiar"
+            style={{ background: dest, color: '#fff', padding: '10px 22px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}
+          >
+            Quero apoiar
           </a>
+        </div>
+      </header>
+
+      {/* ─── HERO ─── */}
+      <section style={{ background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`, color: '#fff', padding: '90px 24px', position: 'relative', overflow: 'hidden' }}>
+        {/* Círculos decorativos */}
+        <div style={{ position: 'absolute', top: -80, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'rgba(255,255,255,.06)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -60, left: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,.04)', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: 1140, margin: '0 auto', display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 48, alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.25)', borderRadius: 50, padding: '6px 16px', fontSize: 12, fontWeight: 700, marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {portal.candidate.position && <span>{portal.candidate.position}</span>}
+              {portal.candidate.party && <><span style={{ opacity: .5 }}>·</span><span>{portal.candidate.party}</span></>}
+              {portal.candidate.city && <><span style={{ opacity: .5 }}>·</span><span>{portal.candidate.city}{portal.candidate.state ? `/${portal.candidate.state}` : ''}</span></>}
+            </div>
+            <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 18 }}>{portal.titulo}</h1>
+            {portal.subtitulo && (
+              <p style={{ fontSize: 18, color: 'rgba(255,255,255,.85)', lineHeight: 1.65, marginBottom: 28, maxWidth: 500 }}>{portal.subtitulo}</p>
+            )}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 40 }}>
+              <a href="#apoiar" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: dest, color: '#fff', fontWeight: 700, fontSize: 16, padding: '14px 32px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 6px 20px ${dest}66` }}>
+                Quero ser voluntário
+              </a>
+              {temPropostas && (
+                <a href="#propostas" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.12)', color: '#fff', fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 50, border: '1.5px solid rgba(255,255,255,.3)', textDecoration: 'none' }}>
+                  Ver propostas
+                </a>
+              )}
+            </div>
+            {portal.totalCadastros > 0 && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,.1)', borderRadius: 50, padding: '8px 18px', fontSize: 13, fontWeight: 500 }}>
+                <Users size={14} />
+                {portal.totalCadastros.toLocaleString('pt-BR')} apoiadores cadastrados
+              </div>
+            )}
+          </div>
+
+          {/* Foto */}
+          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 380, aspectRatio: '4/5', borderRadius: 16, overflow: 'hidden', border: '6px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.1)' }}>
+              {portal.fotoUrl ? (
+                <img src={portal.fotoUrl} alt={portal.candidate.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80, fontWeight: 900, color: 'rgba(255,255,255,.6)' }}>
+                  {portal.candidate.name[0]}
+                </div>
+              )}
+            </div>
+            {/* Número circular */}
+            {portal.numero && (
+              <div style={{ position: 'absolute', bottom: -18, right: 10, width: 100, height: 100, borderRadius: '50%', background: dest, border: '4px solid #fff', boxShadow: '0 10px 28px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                <span style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>{portal.numero}</span>
+                <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700 }}>VOTE</span>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* ── DESCRIÇÃO ─────────────────────────────────────────────────────── */}
+      {/* ─── DESCRIÇÃO ─── */}
       {portal.descricao && (
-        <section className="bg-white border-b">
-          <div className="max-w-3xl mx-auto px-6 py-10 text-center">
-            <p className="text-gray-700 text-base leading-relaxed whitespace-pre-line">{portal.descricao}</p>
+        <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ maxWidth: 760, margin: '0 auto', padding: '56px 24px', textAlign: 'center' }}>
+            <p style={{ fontSize: 17, color: '#475569', lineHeight: 1.75, whiteSpace: 'pre-line' }}>{portal.descricao}</p>
           </div>
         </section>
       )}
 
-      {/* ── HISTÓRIA ──────────────────────────────────────────────────────── */}
+      {/* ─── SOBRE (história) ─── */}
       {temHistoria && (
-        <section className="bg-gray-50 border-b">
-          <div className="max-w-3xl mx-auto px-6 py-12">
-            <div className="text-center mb-8">
-              <span className="text-2xl">📖</span>
-              <h2 className="text-2xl font-bold text-gray-900 mt-2">Quem é {primeiroNome}?</h2>
-              <div className="w-12 h-1 rounded-full mx-auto mt-3" style={{ background: cor }} />
+        <section id="sobre" style={{ background: '#F7F8FA', borderBottom: '1px solid #e2e8f0', padding: '80px 24px' }}>
+          <div style={{ maxWidth: 1140, margin: '0 auto', display: 'grid', gridTemplateColumns: '.8fr 1.2fr', gap: 48, alignItems: 'start' }}>
+            {/* Foto lateral */}
+            <div style={{ borderRadius: 14, overflow: 'hidden', background: '#e2e8f0', aspectRatio: '1/1' }}>
+              {portal.fotoUrl
+                ? <img src={portal.fotoUrl} alt={portal.candidate.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 60, color: '#9aa0aa' }}>{portal.candidate.name[0]}</div>
+              }
             </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm sm:text-base">
-                {portal.candidate.story}
-              </p>
+            <div>
+              <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Quem é</span>
+              <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0 18px', color: darken(cor, 20) }}>{portal.candidate.name}</h2>
+              {portal.candidate.story?.split('\n\n').map((p, i) => (
+                <p key={i} style={{ color: '#475569', marginBottom: 14, fontSize: 16, lineHeight: 1.75 }}>{p}</p>
+              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ── PROPOSTAS ─────────────────────────────────────────────────────── */}
+      {/* ─── PROPOSTAS ─── */}
       {temPropostas && (
-        <section className="bg-white border-b">
-          <div className="max-w-4xl mx-auto px-6 py-12">
-            <div className="text-center mb-8">
-              <span className="text-2xl">🗳️</span>
-              <h2 className="text-2xl font-bold text-gray-900 mt-2">Nossas Propostas</h2>
-              <div className="w-12 h-1 rounded-full mx-auto mt-3" style={{ background: cor }} />
-              <p className="text-gray-500 text-sm mt-2">O que {primeiroNome} vai fazer por você</p>
+        <section id="propostas" style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '80px 24px' }}>
+          <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 48 }}>
+              <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Plataforma</span>
+              <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0 8px', color: darken(cor, 20) }}>Propostas para uma cidade mais justa</h2>
+              <p style={{ color: '#5B6472', fontSize: 16 }}>O que {primeiroNome} vai fazer por você</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 24 }}>
               {portal.candidate.propostas.map(p => (
                 <button
                   key={p.topicKey}
                   onClick={() => setPropostaAberta(p)}
-                  className="text-left bg-gray-50 rounded-2xl p-5 border border-gray-100 hover:shadow-md hover:border-gray-300 active:scale-95 transition-all cursor-pointer group"
+                  style={{ textAlign: 'left', background: '#F7F8FA', borderRadius: 14, padding: 28, borderTop: `4px solid ${dest}`, border: `1px solid #e2e8f0`, borderTopColor: dest, cursor: 'pointer', transition: 'transform .2s, box-shadow .2s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(0,0,0,.1)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '' }}
                 >
-                  <div className="text-3xl mb-3">{getIcon(p.topicKey)}</div>
-                  <h3 className="font-semibold text-gray-900 text-sm mb-2">{p.topicName}</h3>
-                  {p.content && (
-                    <p className="text-gray-500 text-xs leading-relaxed line-clamp-3">{p.content}</p>
-                  )}
-                  <p className="text-xs font-medium mt-3 group-hover:underline" style={{ color: cor }}>
-                    Ver mais →
-                  </p>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{getIcon(p.topicKey)}</div>
+                  <h3 style={{ fontSize: 19, marginBottom: 8, color: darken(cor, 20), fontWeight: 800 }}>{p.topicName}</h3>
+                  {p.content && <p style={{ color: '#5B6472', fontSize: 14, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.content}</p>}
+                  <p style={{ fontSize: 12, fontWeight: 700, marginTop: 12, color: dest }}>Ver mais →</p>
                 </button>
               ))}
             </div>
@@ -330,167 +318,211 @@ export default function PortalPublicoPage() {
         </section>
       )}
 
-      {/* ── FORMULÁRIO ────────────────────────────────────────────────────── */}
-      <section id="apoiar" className="bg-gray-50 py-14">
-        <div className="max-w-lg mx-auto px-4">
-
-          {/* Chamada */}
-          <div className="text-center mb-8">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
-              style={{ background: cor }}
-            >
-              <Heart className="w-7 h-7 text-white" />
+      {/* ─── TRAJETÓRIA ─── */}
+      {temTrajetoria && (
+        <section id="trajetoria" style={{ background: '#F7F8FA', borderBottom: '1px solid #e2e8f0', padding: '80px 24px' }}>
+          <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 48 }}>
+              <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Trajetória</span>
+              <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0', color: darken(cor, 20) }}>Uma história de compromisso</h2>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Faça parte dessa mudança!</h2>
-            <p className="text-gray-500 text-sm mt-2">
-              Cadastre-se e receba novidades da campanha de {primeiroNome}
-            </p>
-          </div>
-
-          {/* Card do formulário */}
-          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-            {/* Faixa de cor no topo */}
-            <div className="h-2" style={{ background: `linear-gradient(90deg, ${cor}, ${corEscura})` }} />
-
-            <div className="p-6 sm:p-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-                <Star className="w-5 h-5" style={{ color: cor }} />
-                Quero apoiar!
-              </h3>
-
-              <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Nome completo *</label>
-                  <input
-                    {...register('nome')}
-                    placeholder="Seu nome"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 transition-shadow"
-                    style={{ '--tw-ring-color': cor } as React.CSSProperties}
-                  />
-                  {errors.nome && <p className="text-xs text-red-500">{errors.nome.message}</p>}
+            <div style={{ maxWidth: 760, margin: '0 auto', borderLeft: `3px solid ${dest}`, paddingLeft: 28 }}>
+              {portal.trajetoria.map((item, idx) => (
+                <div key={idx} style={{ marginBottom: 32, position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: -35, top: 4, width: 14, height: 14, borderRadius: '50%', background: dest }} />
+                  <div style={{ fontWeight: 800, color: cor, fontSize: 18 }}>{item.ano}</div>
+                  <p style={{ color: '#5B6472', marginTop: 4, fontSize: 15, lineHeight: 1.6 }}>{item.descricao}</p>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-gray-400" />WhatsApp / Telefone *
-                  </label>
-                  <input
-                    {...register('telefone')}
-                    placeholder="(00) 00000-0000"
-                    type="tel"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 transition-shadow"
-                  />
-                  {errors.telefone && <p className="text-xs text-red-500">{errors.telefone.message}</p>}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-gray-400" />Email
-                    <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <input
-                    {...register('email')}
-                    placeholder="seu@email.com"
-                    type="email"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 transition-shadow"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400" />CEP
-                    <span className="text-gray-400 font-normal">(opcional — preenche cidade e bairro)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      {...register('cep')}
-                      placeholder="00000-000"
-                      maxLength={9}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 pr-10"
-                      onChange={e => {
-                        // Máscara CEP
-                        const v = e.target.value.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2')
-                        e.target.value = v
-                        register('cep').onChange(e)
-                        buscarCep(v)
-                      }}
-                    />
-                    {buscandoCep && (
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700">Cidade</label>
-                    <input
-                      {...register('cidade')}
-                      placeholder="Sua cidade"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700">Bairro</label>
-                    <input
-                      {...register('bairro')}
-                      placeholder="Seu bairro"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Como posso ajudar?</label>
-                  <input
-                    {...register('assunto')}
-                    placeholder="ex: Voluntário, Doação, Divulgar nas redes..."
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-gray-400" />Mensagem
-                    <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <textarea
-                    {...register('mensagem')}
-                    rows={3}
-                    placeholder="Deixe uma mensagem de apoio..."
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 resize-none"
-                  />
-                </div>
-
-                {mutation.isError && (
-                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl p-3">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    Ocorreu um erro. Tente novamente.
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={mutation.isPending}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
-                  style={{ background: `linear-gradient(135deg, ${cor}, ${corEscura})` }}
-                >
-                  {mutation.isPending
-                    ? <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
-                    : <><Heart className="w-5 h-5" /> Quero apoiar {primeiroNome}!</>
-                  }
-                </button>
-              </form>
+              ))}
             </div>
           </div>
+        </section>
+      )}
 
-          <p className="text-center text-xs text-gray-400 mt-6">
-            Powered by <span className="font-semibold">SyncroFlow</span>Eleições
-          </p>
+      {/* ─── DEPOIMENTOS ─── */}
+      {temDepoimentos && (
+        <section style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '80px 24px' }}>
+          <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 48 }}>
+              <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Apoio</span>
+              <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0', color: darken(cor, 20) }}>Quem confia em {primeiroNome}</h2>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 }}>
+              {portal.depoimentos.map((dep, idx) => (
+                <div key={idx} style={{ background: '#F7F8FA', borderRadius: 14, padding: 28, border: '1px solid #e2e8f0' }}>
+                  <p style={{ fontStyle: 'italic', color: '#1A1A1A', marginBottom: 14, lineHeight: 1.65 }}>"{dep.texto}"</p>
+                  <p style={{ fontWeight: 700, color: darken(cor, 20), fontSize: 14 }}>{dep.autor}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ─── FORMULÁRIO DE APOIO ─── */}
+      <section id="apoiar" style={{ background: '#F7F8FA', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', marginBottom: 36 }}>
+          <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Participe</span>
+          <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0 8px', color: darken(cor, 20) }}>Toda ajuda faz a diferença</h2>
+          <p style={{ color: '#5B6472', fontSize: 16 }}>Leva menos de 1 minuto: conte como você quer ajudar essa campanha a vencer.</p>
+        </div>
+
+        <div style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 20, boxShadow: '0 10px 34px rgba(0,0,0,.09)', overflow: 'hidden' }}>
+          {/* Barra de cor */}
+          <div style={{ height: 6, background: `linear-gradient(90deg, ${cor}, ${dest})` }} />
+
+          <div style={{ padding: '32px' }}>
+            <form onSubmit={handleSubmit(d => mutation.mutate(d))} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Nome completo *</label>
+                <input {...register('nome')} placeholder="Seu nome" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                {errors.nome && <p style={{ fontSize: 12, color: '#EF4444', marginTop: 4 }}>{errors.nome.message}</p>}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>WhatsApp / Telefone *</label>
+                <input {...register('telefone')} placeholder="(00) 00000-0000" type="tel" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                {errors.telefone && <p style={{ fontSize: 12, color: '#EF4444', marginTop: 4 }}>{errors.telefone.message}</p>}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Email <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(opcional)</span></label>
+                <input {...register('email')} placeholder="seu@email.com" type="email" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>CEP <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(preenche cidade e bairro)</span></label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    {...register('cep')}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', paddingRight: buscandoCep ? 40 : 14, boxSizing: 'border-box' }}
+                    onChange={e => {
+                      const v = e.target.value.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2')
+                      e.target.value = v
+                      register('cep').onChange(e)
+                      buscarCep(v)
+                    }}
+                  />
+                  {buscandoCep && <Loader2 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, animation: 'spin 1s linear infinite', color: '#9CA3AF' }} />}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Cidade</label>
+                  <input {...register('cidade')} placeholder="Sua cidade" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Bairro</label>
+                  <input {...register('bairro')} placeholder="Seu bairro" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Como posso ajudar?</label>
+                <input {...register('assunto')} placeholder="ex: Voluntário, Doação, Divulgar nas redes..." style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Mensagem <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(opcional)</span></label>
+                <textarea {...register('mensagem')} rows={3} placeholder="Deixe uma mensagem de apoio..." style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 14, outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              {mutation.isError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#DC2626', background: '#FEF2F2', borderRadius: 10, padding: '10px 14px' }}>
+                  <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+                  Ocorreu um erro. Tente novamente.
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={mutation.isPending}
+                style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', color: '#fff', fontWeight: 700, fontSize: 16, cursor: mutation.isPending ? 'not-allowed' : 'pointer', background: `linear-gradient(135deg, ${cor}, ${dest})`, opacity: mutation.isPending ? .7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 6px 20px ${cor}55` }}
+              >
+                {mutation.isPending
+                  ? <><Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} /> Enviando...</>
+                  : <><Heart style={{ width: 20, height: 20 }} /> Quero apoiar {primeiroNome}!</>
+                }
+              </button>
+            </form>
+          </div>
         </div>
       </section>
+
+      {/* ─── CTA FINAL ─── */}
+      <section style={{ background: darken(cor, 40), color: '#fff', textAlign: 'center', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 32, fontWeight: 900, marginBottom: 14 }}>Faça parte dessa campanha</h2>
+          <p style={{ color: 'rgba(255,255,255,.85)', marginBottom: 32, fontSize: 17, lineHeight: 1.65 }}>
+            Junte-se a {portal.candidate.name} e ajude a fazer a diferença nas eleições de 2026.
+          </p>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="#apoiar" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: dest, color: '#fff', fontWeight: 700, fontSize: 16, padding: '14px 32px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 6px 20px ${dest}66` }}>
+              <Heart size={18} />Quero apoiar
+            </a>
+            {portal.whatsapp && (
+              <a
+                href={`https://wa.me/${portal.whatsapp.replace(/\D/g, '')}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.1)', color: '#fff', fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 50, border: '1.5px solid rgba(255,255,255,.3)', textDecoration: 'none' }}
+              >
+                💬 Falar no WhatsApp
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FOOTER ─── */}
+      <footer style={{ background: '#0e0e0f', color: '#c9ccd1', padding: '48px 24px 24px', fontSize: 14 }}>
+        <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 32, marginBottom: 32 }}>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 8 }}>
+                {portal.candidate.name}{portal.numero ? ` — ${portal.numero}` : ''}
+              </p>
+              {portal.subtitulo && <p style={{ color: '#a7abb3', maxWidth: 340, fontSize: 13, lineHeight: 1.6 }}>{portal.subtitulo}</p>}
+            </div>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Redes</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {portal.instagram && <a href={portal.instagram.startsWith('http') ? portal.instagram : `https://instagram.com/${portal.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ color: '#c9ccd1', textDecoration: 'none', fontSize: 13 }}>Instagram</a>}
+                {portal.facebook && <a href={portal.facebook.startsWith('http') ? portal.facebook : `https://${portal.facebook}`} target="_blank" rel="noopener noreferrer" style={{ color: '#c9ccd1', textDecoration: 'none', fontSize: 13 }}>Facebook</a>}
+                {portal.tiktok && <a href={portal.tiktok.startsWith('http') ? portal.tiktok : `https://tiktok.com/${portal.tiktok.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ color: '#c9ccd1', textDecoration: 'none', fontSize: 13 }}>TikTok</a>}
+              </div>
+            </div>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Contato</p>
+              {portal.whatsapp && (
+                <a href={`https://wa.me/${portal.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ color: '#c9ccd1', textDecoration: 'none', fontSize: 13, display: 'block', marginBottom: 8 }}>
+                  💬 WhatsApp
+                </a>
+              )}
+              {portal.candidate.city && (
+                <p style={{ color: '#a7abb3', fontSize: 13 }}>
+                  {portal.candidate.city}{portal.candidate.state ? `, ${portal.candidate.state}` : ''}
+                </p>
+              )}
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, fontSize: 12, color: '#8b909a', lineHeight: 1.7 }}>
+            Conteúdo de propaganda eleitoral. Candidato(a) {portal.candidate.name}{portal.numero ? `, número ${portal.numero}` : ''}{portal.candidate.party ? `, ${portal.candidate.party}` : ''}.
+            Este material segue as normas do TSE para propaganda eleitoral na internet (Lei 9.504/97 e resoluções vigentes).
+            <br />
+            <span style={{ opacity: .6 }}>Powered by <strong style={{ color: '#fff' }}>SyncroFlow</strong>Eleições</span>
+          </div>
+        </div>
+      </footer>
+
+      <style>{`
+        @media (max-width: 860px) {
+          .hidden-mobile { display: none !important; }
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
-    </>
   )
 }

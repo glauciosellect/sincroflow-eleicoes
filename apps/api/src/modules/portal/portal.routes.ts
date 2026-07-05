@@ -6,6 +6,16 @@ import { requireModule, auditLog } from '../../lib/rbac'
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
+const trajetoriaItemSchema = z.object({
+  ano: z.string().max(10),
+  descricao: z.string().max(300),
+})
+
+const depoimentoItemSchema = z.object({
+  texto: z.string().max(500),
+  autor: z.string().max(100),
+})
+
 const portalConfigSchema = z.object({
   slug: z.string().min(3).max(60).regex(/^[a-z0-9-]+$/, 'Apenas letras minúsculas, números e hífens'),
   titulo: z.string().min(3).max(120),
@@ -13,6 +23,14 @@ const portalConfigSchema = z.object({
   descricao: z.string().max(2000).optional(),
   fotoUrl: z.string().url().optional().nullable(),
   corPrimaria: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#002776'),
+  corDestaque: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#C9A227'),
+  numero: z.string().max(20).optional().nullable(),
+  instagram: z.string().max(100).optional().nullable(),
+  facebook: z.string().max(100).optional().nullable(),
+  tiktok: z.string().max(100).optional().nullable(),
+  whatsapp: z.string().max(20).optional().nullable(),
+  trajetoria: z.array(trajetoriaItemSchema).max(10).optional().nullable(),
+  depoimentos: z.array(depoimentoItemSchema).max(6).optional().nullable(),
   ativo: z.boolean().default(true),
 })
 
@@ -43,6 +61,14 @@ export async function portalPublicRoutes(app: FastifyInstance) {
         descricao: true,
         fotoUrl: true,
         corPrimaria: true,
+        corDestaque: true,
+        numero: true,
+        instagram: true,
+        facebook: true,
+        tiktok: true,
+        whatsapp: true,
+        trajetoria: true,
+        depoimentos: true,
         ativo: true,
         totalCadastros: true,
         candidate: {
@@ -68,6 +94,8 @@ export async function portalPublicRoutes(app: FastifyInstance) {
     return reply.send({
       ...portal,
       fotoUrl: fotoFinal,
+      trajetoria: (portal.trajetoria as any[]) ?? [],
+      depoimentos: (portal.depoimentos as any[]) ?? [],
       candidate: {
         name: portal.candidate.name,
         position: portal.candidate.position,

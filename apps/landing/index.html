@@ -445,46 +445,145 @@
       </div>
     </div>
     <div class="flag-wrap">
-      <!-- Bandeira do Brasil SVG real -->
-      <svg class="flag-svg" viewBox="0 0 720 504" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bandeira do Brasil">
-        <rect width="720" height="504" fill="#009C3B" rx="12"/>
-        <polygon points="360,48 672,252 360,456 48,252" fill="#FFDF00"/>
-        <circle cx="360" cy="252" r="144" fill="#002776"/>
-        <!-- Faixa branca diagonal -->
-        <path d="M216,252 Q360,198 504,252" stroke="white" stroke-width="28" fill="none" opacity=".95"/>
-        <!-- Estrelas (simplificadas) -->
-        <g fill="white" opacity=".9">
-          <circle cx="290" cy="222" r="5"/>
-          <circle cx="318" cy="208" r="4"/>
-          <circle cx="348" cy="200" r="5"/>
-          <circle cx="378" cy="205" r="4"/>
-          <circle cx="405" cy="218" r="5"/>
-          <circle cx="424" cy="238" r="4"/>
-          <circle cx="415" cy="260" r="4"/>
-          <circle cx="390" cy="274" r="5"/>
-          <circle cx="360" cy="278" r="4"/>
-          <circle cx="330" cy="272" r="5"/>
-          <circle cx="305" cy="258" r="4"/>
-          <circle cx="294" cy="240" r="4"/>
-          <!-- grandes cidades -->
-          <circle cx="338" cy="285" r="6"/>
-          <circle cx="370" cy="290" r="5"/>
-          <circle cx="400" cy="282" r="5"/>
-          <circle cx="280" cy="250" r="5"/>
-          <circle cx="440" cy="248" r="5"/>
-          <circle cx="360" cy="230" r="3"/>
-          <circle cx="320" cy="238" r="3"/>
-          <circle cx="400" cy="240" r="3"/>
+      <!-- Urna Eleitoral + Bandeira do Brasil — SVG próprio SyncroFlowEleições -->
+      <svg class="flag-svg" viewBox="0 0 480 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Urna eleitoral brasileira">
+        <defs>
+          <radialGradient id="bg-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#009C3B" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#002776" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="shadow-urna" x="-20%" y="-10%" width="140%" height="130%">
+            <feDropShadow dx="0" dy="18" stdDeviation="28" flood-color="#000" flood-opacity=".45"/>
+          </filter>
+          <filter id="glow-screen" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="6" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <linearGradient id="flag-gr" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#009C3B"/>
+            <stop offset="100%" stop-color="#006B29"/>
+          </linearGradient>
+          <linearGradient id="urna-body" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#2D3A4A"/>
+            <stop offset="100%" stop-color="#1A2535"/>
+          </linearGradient>
+          <linearGradient id="urna-top" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#3E5068"/>
+            <stop offset="100%" stop-color="#28394F"/>
+          </linearGradient>
+          <linearGradient id="screen-gr" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#0A2A1A"/>
+            <stop offset="100%" stop-color="#061610"/>
+          </linearGradient>
+          <clipPath id="flag-clip">
+            <rect x="40" y="30" width="400" height="280" rx="16"/>
+          </clipPath>
+        </defs>
+
+        <!-- ── Fundo glow ── -->
+        <ellipse cx="240" cy="420" rx="180" ry="40" fill="#009C3B" opacity=".18"/>
+        <circle cx="240" cy="260" r="220" fill="url(#bg-glow)"/>
+
+        <!-- ══ BANDEIRA DO BRASIL (fundo, estilizada) ══ -->
+        <g clip-path="url(#flag-clip)" opacity=".92">
+          <!-- Verde -->
+          <rect x="40" y="30" width="400" height="280" rx="16" fill="url(#flag-gr)"/>
+          <!-- Losango amarelo -->
+          <polygon points="240,52 420,170 240,288 60,170" fill="#FFDF00"/>
+          <!-- Círculo azul -->
+          <circle cx="240" cy="170" r="92" fill="#002776"/>
+          <!-- Faixa branca (Ordem e Progresso) -->
+          <path d="M148,170 Q240,130 332,170" stroke="white" stroke-width="18" fill="none" stroke-linecap="round"/>
+          <!-- Texto -->
+          <rect x="152" y="162" width="176" height="16" rx="3" fill="white" opacity=".95"/>
+          <text x="240" y="174" text-anchor="middle" font-family="serif" font-size="8" font-weight="bold" fill="#002776" letter-spacing="1.2">ORDEM E PROGRESSO</text>
+          <!-- Estrelas -->
+          <g fill="white" opacity=".85">
+            <circle cx="196" cy="152" r="3.5"/><circle cx="214" cy="143" r="2.8"/>
+            <circle cx="234" cy="139" r="3.5"/><circle cx="254" cy="143" r="2.8"/>
+            <circle cx="272" cy="152" r="3.5"/><circle cx="284" cy="165" r="2.8"/>
+            <circle cx="279" cy="180" r="2.8"/><circle cx="261" cy="189" r="3.5"/>
+            <circle cx="240" cy="192" r="2.8"/><circle cx="219" cy="188" r="3.5"/>
+            <circle cx="201" cy="179" r="2.8"/><circle cx="193" cy="163" r="2.8"/>
+            <circle cx="226" cy="196" r="4"/><circle cx="252" cy="197" r="3.5"/>
+            <circle cx="277" cy="189" r="3.5"/>
+          </g>
+          <!-- Overlay sutil para a urna sobrepor bem -->
+          <rect x="40" y="30" width="400" height="280" rx="16" fill="rgba(0,0,20,.15)"/>
         </g>
-        <!-- ORDEM E PROGRESSO -->
-        <rect x="230" y="241" width="260" height="22" rx="3" fill="white" opacity=".92"/>
-        <text x="360" y="256" text-anchor="middle" font-family="serif" font-size="12" font-weight="bold" fill="#002776" letter-spacing="1.5">ORDEM E PROGRESSO</text>
-        <!-- Brilho animado -->
-        <ellipse cx="300" cy="180" rx="80" ry="40" fill="white" opacity="0" style="animation:shimmer 3s ease-in-out infinite;"/>
+        <!-- Borda da bandeira -->
+        <rect x="40" y="30" width="400" height="280" rx="16" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1.5"/>
+
+        <!-- ══ URNA ELEITORAL ══ -->
+        <g filter="url(#shadow-urna)">
+          <!-- Base / corpo -->
+          <rect x="120" y="240" width="240" height="220" rx="14" fill="url(#urna-body)"/>
+          <!-- Lateral esquerda (profundidade) -->
+          <path d="M120,254 L100,270 L100,474 L120,460 Z" fill="#1A2535"/>
+          <!-- Lateral inferior (sombra) -->
+          <path d="M100,474 L140,494 L360,494 L360,460 L120,460 Z" fill="#141D2C"/>
+
+          <!-- Cabeçote / topo da urna -->
+          <rect x="105" y="220" width="270" height="40" rx="10" fill="url(#urna-top)"/>
+          <!-- Fenda de inserção do voto -->
+          <rect x="155" y="232" width="170" height="8" rx="4" fill="#0D1B2A"/>
+          <text x="240" y="239" text-anchor="middle" font-family="sans-serif" font-size="6" fill="rgba(255,255,255,.35)" letter-spacing=".5">INSIRA O COMPROVANTE</text>
+
+          <!-- ── TELA ── -->
+          <rect x="138" y="262" width="204" height="120" rx="8" fill="#0a1520"/>
+          <rect x="142" y="266" width="196" height="112" rx="6" fill="url(#screen-gr)"/>
+          <!-- Brilho da tela -->
+          <rect x="142" y="266" width="196" height="112" rx="6" fill="url(#screen-gr)" filter="url(#glow-screen)"/>
+          <!-- Conteúdo da tela: VOTE + número -->
+          <text x="240" y="300" text-anchor="middle" font-family="'Courier New',monospace" font-size="11" fill="#00FF66" letter-spacing="1" opacity=".9">SISTEMA ELEITORAL</text>
+          <text x="240" y="322" text-anchor="middle" font-family="'Courier New',monospace" font-size="38" font-weight="bold" fill="#FFDF00" letter-spacing="2" opacity=".95">VOTE!</text>
+          <text x="240" y="345" text-anchor="middle" font-family="'Courier New',monospace" font-size="10" fill="rgba(255,255,255,.5)" letter-spacing=".5">confirme sua escolha</text>
+          <!-- Cursor piscando -->
+          <rect x="236" y="350" width="8" height="2" rx="1" fill="#00FF66" opacity=".8" style="animation:typing 1s step-end infinite;"/>
+
+          <!-- ── TECLADO NUMÉRICO ── -->
+          <g fill="#2A3D54">
+            <!-- Linha 1: 1 2 3 -->
+            <rect x="148" y="400" width="46" height="28" rx="5"/>
+            <rect x="204" y="400" width="46" height="28" rx="5"/>
+            <rect x="260" y="400" width="46" height="28" rx="5"/>
+            <!-- Linha 2: 4 5 6 -->
+            <rect x="148" y="434" width="46" height="28" rx="5"/>
+            <rect x="204" y="434" width="46" height="28" rx="5"/>
+            <rect x="260" y="434" width="46" height="28" rx="5"/>
+          </g>
+          <!-- Textos das teclas -->
+          <g font-family="'Courier New',monospace" font-size="12" font-weight="bold" text-anchor="middle" fill="rgba(255,255,255,.75)">
+            <text x="171" y="419">1</text><text x="227" y="419">2</text><text x="283" y="419">3</text>
+            <text x="171" y="453">4</text><text x="227" y="453">5</text><text x="283" y="453">6</text>
+          </g>
+          <!-- Tecla CONFIRMA (verde) -->
+          <rect x="148" y="468" width="70" height="28" rx="5" fill="#006B29"/>
+          <text x="183" y="486" text-anchor="middle" font-family="sans-serif" font-size="8" font-weight="bold" fill="white">CONFIRMA</text>
+          <!-- Tecla CORRIGE (amarela) -->
+          <rect x="228" y="468" width="78" height="28" rx="5" fill="#B8900A"/>
+          <text x="267" y="486" text-anchor="middle" font-family="sans-serif" font-size="8" font-weight="bold" fill="white">CORRIGE</text>
+        </g>
+
+        <!-- ── Label SyncroFlow ── -->
+        <rect x="152" y="388" width="176" height="6" rx="3" fill="rgba(0,156,59,.3)"/>
+        <text x="240" y="393" text-anchor="middle" font-family="sans-serif" font-size="5" fill="#4ADE80" letter-spacing=".5">SyncroFlowEleições · Tecnologia de Campanha</text>
       </svg>
     </div>
   </div>
 </section>
+
+<!-- ═══════════ FAIXA ECOSISTEMA ═══════════ -->
+<div style="background:linear-gradient(135deg,#002776 0%,#009C3B 55%,#FFDF00 100%);padding:0;overflow:hidden;position:relative;">
+  <div style="background:rgba(0,0,0,.38);padding:28px 24px;text-align:center;position:relative;z-index:1;">
+    <p style="font-size:clamp(16px,2.4vw,24px);font-weight:900;color:#ffffff;letter-spacing:.04em;margin:0;text-shadow:0 2px 12px rgba(0,0,0,.45);">
+      ⚡ O Ecossistema de Campanha mais completo do Brasil —
+      <span style="color:#FFDF00;">tudo em uma única plataforma, tudo em conformidade com o TSE.</span>
+    </p>
+  </div>
+  <!-- Brilho sutil animado -->
+  <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.08) 50%,transparent 100%);animation:shimmer 3s ease-in-out infinite;pointer-events:none;z-index:0;"></div>
+</div>
 
 <!-- ═══════════ COMO FUNCIONA ═══════════ -->
 <section id="como-funciona" style="background:var(--gray-50);">
@@ -1076,8 +1175,8 @@
     <div class="pricing-grid">
       <div class="price-card reveal">
         <h3>Dep. Estadual</h3>
-        <div class="price-value">R$&nbsp;4.790</div>
-        <div class="price-install">ou 3x de R$&nbsp;1.597 sem juros</div>
+        <div class="price-value">R$&nbsp;5.990</div>
+        <div class="price-install">ou 3x de R$&nbsp;1.997 sem juros</div>
         <ul class="price-features">
           <li>Assistente IA 24/7 — 5 canais</li>
           <li>Pesquisa de voto em campo</li>
@@ -1095,8 +1194,8 @@
       </div>
       <div class="price-card highlight reveal reveal-delay-1">
         <h3>Dep. Federal</h3>
-        <div class="price-value">R$&nbsp;7.200</div>
-        <div class="price-install">ou 3x de R$&nbsp;2.400 sem juros</div>
+        <div class="price-value">R$&nbsp;7.490</div>
+        <div class="price-install">ou 3x de R$&nbsp;2.497 sem juros</div>
         <ul class="price-features">
           <li>Assistente IA 24/7 — 5 canais</li>
           <li>Pesquisa de voto em campo</li>
@@ -1114,8 +1213,8 @@
       </div>
       <div class="price-card reveal reveal-delay-2">
         <h3>Senador / Governador</h3>
-        <div class="price-value">R$&nbsp;10.800</div>
-        <div class="price-install">ou 3x de R$&nbsp;3.600 sem juros</div>
+        <div class="price-value">R$&nbsp;10.990</div>
+        <div class="price-install">ou 3x de R$&nbsp;3.664 sem juros</div>
         <ul class="price-features">
           <li>Assistente IA 24/7 — 5 canais</li>
           <li>Pesquisa de voto em campo</li>

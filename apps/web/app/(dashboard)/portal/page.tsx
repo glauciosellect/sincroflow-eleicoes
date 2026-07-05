@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/lib/api'
@@ -9,14 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import {
   Globe, Settings, Users, Download, ExternalLink, Copy, CheckCircle2,
   ChevronLeft, ChevronRight, Loader2, Search, Trash2, Phone, Mail, MapPin,
-  UserPlus, RefreshCw, BookOpen, ImageIcon, Link2, Palette, Eye, ArrowRight
+  UserPlus, RefreshCw, Plus, X, Instagram, Facebook
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+
+const trajetoriaSchema = z.object({ ano: z.string().max(10), descricao: z.string().max(300) })
+const depoimentoSchema = z.object({ texto: z.string().max(500), autor: z.string().max(100) })
 
 const configSchema = z.object({
   slug: z.string().min(3).max(60).regex(/^[a-z0-9-]+$/, 'Apenas letras minúsculas, números e hífens'),
@@ -24,14 +26,26 @@ const configSchema = z.object({
   subtitulo: z.string().max(200).optional(),
   descricao: z.string().max(2000).optional(),
   fotoUrl: z.string().url('URL inválida').optional().or(z.literal('')),
-  corPrimaria: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor hex inválida').default('#002776'),
+  corPrimaria: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#002776'),
+  corDestaque: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#C9A227'),
+  numero: z.string().max(20).optional(),
+  instagram: z.string().max(100).optional(),
+  facebook: z.string().max(100).optional(),
+  tiktok: z.string().max(100).optional(),
+  whatsapp: z.string().max(20).optional(),
+  trajetoria: z.array(trajetoriaSchema).optional(),
+  depoimentos: z.array(depoimentoSchema).optional(),
   ativo: z.boolean().default(true),
 })
 type ConfigForm = z.infer<typeof configSchema>
 
 interface Portal {
   id: string; slug: string; titulo: string; subtitulo?: string; descricao?: string
-  fotoUrl?: string; corPrimaria: string; ativo: boolean; totalCadastros: number
+  fotoUrl?: string; corPrimaria: string; corDestaque: string; numero?: string
+  instagram?: string; facebook?: string; tiktok?: string; whatsapp?: string
+  trajetoria?: { ano: string; descricao: string }[]
+  depoimentos?: { texto: string; autor: string }[]
+  ativo: boolean; totalCadastros: number
 }
 
 interface Cadastro {
@@ -67,20 +81,49 @@ export default function PortalPage() {
     enabled: tab === 'cadastros',
   })
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ConfigForm>({
+  const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
-    defaultValues: portal ?? {
-      slug: '', titulo: '', subtitulo: '', descricao: '', fotoUrl: '', corPrimaria: '#002776', ativo: true,
+    defaultValues: {
+      slug: '', titulo: '', subtitulo: '', descricao: '', fotoUrl: '',
+      corPrimaria: '#002776', corDestaque: '#C9A227', numero: '', instagram: '',
+      facebook: '', tiktok: '', whatsapp: '',
+      trajetoria: [{ ano: '', descricao: '' }],
+      depoimentos: [{ texto: '', autor: '' }],
+      ativo: true,
     },
   })
 
-  // Reset form when portal data loads
-  useState(() => {
-    if (portal) reset(portal)
-  })
+  const { fields: trajFields, append: trajAppend, remove: trajRemove } = useFieldArray({ control, name: 'trajetoria' })
+  const { fields: depFields, append: depAppend, remove: depRemove } = useFieldArray({ control, name: 'depoimentos' })
+
+  useEffect(() => {
+    if (portal) {
+      reset({
+        ...portal,
+        fotoUrl: portal.fotoUrl ?? '',
+        numero: portal.numero ?? '',
+        instagram: portal.instagram ?? '',
+        facebook: portal.facebook ?? '',
+        tiktok: portal.tiktok ?? '',
+        whatsapp: portal.whatsapp ?? '',
+        trajetoria: portal.trajetoria?.length ? portal.trajetoria : [{ ano: '', descricao: '' }],
+        depoimentos: portal.depoimentos?.length ? portal.depoimentos : [{ texto: '', autor: '' }],
+      })
+    }
+  }, [portal, reset])
 
   const saveMutation = useMutation({
-    mutationFn: (data: ConfigForm) => api.post('/portal', { ...data, fotoUrl: data.fotoUrl || null }),
+    mutationFn: (data: ConfigForm) => api.post('/portal', {
+      ...data,
+      fotoUrl: data.fotoUrl || null,
+      numero: data.numero || null,
+      instagram: data.instagram || null,
+      facebook: data.facebook || null,
+      tiktok: data.tiktok || null,
+      whatsapp: data.whatsapp || null,
+      trajetoria: data.trajetoria?.filter(t => t.ano && t.descricao) ?? [],
+      depoimentos: data.depoimentos?.filter(d => d.texto && d.autor) ?? [],
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portal'] })
       toast({ title: 'Portal salvo com sucesso!' })
@@ -124,7 +167,6 @@ export default function PortalPage() {
 
   const copyLink = () => {
     if (!portal) return
-    const url = `${window.location.origin.replace('3000', '3001')}/eleitor/${portal.slug}`
     navigator.clipboard.writeText(`https://app.syncrofloweleicoes.com.br/eleitor/${portal.slug}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -141,7 +183,7 @@ export default function PortalPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Portal do Eleitor</h1>
-          <p className="text-sm text-gray-500 mt-1">Página pública para cadastro de eleitores — compartilhe o link e receba apoiadores.</p>
+          <p className="text-sm text-gray-500 mt-1">Sua landing page pública para captar apoiadores — compartilhe o link e receba cadastros.</p>
         </div>
         {portal && (
           <div className="flex gap-2">
@@ -174,149 +216,102 @@ export default function PortalPage() {
         ))}
       </div>
 
-      {/* Config Tab */}
+      {/* ─── Config Tab ─── */}
       {tab === 'config' && (
         <form onSubmit={handleSubmit(d => saveMutation.mutate(d))} className="space-y-6">
 
-          {/* Guia passo a passo */}
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2 text-blue-800">
-                <BookOpen className="w-5 h-5" />
-                Como configurar seu Portal do Eleitor — passo a passo
-              </CardTitle>
-              <p className="text-sm text-blue-700 mt-1">
-                O Portal do Eleitor é uma página pública que você compartilha nas redes sociais, WhatsApp e material impresso. Eleitores se cadastram e ficam na sua base de apoiadores.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-
-              {/* Passo 1 */}
-              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">1</div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                    <Link2 className="w-4 h-4 text-blue-500" />
-                    Escolha o endereço (slug) do seu portal
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    O slug é o final do link que você vai compartilhar. Use seu nome sem espaços ou acentos.
-                    Exemplo: se você se chama <strong>João Silva</strong>, coloque <code className="bg-gray-100 px-1 rounded">joao-silva</code>.
-                    Seu link ficará: <span className="text-blue-700 font-medium">syncrofloweleicoes.com.br/eleitor/joao-silva</span>
-                  </p>
+          {/* Guia rápido */}
+          <div className="rounded-2xl border border-[#002776]/20 bg-gradient-to-br from-[#EFF6FF] to-[#F0FDF4] p-5">
+            <h2 className="text-base font-bold text-[#002776] mb-1">🗺️ Como montar sua página pública</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Seu Portal do Eleitor é uma <strong>landing page completa</strong> no estilo de campanha profissional. Preencha as seções abaixo e clique em <strong>"Salvar"</strong> — o sistema já busca automaticamente sua foto, história e propostas cadastradas em <em>Minha História e Propostas</em>.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              {[
+                { num: '1', icon: '🔗', title: 'Endereço (slug)', desc: 'O link que você vai compartilhar. Use seu nome: ex. joao-silva45' },
+                { num: '2', icon: '🎨', title: 'Cores da campanha', desc: 'Cor principal (fundo do hero) e cor de destaque (botões, linha do tempo). Combine com seu material gráfico.' },
+                { num: '3', icon: '🗓️', title: 'Trajetória', desc: 'Adicione marcos da sua história política (ano + descrição) — aparecem como linha do tempo.' },
+                { num: '4', icon: '💬', title: 'Depoimentos', desc: 'Frases de apoiadores ou lideranças que te indicam — criam prova social poderosa.' },
+                { num: '5', icon: '📱', title: 'Redes sociais', desc: 'Instagram, Facebook, TikTok e WhatsApp — exibidos no rodapé da sua página.' },
+                { num: '6', icon: '👁️', title: 'Visualize e compartilhe', desc: 'Clique em "Ver portal" para conferir. Depois copie o link e publique nas redes.' },
+              ].map(s => (
+                <div key={s.num} className="flex gap-3 bg-white rounded-xl p-3 border border-gray-100">
+                  <div className="w-7 h-7 rounded-full bg-[#002776] text-white text-xs font-bold flex items-center justify-center shrink-0">{s.num}</div>
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{s.icon} {s.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
+                  </div>
                 </div>
-              </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+              <span className="text-base shrink-0">💡</span>
+              <p><strong>Dica:</strong> Foto, história e propostas são puxadas automaticamente de <em>Minha História e Propostas</em>. Quanto mais completo esse cadastro, mais rica fica sua landing page — sem precisar repetir informações aqui.</p>
+            </div>
+          </div>
 
-              {/* Passo 2 */}
-              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">2</div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4 text-blue-500" />
-                    Escreva o título e a mensagem do portal
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    O <strong>Título</strong> é o que aparece em destaque para o eleitor (ex: <em>"Apoie a campanha de João Silva — Deputado Estadual"</em>).
-                    A <strong>Descrição</strong> é a mensagem motivacional abaixo do título — use para contar por que o eleitor deve se cadastrar e apoiar sua candidatura.
-                  </p>
-                </div>
-              </div>
-
-              {/* Passo 3 */}
-              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">3</div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-blue-500" />
-                    Adicione sua foto
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Cole o link direto de uma foto sua (URL terminando em .jpg ou .png).
-                    Dica: faça upload da foto no{' '}
-                    <a href="https://imgbb.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">imgbb.com</a>
-                    {' '}(gratuito, sem cadastro) e copie o "Direct link" gerado.
-                  </p>
-                </div>
-              </div>
-
-              {/* Passo 4 */}
-              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">4</div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                    <Palette className="w-4 h-4 text-blue-500" />
-                    Escolha a cor da sua campanha
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Clique no campo de cor e selecione a cor principal da sua campanha.
-                    Ela aparecerá no botão e no cabeçalho do portal — use a mesma cor dos seus materiais de campanha para manter a identidade visual.
-                  </p>
-                </div>
-              </div>
-
-              {/* Passo 5 */}
-              <div className="flex gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                <div className="w-7 h-7 rounded-full bg-green-600 text-white text-sm font-bold flex items-center justify-center shrink-0">5</div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-green-500" />
-                    Salve, visualize e compartilhe!
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Clique em <strong>"Criar portal"</strong> (ou "Salvar alterações"). Depois clique em <strong>"Ver portal"</strong> no topo da tela para ver como ficou.
-                    Quando estiver satisfeito, clique em <strong>"Copiar link"</strong> e compartilhe nas suas redes sociais, grupos de WhatsApp e material impresso (QR Code).
-                  </p>
-                </div>
-              </div>
-
-              {/* Dica extra */}
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <span className="text-lg shrink-0">💡</span>
-                <p className="text-xs text-amber-800">
-                  <strong>Dica:</strong> Os eleitores que se cadastrarem aparecem automaticamente na aba <strong>Cadastros</strong> desta página. Você pode marcá-los como "Contatado" ou "Convertido" conforme for fazendo o acompanhamento. Use o botão <strong>"Exportar CSV"</strong> para baixar a lista completa e usar em outras ferramentas.
-                </p>
-              </div>
-
-            </CardContent>
-          </Card>
+          {/* Seção 1 — Identidade básica */}
           <Card>
-            <CardHeader><CardTitle className="text-base">Identidade do portal</CardTitle></CardHeader>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Identidade e link</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Slug (URL) *</label>
                   <div className="flex items-center border rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-[#002776]">
                     <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-r whitespace-nowrap">/eleitor/</span>
-                    <input {...register('slug')} placeholder="nome-do-candidato" className="flex-1 px-3 py-2 text-sm outline-none" />
+                    <input {...register('slug')} placeholder="nome-candidato45" className="flex-1 px-3 py-2 text-sm outline-none" />
                   </div>
                   {errors.slug && <p className="text-xs text-red-600">{errors.slug.message}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Cor primária</label>
-                  <input type="color" {...register('corPrimaria')} className="h-10 w-full rounded-md border cursor-pointer" />
+                  <label className="text-sm font-medium text-gray-700">Número eleitoral</label>
+                  <Input {...register('numero')} placeholder="ex: 45678" />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Título do portal *</label>
-                <Input {...register('titulo')} placeholder="ex: Apoie a campanha de João Silva" />
+                <Input {...register('titulo')} placeholder="ex: João Silva — Deputado Estadual" />
                 {errors.titulo && <p className="text-xs text-red-600">{errors.titulo.message}</p>}
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Subtítulo</label>
-                <Input {...register('subtitulo')} placeholder="ex: Juntos por um futuro melhor para o Brasil" />
+                <label className="text-sm font-medium text-gray-700">Subtítulo / Slogan</label>
+                <Input {...register('subtitulo')} placeholder="ex: Juntos por uma cidade mais justa e humana" />
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Descrição / Mensagem ao eleitor</label>
-                <Textarea {...register('descricao')} rows={4} placeholder="Escreva uma mensagem motivacional para quem acessar o portal..." />
+                <label className="text-sm font-medium text-gray-700">Mensagem ao eleitor</label>
+                <Textarea {...register('descricao')} rows={3} placeholder="Escreva por que o eleitor deve te apoiar. Aparece logo abaixo do hero." />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">URL da foto do candidato</label>
                 <Input {...register('fotoUrl')} placeholder="https://..." />
+                <p className="text-xs text-gray-400">Dica: hospede em imgbb.com (gratuito) e cole o "Direct link". Se não preencher, usa a foto já cadastrada no sistema.</p>
                 {errors.fotoUrl && <p className="text-xs text-red-600">{errors.fotoUrl.message}</p>}
+              </div>
+
+              {/* Paleta de cores */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Cor principal</label>
+                  <p className="text-xs text-gray-400 -mt-0.5">Fundo do cabeçalho (hero)</p>
+                  <div className="flex items-center gap-2">
+                    <input type="color" {...register('corPrimaria')} className="h-10 w-14 rounded-md border cursor-pointer" />
+                    <input {...register('corPrimaria')} className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]" placeholder="#002776" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Cor de destaque</label>
+                  <p className="text-xs text-gray-400 -mt-0.5">Botões, linha do tempo, bordas</p>
+                  <div className="flex items-center gap-2">
+                    <input type="color" {...register('corDestaque')} className="h-10 w-14 rounded-md border cursor-pointer" />
+                    <input {...register('corDestaque')} className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]" placeholder="#C9A227" />
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -326,22 +321,105 @@ export default function PortalPage() {
             </CardContent>
           </Card>
 
-          {portal && (
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-blue-600 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-blue-800">Link do portal</p>
-                    <p className="text-xs text-blue-600 truncate">{portalUrl}</p>
-                  </div>
+          {/* Seção 2 — Trajetória */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">🗓️ Trajetória política</CardTitle>
+              <Button type="button" variant="outline" size="sm" onClick={() => trajAppend({ ano: '', descricao: '' })} className="gap-1">
+                <Plus className="w-3.5 h-3.5" />Adicionar marco
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-gray-500">Marcos da sua história (aparecem como linha do tempo na página). Ex: 2012 — "Início como assistente social na rede municipal".</p>
+              {trajFields.map((field, idx) => (
+                <div key={field.id} className="flex gap-2 items-start">
+                  <input
+                    {...register(`trajetoria.${idx}.ano`)}
+                    placeholder="Ano"
+                    className="w-20 border rounded-md px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-[#002776]"
+                  />
+                  <input
+                    {...register(`trajetoria.${idx}.descricao`)}
+                    placeholder="Descreva o que aconteceu neste ano..."
+                    className="flex-1 border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#002776]"
+                  />
+                  <button type="button" onClick={() => trajRemove(idx)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Seção 3 — Depoimentos */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">💬 Depoimentos de apoio</CardTitle>
+              <Button type="button" variant="outline" size="sm" onClick={() => depAppend({ texto: '', autor: '' })} className="gap-1">
+                <Plus className="w-3.5 h-3.5" />Adicionar depoimento
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-gray-500">Frases de apoiadores, líderes ou comunidades — aparecem na seção de prova social da sua landing page.</p>
+              {depFields.map((field, idx) => (
+                <div key={field.id} className="flex gap-2 items-start">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      {...register(`depoimentos.${idx}.texto`)}
+                      placeholder="Depoimento de apoio..."
+                      className="w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#002776]"
+                    />
+                    <input
+                      {...register(`depoimentos.${idx}.autor`)}
+                      placeholder="Autor — ex: Maria Silva, moradora do Jardim das Flores"
+                      className="w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#002776]"
+                    />
+                  </div>
+                  <button type="button" onClick={() => depRemove(idx)} className="p-2 text-gray-400 hover:text-red-500 transition-colors mt-1">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Seção 4 — Redes sociais */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">📱 Redes sociais e contato</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><Instagram className="w-3.5 h-3.5" />Instagram</label>
+                <Input {...register('instagram')} placeholder="@seuinstagram" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><Facebook className="w-3.5 h-3.5" />Facebook</label>
+                <Input {...register('facebook')} placeholder="facebook.com/suapagina" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">TikTok</label>
+                <Input {...register('tiktok')} placeholder="@seutiktok" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />WhatsApp (somente números)</label>
+                <Input {...register('whatsapp')} placeholder="5511999990000" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {portal && (
+            <div className="flex items-center gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+              <Globe className="w-5 h-5 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-blue-800">Link do seu portal</p>
+                <p className="text-xs text-blue-600 truncate">{portalUrl}</p>
+              </div>
+            </div>
           )}
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting || saveMutation.isPending} className="bg-[#002776] hover:bg-[#001f5e] gap-2">
+            <Button type="submit" disabled={isSubmitting || saveMutation.isPending} className="bg-[#002776] hover:bg-[#001f5e] gap-2 px-8">
               {(isSubmitting || saveMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
               {portal ? 'Salvar alterações' : 'Criar portal'}
             </Button>
@@ -349,7 +427,7 @@ export default function PortalPage() {
         </form>
       )}
 
-      {/* Cadastros Tab */}
+      {/* ─── Cadastros Tab ─── */}
       {tab === 'cadastros' && (
         <div className="space-y-4">
           {!portal ? (
@@ -450,7 +528,6 @@ export default function PortalPage() {
                 </div>
               )}
 
-              {/* Pagination */}
               {cadastrosData && cadastrosData.pages > 1 && (
                 <div className="flex items-center justify-center gap-3 pt-2">
                   <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>
