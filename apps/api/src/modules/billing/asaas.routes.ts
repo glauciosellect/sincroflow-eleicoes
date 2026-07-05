@@ -152,10 +152,12 @@ export async function asaasWebhookRoutes(app: FastifyInstance) {
         const { getPendingRegistration, activatePendingRegistration } = await import('../auth/auth.service')
         const pending = await getPendingRegistration(pendingId)
         if (pending) {
-          await activatePendingRegistration(pendingId, {
-            campaignPaymentMethod: payMethod,
-            campaignPaidUntil: paidUntil,
-          } as any)
+          await activatePendingRegistration(
+            pendingId,
+            null,
+            null,
+            { method: payMethod, paidUntil },
+          )
           logger.info('[ASAAS] Conta criada via webhook onboarding', { pendingId })
         }
       } else if (candidateId) {
