@@ -27,13 +27,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (hydrated && !user) router.push('/login')
   }, [hydrated, user, router])
 
-  // Agente de Campo só acessa as rotas do módulo field_agent — qualquer outra redireciona
-  const AGENTE_CAMPO_ROUTES = ['/meu-desempenho', '/consultor-fatos']
+  // Agente de Campo só acessa rotas de campo — qualquer outra redireciona
+  const AGENTE_CAMPO_ROUTES = ['/meu-desempenho', '/consultor-fatos', '/pesquisa', '/mapa-apoiadores']
+  const isAgenteRoute = AGENTE_CAMPO_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'))
   useEffect(() => {
-    if (hydrated && role === 'AGENTE_CAMPO' && !AGENTE_CAMPO_ROUTES.includes(pathname)) {
+    if (hydrated && role === 'AGENTE_CAMPO' && !isAgenteRoute) {
       router.replace('/meu-desempenho')
     }
-  }, [hydrated, role, pathname, router])
+  }, [hydrated, role, isAgenteRoute, router])
 
   if (!hydrated || !user) return null
 

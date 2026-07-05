@@ -119,7 +119,7 @@ export async function activatePendingRegistration(
   return { userId: user.id, candidateId: candidate.id }
 }
 
-export async function loginUser(input: LoginInput, signTokens: (userId: string, candidateId?: string) => { accessToken: string; refreshToken: string }) {
+export async function loginUser(input: LoginInput, signTokens: (userId: string, candidateId?: string, role?: string) => { accessToken: string; refreshToken: string }) {
   const user = await prisma.user.findUnique({
     where: { email: input.email },
     include: {
@@ -150,7 +150,7 @@ export async function loginUser(input: LoginInput, signTokens: (userId: string, 
   const preferred = members.find(m => m.role === 'ADMINISTRADOR') ?? members[0]
   const candidate = preferred?.candidate
 
-  const tokens = signTokens(user.id, candidate?.id)
+  const tokens = signTokens(user.id, candidate?.id, preferred?.role)
   await saveRefreshToken(user.id, tokens.refreshToken)
 
   return { user: sanitize(user), candidate, role: preferred?.role, ...tokens }
@@ -158,7 +158,7 @@ export async function loginUser(input: LoginInput, signTokens: (userId: string, 
 
 export async function refreshTokens(
   oldRefreshToken: string,
-  signTokens: (userId: string, candidateId?: string) => { accessToken: string; refreshToken: string }
+  signTokens: (userId: string, candidateId?: string, role?: string) => { accessToken: string; refreshToken: string }
 ) {
   const session = await prisma.session.findUnique({
     where: { refreshToken: oldRefreshToken },
@@ -169,13 +169,15 @@ export async function refreshTokens(
     throw new Error('Refresh token inválido ou expirado')
   }
 
-  const member = await prisma.teamMember.findFirst({
+  // Prioriza ADMINISTRADOR; senão pega o primeiro membro ativo
+  const members = await prisma.teamMember.findMany({
     where: { userId: session.userId, status: 'ACTIVE' },
     orderBy: { acceptedAt: 'asc' },
     include: { candidate: true },
   })
+  const preferred = members.find(m => m.role === 'ADMINISTRADOR') ?? members[0]
 
-  const tokens = signTokens(session.userId, member?.candidateId)
+  const tokens = signTokens(session.userId, preferred?.candidateId, preferred?.role)
   await prisma.session.update({
     where: { id: session.id },
     data: {
@@ -184,7 +186,7 @@ export async function refreshTokens(
     },
   })
 
-  return { user: sanitize(session.user), candidate: member?.candidate ?? null, ...tokens }
+  return { user: sanitize(session.user), candidate: preferred?.candidate ?? null, role: preferred?.role, ...tokens }
 }
 
 export async function logoutUser(refreshToken: string) {

@@ -21,8 +21,8 @@ import {
 } from './auth.service'
 
 export async function authRoutes(app: FastifyInstance) {
-  const signTokens = (userId: string, candidateId?: string) => ({
-    accessToken: app.jwt.sign({ sub: userId, wid: candidateId }, { expiresIn: '15m' }),
+  const signTokens = (userId: string, candidateId?: string, role?: string) => ({
+    accessToken: app.jwt.sign({ sub: userId, wid: candidateId, role }, { expiresIn: '15m' }),
     refreshToken: app.jwt.sign({ sub: userId, type: 'refresh' }, { expiresIn: '7d' }),
   })
 
@@ -121,11 +121,12 @@ export async function authRoutes(app: FastifyInstance) {
       data: { userId: user.id, status: 'ACTIVE', acceptedAt: new Date(), inviteToken: null },
     })
 
-    const tokens = signTokens(user.id, invite.candidateId)
+    const tokens = signTokens(user.id, invite.candidateId, invite.role)
     await saveRefreshToken(user.id, tokens.refreshToken)
 
+    const candidate = await prisma.candidate.findUnique({ where: { id: invite.candidateId } })
     const { passwordHash, twoFactorSecret, ...safeUser } = user
-    return reply.send({ ok: true, user: safeUser, candidateId: invite.candidateId, ...tokens })
+    return reply.send({ ok: true, user: safeUser, candidate, role: invite.role, candidateId: invite.candidateId, ...tokens })
   })
 
   app.patch('/auth/me', { onRequest: [app.authenticate] }, async (req, reply) => {

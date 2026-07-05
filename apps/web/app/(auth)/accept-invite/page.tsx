@@ -47,11 +47,11 @@ function AcceptInviteContent() {
     setLoading(true)
     try {
       const res = await api.post('/auth/invite/accept', { token, password: data.password })
-      const { user, accessToken, refreshToken } = res.data
-      // O candidate completo (campanha) é buscado pelas telas do dashboard via /candidates/me.
-      setAuth(user, null, accessToken, refreshToken)
+      const { user, candidate, role, accessToken, refreshToken } = res.data
+      setAuth(user, candidate ?? null, accessToken, refreshToken, role)
       toast({ title: 'Convite aceito!', description: 'Bem-vindo à equipe da campanha.' })
-      router.push('/dashboard')
+      // Agente de Campo vai direto para o painel de desempenho
+      router.push(role === 'AGENTE_CAMPO' ? '/meu-desempenho' : '/dashboard')
     } catch (err: any) {
       toast({ title: 'Erro ao aceitar convite', description: err.response?.data?.error || 'Convite inválido ou já utilizado', variant: 'destructive' })
     } finally {
