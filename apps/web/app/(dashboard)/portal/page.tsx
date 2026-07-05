@@ -88,7 +88,7 @@ export default function PortalPage() {
     enabled: tab === 'cadastros',
   })
 
-  const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<ConfigForm>({
+  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
     defaultValues: {
       slug: '', titulo: '', subtitulo: '', descricao: '', fotoUrl: '',
@@ -427,16 +427,36 @@ export default function PortalPage() {
                   <label className="text-sm font-medium text-gray-700">Cor principal</label>
                   <p className="text-xs text-gray-400 -mt-0.5">Fundo do cabeçalho (hero)</p>
                   <div className="flex items-center gap-2">
-                    <input type="color" {...register('corPrimaria')} className="h-10 w-14 rounded-md border cursor-pointer" />
-                    <input {...register('corPrimaria')} className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]" placeholder="#002776" />
+                    <input
+                      type="color"
+                      value={watch('corPrimaria') || '#002776'}
+                      onChange={e => setValue('corPrimaria', e.target.value, { shouldDirty: true })}
+                      className="h-10 w-14 rounded-md border cursor-pointer"
+                    />
+                    <input
+                      {...register('corPrimaria')}
+                      className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]"
+                      placeholder="#002776"
+                      onChange={e => setValue('corPrimaria', e.target.value, { shouldDirty: true })}
+                    />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Cor de destaque</label>
                   <p className="text-xs text-gray-400 -mt-0.5">Botões, linha do tempo, bordas</p>
                   <div className="flex items-center gap-2">
-                    <input type="color" {...register('corDestaque')} className="h-10 w-14 rounded-md border cursor-pointer" />
-                    <input {...register('corDestaque')} className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]" placeholder="#C9A227" />
+                    <input
+                      type="color"
+                      value={watch('corDestaque') || '#C9A227'}
+                      onChange={e => setValue('corDestaque', e.target.value, { shouldDirty: true })}
+                      className="h-10 w-14 rounded-md border cursor-pointer"
+                    />
+                    <input
+                      {...register('corDestaque')}
+                      className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]"
+                      placeholder="#C9A227"
+                      onChange={e => setValue('corDestaque', e.target.value, { shouldDirty: true })}
+                    />
                   </div>
                 </div>
               </div>
