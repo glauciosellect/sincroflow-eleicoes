@@ -112,6 +112,14 @@ export async function asaasRoutes(app: FastifyInstance) {
 // POST /billing/asaas/webhook — recebe notificações do Asaas (sem auth JWT)
 export async function asaasWebhookRoutes(app: FastifyInstance) {
   app.post('/billing/asaas/webhook', async (req, reply) => {
+    // Valida token de autenticação do Asaas
+    const token = req.headers['asaas-access-token'] as string | undefined
+    const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN
+    if (expectedToken && token !== expectedToken) {
+      logger.warn('[ASAAS WEBHOOK] Token inválido', { token })
+      return reply.status(401).send({ error: 'Unauthorized' })
+    }
+
     const body = req.body as any
     const event = body?.event
     const payment = body?.payment
