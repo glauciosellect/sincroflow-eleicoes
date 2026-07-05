@@ -474,4 +474,79 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
 
     return reply.send({ coordenador: { id: coord.id, nome: coord.nome, cidade: coord.cidade, bairros: coord.bairros, metaVotos: coord.metaVotos }, checkIns, totalEleitores })
   })
+
+  // GET /painel/coordenadores/dashboard — dashboard de supervisão com métricas de todos
+  app.get('/painel/coordenadores/dashboard', { onRequest: [requireModule('equipe')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const coordenadores = await prisma.coordenador.findMany({
+      where: { candidateId },
+      select: {
+        id: true, nome: true, cidade: true, bairros: true, metaVotos: true,
+        ativo: true, ultimoAcesso: true, createdAt: true,
+        _count: { select: { checkIns: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    // Para cada coordenador calcula cadastros no portal dentro do seu escopo
+    const portalId = await prisma.portalEleitor.findUnique({
+      where: { candidateId },
+      select: { id: true },
+    })
+
+    const dados = await Promise.all(coordenadores.map(async coord => {
+      const cadastros = portalId ? await prisma.cadastroPortal.count({
+        where: {
+          portalId: portalId.id,
+          ...(coord.cidade ? { cidade: coord.cidade } : {}),
+          ...(coord.bairros.length > 0 ? { bairro: { in: coord.bairros } } : {}),
+        },
+      }) : 0
+
+      const cadastrosSemana = portalId ? await prisma.cadastroPortal.count({
+        where: {
+          portalId: portalId.id,
+          ...(coord.cidade ? { cidade: coord.cidade } : {}),
+          ...(coord.bairros.length > 0 ? { bairro: { in: coord.bairros } } : {}),
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        },
+      }) : 0
+
+      const metaPct = coord.metaVotos && cadastros > 0
+        ? Math.min(100, Math.round((cadastros / coord.metaVotos) * 100))
+        : 0
+
+      const diasSemAcesso = coord.ultimoAcesso
+        ? Math.floor((Date.now() - new Date(coord.ultimoAcesso).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+
+      return {
+        id: coord.id,
+        nome: coord.nome,
+        cidade: coord.cidade,
+        bairros: coord.bairros,
+        metaVotos: coord.metaVotos,
+        ativo: coord.ativo,
+        ultimoAcesso: coord.ultimoAcesso,
+        diasSemAcesso,
+        checkIns: coord._count.checkIns,
+        cadastros,
+        cadastrosSemana,
+        metaPct,
+        status: !coord.ativo ? 'inativo' : diasSemAcesso !== null && diasSemAcesso > 7 ? 'alerta' : 'ok',
+      }
+    }))
+
+    const totais = {
+      coordenadores: coordenadores.length,
+      ativos: coordenadores.filter(c => c.ativo).length,
+      totalCadastros: dados.reduce((s, d) => s + d.cadastros, 0),
+      cadastrosSemana: dados.reduce((s, d) => s + d.cadastrosSemana, 0),
+      emAlerta: dados.filter(d => d.status === 'alerta').length,
+    }
+
+    return reply.send({ coordenadores: dados, totais })
+  })
 }

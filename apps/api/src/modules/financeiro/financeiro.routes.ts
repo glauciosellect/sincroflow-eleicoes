@@ -334,6 +334,73 @@ export async function financeiroRoutes(app: FastifyInstance) {
     })
   })
 
+  // GET /financeiro/dre — DRE Eleitoral completo com comparativo e análise
+  app.get('/financeiro/dre', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { ano } = req.query as { ano?: string }
+    const anoRef = parseInt(ano ?? new Date().getFullYear().toString(), 10)
+
+    const [candidate, meta, lancamentos] = await Promise.all([
+      prisma.candidate.findUnique({ where: { id: candidateId }, select: { name: true, cpf: true, party: true, position: true, city: true, state: true } }),
+      prisma.metaOrcamento.findUnique({ where: { candidateId } }),
+      prisma.lancamentoFinanceiro.findMany({
+        where: {
+          candidateId,
+          status: { not: 'cancelado' },
+          data: { gte: new Date(`${anoRef}-01-01`), lte: new Date(`${anoRef}-12-31T23:59:59`) },
+        },
+        orderBy: { data: 'asc' },
+      }),
+    ])
+
+    const receitas = lancamentos.filter(l => l.tipo === 'receita')
+    const despesas = lancamentos.filter(l => l.tipo === 'despesa')
+    const totalReceita = receitas.reduce((s, l) => s + Number(l.valor), 0)
+    const totalDespesa = despesas.reduce((s, l) => s + Number(l.valor), 0)
+    const saldo = totalReceita - totalDespesa
+
+    // Evolução mensal
+    const meses = []
+    for (let m = 0; m < 12; m++) {
+      const inicio = new Date(anoRef, m, 1)
+      const fim = new Date(anoRef, m + 1, 0, 23, 59, 59)
+      const rec = receitas.filter(l => l.data >= inicio && l.data <= fim).reduce((s, l) => s + Number(l.valor), 0)
+      const des = despesas.filter(l => l.data >= inicio && l.data <= fim).reduce((s, l) => s + Number(l.valor), 0)
+      meses.push({ mes: inicio.toLocaleDateString('pt-BR', { month: 'short' }), receita: rec, despesa: des, saldo: rec - des })
+    }
+
+    // Por categoria TSE
+    const porCategoriaTSE: Record<string, { codigo: string; descricao: string; tipo: string; valor: number; percentual: number }> = {}
+    for (const l of lancamentos) {
+      const key = l.tseCategoria ?? l.categoria
+      if (!porCategoriaTSE[key]) {
+        porCategoriaTSE[key] = { codigo: l.tseCategoria ?? '-', descricao: l.categoria, tipo: l.tipo, valor: 0, percentual: 0 }
+      }
+      porCategoriaTSE[key].valor += Number(l.valor)
+    }
+    const totalBase = totalReceita || 1
+    for (const k of Object.keys(porCategoriaTSE)) {
+      porCategoriaTSE[k].percentual = Math.round((porCategoriaTSE[k].valor / totalBase) * 100)
+    }
+
+    // Indicadores
+    const indiceEficiencia = totalReceita > 0 ? Math.round((saldo / totalReceita) * 100) : 0
+    const orcamentoPrevisto = Number(meta?.totalPrevisto ?? 0)
+    const execucaoOrcamento = orcamentoPrevisto > 0 ? Math.round((totalDespesa / orcamentoPrevisto) * 100) : null
+    const alertaOrcamento = execucaoOrcamento !== null && execucaoOrcamento >= (meta?.alertaPercentual ?? 80)
+
+    return reply.send({
+      candidato: candidate,
+      ano: anoRef,
+      totalReceita, totalDespesa, saldo,
+      meses, porCategoriaTSE: Object.values(porCategoriaTSE),
+      indicadores: { indiceEficiencia, execucaoOrcamento, alertaOrcamento, orcamentoPrevisto },
+      totalLancamentos: lancamentos.length,
+      doadores: receitas.filter(l => l.categoria === 'doacao_pessoa_fisica').length,
+    })
+  })
+
   // GET /financeiro/checklist — busca etapas concluídas pelo candidato
   app.get('/financeiro/checklist', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }

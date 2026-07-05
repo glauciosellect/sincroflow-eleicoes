@@ -47,7 +47,7 @@ const emptyForm = {
 }
 
 export default function FinanceiroPage() {
-  const [tab, setTab] = useState<'resumo' | 'lancamentos' | 'relatorio' | 'meta'>('resumo')
+  const [tab, setTab] = useState<'resumo' | 'lancamentos' | 'relatorio' | 'meta' | 'dre'>('resumo')
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [relatorio, setRelatorio] = useState<Relatorio | null>(null)
@@ -66,6 +66,9 @@ export default function FinanceiroPage() {
   const [exportando, setExportando] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [filtroPeriodo, setFiltroPeriodo] = useState({ inicio: '', fim: '' })
+  const [dre, setDre] = useState<any>(null)
+  const [dreAno, setDreAno] = useState(new Date().getFullYear().toString())
+  const [loadingDre, setLoadingDre] = useState(false)
 
   const loadResumo = async () => {
     const res = await api.get('/financeiro/resumo')
@@ -91,6 +94,16 @@ export default function FinanceiroPage() {
   useEffect(() => { loadResumo().finally(() => setLoading(false)) }, [])
   useEffect(() => { if (tab === 'lancamentos') loadLancamentos(1, filtroTipo) }, [tab, filtroTipo])
   useEffect(() => { if (tab === 'relatorio') loadRelatorio() }, [tab])
+
+  const loadDre = async (ano = dreAno) => {
+    setLoadingDre(true)
+    try {
+      const res = await api.get('/financeiro/dre', { params: { ano } })
+      setDre(res.data)
+    } catch {} finally { setLoadingDre(false) }
+  }
+
+  useEffect(() => { if (tab === 'dre') loadDre() }, [tab])
 
   const abrirNovo = () => { setEditando(null); setForm(emptyForm); setErro(''); setShowForm(true) }
 
@@ -179,15 +192,16 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b overflow-x-auto">
         {[
           { key: 'resumo', label: 'Resumo' },
           { key: 'lancamentos', label: 'Lançamentos' },
+          { key: 'dre', label: '⭐ DRE Eleitoral' },
           { key: 'relatorio', label: 'Relatório Contador' },
           { key: 'meta', label: 'Meta Orçamentária' },
         ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key as 'resumo' | 'lancamentos' | 'relatorio' | 'meta')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? 'border-[#009C3B] text-[#009C3B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          <button key={t.key} onClick={() => setTab(t.key as 'resumo' | 'lancamentos' | 'relatorio' | 'meta' | 'dre')}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.key ? 'border-[#009C3B] text-[#009C3B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             {t.label}
           </button>
         ))}
@@ -637,6 +651,123 @@ export default function FinanceiroPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── DRE ELEITORAL ── */}
+      {tab === 'dre' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Ano de referência:</label>
+              <select value={dreAno} onChange={e => { setDreAno(e.target.value); loadDre(e.target.value) }}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#009C3B]">
+                {[2024, 2025, 2026, 2027, 2028].map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <button onClick={() => loadDre(dreAno)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg">
+              <FileBarChart2 size={14} /> Atualizar
+            </button>
+          </div>
+
+          {loadingDre ? (
+            <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+          ) : !dre ? null : (
+            <div className="space-y-5">
+              {/* Cards de resultado */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                  <p className="text-xs text-green-700 font-medium mb-1">Total Receitas</p>
+                  <p className="text-xl font-bold text-green-700">{fmt(dre.totalReceita)}</p>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                  <p className="text-xs text-red-700 font-medium mb-1">Total Despesas</p>
+                  <p className="text-xl font-bold text-red-600">{fmt(dre.totalDespesa)}</p>
+                </div>
+                <div className={`border rounded-2xl p-4 ${dre.saldo >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+                  <p className={`text-xs font-medium mb-1 ${dre.saldo >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Resultado</p>
+                  <p className={`text-xl font-bold ${dre.saldo >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>{fmt(dre.saldo)}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <p className="text-xs text-gray-500 font-medium mb-1">Índice Eficiência</p>
+                  <p className="text-xl font-bold text-gray-700">{dre.indicadores.indiceEficiencia}%</p>
+                  <p className="text-xs text-gray-400">{dre.totalLancamentos} lançamentos</p>
+                </div>
+              </div>
+
+              {/* Alerta orçamento */}
+              {dre.indicadores.alertaOrcamento && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-700">
+                  <AlertCircle size={16} />
+                  <span>Orçamento em alerta — {dre.indicadores.execucaoOrcamento}% do previsto ({fmt(dre.indicadores.orcamentoPrevisto)}) já foi gasto</span>
+                </div>
+              )}
+
+              {/* Evolução mensal */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <h3 className="font-semibold text-gray-800 mb-4">Evolução Mensal {dreAno}</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-500 border-b">
+                        <th className="text-left pb-2 font-medium">Mês</th>
+                        <th className="text-right pb-2 font-medium text-green-600">Receitas</th>
+                        <th className="text-right pb-2 font-medium text-red-500">Despesas</th>
+                        <th className="text-right pb-2 font-medium">Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dre.meses.map((m: any, i: number) => (
+                        <tr key={i} className={`border-b border-gray-50 ${m.receita === 0 && m.despesa === 0 ? 'text-gray-300' : ''}`}>
+                          <td className="py-2 capitalize">{m.mes}</td>
+                          <td className="py-2 text-right text-green-600">{m.receita > 0 ? fmt(m.receita) : '—'}</td>
+                          <td className="py-2 text-right text-red-500">{m.despesa > 0 ? fmt(m.despesa) : '—'}</td>
+                          <td className={`py-2 text-right font-medium ${m.saldo >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                            {m.receita > 0 || m.despesa > 0 ? fmt(m.saldo) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 font-semibold">
+                        <td className="py-2 px-1">TOTAL</td>
+                        <td className="py-2 text-right text-green-600">{fmt(dre.totalReceita)}</td>
+                        <td className="py-2 text-right text-red-500">{fmt(dre.totalDespesa)}</td>
+                        <td className={`py-2 text-right ${dre.saldo >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>{fmt(dre.saldo)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Por categoria TSE */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <h3 className="font-semibold text-gray-800 mb-4">Por Categoria TSE</h3>
+                <div className="space-y-2">
+                  {dre.porCategoriaTSE
+                    .sort((a: any, b: any) => b.valor - a.valor)
+                    .map((cat: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono w-10 text-center">{cat.codigo}</span>
+                      <span className="text-xs text-gray-500 flex-1 truncate capitalize">{LABEL_CATEGORIA[cat.descricao] ?? cat.descricao}</span>
+                      <div className="w-32 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className={`h-full rounded-full ${cat.tipo === 'receita' ? 'bg-green-400' : 'bg-red-400'}`}
+                          style={{ width: `${cat.percentual}%` }} />
+                      </div>
+                      <span className="text-xs font-medium text-gray-700 w-24 text-right">{fmt(cat.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botão exportar */}
+              <button onClick={exportarCSV} disabled={exportando}
+                className="flex items-center gap-2 bg-[#002776] text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-[#001f5e] transition-colors disabled:opacity-50">
+                {exportando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                Exportar CSV — Prestação de Contas TSE
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

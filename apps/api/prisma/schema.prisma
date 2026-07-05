@@ -203,6 +203,8 @@ model AgentConfig {
   googleAccessToken     String?
   googleRefreshToken    String?
   googleTokenExpiry     DateTime?
+  pixKey                String?    // Chave Pix do candidato para receber doações eleitorais
+  elevenLabsVoiceId     String?    // ID da voz clonada no ElevenLabs (futuro)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @default(now()) @updatedAt
   candidate             Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
