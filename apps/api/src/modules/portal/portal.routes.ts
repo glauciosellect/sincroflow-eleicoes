@@ -3,11 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
-import path from 'path'
-import fs from 'fs'
-
-const UPLOADS_DIR = path.join(process.env.UPLOADS_PATH || '/app/apps/api/uploads', 'portal')
-fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+import { uploadPortalPhoto } from '../../lib/storage'
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -382,7 +378,7 @@ export async function portalRoutes(app: FastifyInstance) {
     return reply.send({ synced, total: pendentes.length })
   })
 
-  // POST /portal/upload/:tipo — upload de foto (hero | sobre)
+  // POST /portal/upload/:tipo — upload de foto para Supabase Storage (hero | sobre)
   app.post('/portal/upload/:tipo', { onRequest: [requireModule('portal')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
@@ -400,25 +396,13 @@ export async function portalRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Apenas imagens JPEG, PNG ou WebP são aceitas' })
     }
 
-    const ext = data.mimetype === 'image/png' ? 'png' : data.mimetype === 'image/webp' ? 'webp' : 'jpg'
-    const filename = `${candidateId}-${tipo}.${ext}`
-    const filepath = path.join(UPLOADS_DIR, filename)
-
     const buffer = await data.toBuffer()
-    fs.writeFileSync(filepath, buffer)
+    const url = await uploadPortalPhoto(candidateId, tipo as 'hero' | 'sobre', buffer, data.mimetype)
 
-    const apiBase = process.env.API_URL || 'https://api.syncrofloweleicoes.com.br'
-    const url = `${apiBase}/uploads/portal/${filename}`
-
-    // Atualiza apenas se já existir — não tenta criar portal com upsert
-    // (evita falha quando migrations ainda não rodaram no servidor)
     const existing = await prisma.portalEleitor.findUnique({ where: { candidateId } })
     if (existing) {
       const updateData = tipo === 'hero' ? { fotoUrl: url } : { fotoSobre: url }
-      await prisma.portalEleitor.update({ where: { candidateId }, data: updateData }).catch(() => {
-        // fotoSobre pode não existir se migration 000005 ainda não rodou — salva só fotoUrl nesse caso
-        if (tipo === 'sobre') return prisma.portalEleitor.update({ where: { candidateId }, data: { fotoUrl: url } })
-      })
+      await prisma.portalEleitor.update({ where: { candidateId }, data: updateData as any })
     }
 
     return reply.send({ url })
@@ -431,14 +415,6 @@ export async function portalRoutes(app: FastifyInstance) {
 
     const portal = await prisma.portalEleitor.findUnique({ where: { candidateId } })
     if (!portal) return reply.status(404).send({ error: 'Portal não encontrado' })
-
-    // remove fotos do disco se existirem
-    for (const tipo of ['hero', 'sobre']) {
-      for (const ext of ['jpg', 'png', 'webp']) {
-        const fp = path.join(UPLOADS_DIR, `${candidateId}-${tipo}.${ext}`)
-        if (fs.existsSync(fp)) fs.unlinkSync(fp)
-      }
-    }
 
     await prisma.portalEleitor.delete({ where: { candidateId } })
     return reply.status(204).send()

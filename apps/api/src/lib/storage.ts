@@ -36,10 +36,18 @@ export async function deleteCreativeFile(fileUrl: string): Promise<void> {
 export async function uploadCandidatePhoto(candidateId: string, fileBuffer: Buffer, mimeType: string): Promise<string> {
   const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
   const path = `${candidateId}/photo.${ext}`
-  // upsert: true → substitui o arquivo se já existe
   const { error } = await supabase.storage.from(BUCKET_CANDIDATES).upload(path, fileBuffer, { contentType: mimeType, upsert: true })
   if (error) throw new Error(`Falha ao subir foto: ${error.message}`)
-  // Adiciona timestamp para forçar cache-bust no browser
   const { data } = supabase.storage.from(BUCKET_CANDIDATES).getPublicUrl(path)
+  return `${data.publicUrl}?t=${Date.now()}`
+}
+
+/** Sobe foto do portal (hero ou sobre) e retorna a URL pública permanente. */
+export async function uploadPortalPhoto(candidateId: string, tipo: 'hero' | 'sobre', fileBuffer: Buffer, mimeType: string): Promise<string> {
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
+  const filePath = `${candidateId}/portal-${tipo}.${ext}`
+  const { error } = await supabase.storage.from(BUCKET_CANDIDATES).upload(filePath, fileBuffer, { contentType: mimeType, upsert: true })
+  if (error) throw new Error(`Falha ao subir foto do portal: ${error.message}`)
+  const { data } = supabase.storage.from(BUCKET_CANDIDATES).getPublicUrl(filePath)
   return `${data.publicUrl}?t=${Date.now()}`
 }
