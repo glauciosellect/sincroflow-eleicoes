@@ -854,7 +854,7 @@ model ColaboradorCampanha {
   id             String   @id @default(cuid())
   candidateId    String
   nome           String
-  cpf            String
+  cpf            String?
   funcao         String   // cabo_eleitoral | coordenador | motorista | assessor | mesario | outro
   funcaoCustom   String?
   telefone       String?

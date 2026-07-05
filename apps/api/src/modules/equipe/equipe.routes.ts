@@ -390,7 +390,7 @@ export async function equipeRoutes(app: FastifyInstance) {
       if (!porColaborador[k]) {
         porColaborador[k] = {
           nome: p.colaborador.nome,
-          cpf: p.colaborador.cpf,
+          cpf: p.colaborador.cpf ?? '',
           funcao: FUNCOES[p.colaborador.funcao] ?? p.colaborador.funcaoCustom ?? p.colaborador.funcao,
           totalPago: 0,
           pagamentos: 0,

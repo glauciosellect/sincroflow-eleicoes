@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast'
 import {
   Users, Plus, Loader2, MapPin, Target, X, Eye, EyeOff,
   ToggleLeft, ToggleRight, Trash2, Activity, ChevronDown, ChevronUp,
-  BarChart3, AlertTriangle, CheckCircle, TrendingUp, Calendar
+  BarChart3, AlertTriangle, CheckCircle, TrendingUp, Calendar, Pencil
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -30,6 +30,17 @@ const coordSchema = z.object({
 })
 type CoordForm = z.infer<typeof coordSchema>
 
+const editSchema = z.object({
+  nome: z.string().min(2),
+  email: z.string().email('Email inválido'),
+  telefone: z.string().optional(),
+  cidade: z.string().optional(),
+  bairros: z.string().optional(),
+  metaVotos: z.string().optional(),
+  novaSenha: z.string().min(6, 'Mínimo 6 caracteres').optional().or(z.literal('')),
+})
+type EditForm = z.infer<typeof editSchema>
+
 interface Coord {
   id: string; nome: string; email: string; telefone?: string
   cidade?: string; bairros: string[]; metaVotos?: number
@@ -42,6 +53,7 @@ export default function CoordenadoresPage() {
   const [showForm, setShowForm] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingCoord, setEditingCoord] = useState<Coord | null>(null)
   const { toast } = useToast()
   const qc = useQueryClient()
 
@@ -89,6 +101,25 @@ export default function CoordenadoresPage() {
     mutationFn: (id: string) => api.delete(`/painel/coordenadores/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['coordenadores'] }); toast({ title: 'Coordenador removido' }) },
     onError: (e: any) => toast({ title: 'Erro ao remover', description: e.response?.data?.error, variant: 'destructive' }),
+  })
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: EditForm }) => api.patch(`/painel/coordenadores/${id}`, {
+      nome: data.nome,
+      email: data.email,
+      telefone: data.telefone || undefined,
+      cidade: data.cidade || undefined,
+      bairros: data.bairros ? data.bairros.split(',').map(b => b.trim()).filter(Boolean) : [],
+      metaVotos: data.metaVotos ? parseInt(data.metaVotos) : undefined,
+      ...(data.novaSenha ? { novaSenha: data.novaSenha } : {}),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['coordenadores'] })
+      qc.invalidateQueries({ queryKey: ['coordenadores-dashboard'] })
+      toast({ title: 'Coordenador atualizado!' })
+      setEditingCoord(null)
+    },
+    onError: (e: any) => toast({ title: 'Erro ao atualizar', description: e.response?.data?.error, variant: 'destructive' }),
   })
 
   const ativos = coordenadores.filter(c => c.ativo).length
@@ -337,6 +368,13 @@ export default function CoordenadoresPage() {
                       {expandedId === coord.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                     <button
+                      onClick={() => setEditingCoord(coord)}
+                      className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600"
+                      title="Editar"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => toggleMutation.mutate({ id: coord.id, ativo: !coord.ativo })}
                       className="p-1.5 rounded hover:bg-gray-100 text-gray-400"
                       title={coord.ativo ? 'Desativar' : 'Ativar'}
@@ -362,6 +400,85 @@ export default function CoordenadoresPage() {
         </div>
       )}
       </>)}
+
+      {/* Modal de edição */}
+      {editingCoord && (
+        <ModalEditarCoord
+          coord={editingCoord}
+          onClose={() => setEditingCoord(null)}
+          onSave={(data) => editMutation.mutate({ id: editingCoord.id, data })}
+          saving={editMutation.isPending}
+        />
+      )}
+    </div>
+  )
+}
+
+function ModalEditarCoord({
+  coord, onClose, onSave, saving,
+}: { coord: Coord; onClose: () => void; onSave: (d: EditForm) => void; saving: boolean }) {
+  const { register, handleSubmit, formState: { errors } } = useForm<EditForm>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      nome: coord.nome,
+      email: coord.email,
+      telefone: coord.telefone ?? '',
+      cidade: coord.cidade ?? '',
+      bairros: coord.bairros.join(', '),
+      metaVotos: coord.metaVotos ? String(coord.metaVotos) : '',
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-bold text-gray-900">Editar Coordenador</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSave)} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Nome *</label>
+              <Input {...register('nome')} placeholder="Nome completo" />
+              {errors.nome && <p className="text-xs text-red-600">{errors.nome.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Email *</label>
+              <Input {...register('email')} type="email" />
+              {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Telefone</label>
+              <Input {...register('telefone')} placeholder="(00) 00000-0000" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Cidade</label>
+              <Input {...register('cidade')} placeholder="Cidade de atuação" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-sm font-medium text-gray-700">Bairros (separados por vírgula)</label>
+              <Input {...register('bairros')} placeholder="Centro, Vila Nova, Jardim..." />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Meta de votos</label>
+              <Input {...register('metaVotos')} type="number" min="0" placeholder="Ex: 500" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-sm font-medium text-gray-700">Nova senha <span className="text-gray-400 font-normal">(deixe em branco para manter)</span></label>
+              <Input {...register('novaSenha')} type="password" placeholder="Mínimo 6 caracteres" />
+              {errors.novaSenha && <p className="text-xs text-red-600">{errors.novaSenha.message}</p>}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+            <Button type="submit" disabled={saving} className="flex-1 bg-[#002776] hover:bg-[#001f5e] gap-2">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Salvar alterações
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

@@ -580,6 +580,12 @@ function ModalTerritorio({
 
 type Tab = 'ranking' | 'territorios' | 'hierarquia' | 'alertas'
 
+const LIDER_FORM_INICIAL = {
+  nome: '', funcao: 'cabo_eleitoral', funcaoCustom: '',
+  telefone: '', email: '', cpf: '', bairros: '',
+  metaVotos: '', supervisorId: '', observacao: '',
+}
+
 export default function LideresPage() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('ranking')
@@ -594,6 +600,11 @@ export default function LideresPage() {
   const [filtroFuncao, setFiltroFuncao] = useState('')
   const [perfilId, setPerfilId] = useState<string | null>(null)
   const [modalTerritorio, setModalTerritorio] = useState<Territorio | null | 'novo'>(null)
+  const [showNovoLider, setShowNovoLider] = useState(false)
+  const [novoLiderForm, setNovoLiderForm] = useState(LIDER_FORM_INICIAL)
+  const [salvandoLider, setSalvandoLider] = useState(false)
+  const [erroLider, setErroLider] = useState('')
+  const [editandoLider, setEditandoLider] = useState<Lider | null>(null)
 
   const carregarDados = async () => {
     setLoading(true)
@@ -619,6 +630,84 @@ export default function LideresPage() {
   }
 
   useEffect(() => { carregarDados() }, [])
+
+  const criarLider = async () => {
+    if (!novoLiderForm.nome.trim()) return setErroLider('Nome obrigatório')
+    setSalvandoLider(true)
+    setErroLider('')
+    try {
+      await apiFetch('/lideres', {
+        method: 'POST',
+        body: JSON.stringify({
+          nome: novoLiderForm.nome,
+          funcao: novoLiderForm.funcao,
+          funcaoCustom: novoLiderForm.funcaoCustom || undefined,
+          telefone: novoLiderForm.telefone || undefined,
+          email: novoLiderForm.email || undefined,
+          cpf: novoLiderForm.cpf || undefined,
+          bairros: novoLiderForm.bairros ? novoLiderForm.bairros.split(',').map(b => b.trim()).filter(Boolean) : [],
+          metaVotos: novoLiderForm.metaVotos ? parseInt(novoLiderForm.metaVotos) : undefined,
+          supervisorId: novoLiderForm.supervisorId || undefined,
+          observacao: novoLiderForm.observacao || undefined,
+        }),
+      })
+      setShowNovoLider(false)
+      setNovoLiderForm(LIDER_FORM_INICIAL)
+      await carregarDados()
+    } catch (e: any) {
+      setErroLider(e.message || 'Erro ao criar líder')
+    } finally {
+      setSalvandoLider(false)
+    }
+  }
+
+  const salvarEdicaoLider = async () => {
+    if (!editandoLider) return
+    setSalvandoLider(true)
+    setErroLider('')
+    try {
+      await apiFetch(`/lideres/${editandoLider.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          nome: novoLiderForm.nome,
+          funcao: novoLiderForm.funcao,
+          funcaoCustom: novoLiderForm.funcaoCustom || undefined,
+          telefone: novoLiderForm.telefone || undefined,
+          email: novoLiderForm.email || undefined,
+          cpf: novoLiderForm.cpf || undefined,
+          bairros: novoLiderForm.bairros ? novoLiderForm.bairros.split(',').map(b => b.trim()).filter(Boolean) : [],
+          metaVotos: novoLiderForm.metaVotos ? parseInt(novoLiderForm.metaVotos) : undefined,
+          supervisorId: novoLiderForm.supervisorId || undefined,
+          observacao: novoLiderForm.observacao || undefined,
+        }),
+      })
+      setEditandoLider(null)
+      setNovoLiderForm(LIDER_FORM_INICIAL)
+      await carregarDados()
+    } catch (e: any) {
+      setErroLider(e.message || 'Erro ao salvar')
+    } finally {
+      setSalvandoLider(false)
+    }
+  }
+
+  const abrirEdicaoLider = (lider: Lider) => {
+    setEditandoLider(lider)
+    setNovoLiderForm({
+      nome: lider.nome,
+      funcao: lider.funcao,
+      funcaoCustom: lider.funcaoCustom ?? '',
+      telefone: lider.telefone ?? '',
+      email: lider.email ?? '',
+      cpf: '',
+      bairros: lider.bairros.join(', '),
+      metaVotos: lider.metaVotos ? String(lider.metaVotos) : '',
+      supervisorId: lider.supervisor?.id ?? '',
+      observacao: '',
+    })
+    setErroLider('')
+    setShowNovoLider(false)
+  }
 
   const lideresFiltrados = lideres.filter(l => {
     const matchBusca = !busca || l.nome.toLowerCase().includes(busca.toLowerCase()) || l.bairros.some(b => b.toLowerCase().includes(busca.toLowerCase()))
@@ -648,7 +737,114 @@ export default function LideresPage() {
                 Gerencie territórios, metas e atividade dos seus líderes de campanha
               </p>
             </div>
+            <button
+              onClick={() => { setShowNovoLider(s => !s); setEditandoLider(null); setNovoLiderForm(LIDER_FORM_INICIAL); setErroLider('') }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} /> Novo Líder
+            </button>
           </div>
+
+          {/* Formulário inline novo/editar líder */}
+          {(showNovoLider || editandoLider) && (
+            <div className="mt-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-5">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-4 flex items-center gap-2">
+                <Plus size={16} />
+                {editandoLider ? `Editar: ${editandoLider.nome}` : 'Novo Líder'}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Nome *</label>
+                  <input
+                    value={novoLiderForm.nome}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, nome: e.target.value }))}
+                    placeholder="Nome completo"
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Função</label>
+                  <select
+                    value={novoLiderForm.funcao}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, funcao: e.target.value }))}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    {Object.entries(FUNCAO_LABEL).map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Supervisor</label>
+                  <select
+                    value={novoLiderForm.supervisorId}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, supervisorId: e.target.value }))}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Sem supervisor</option>
+                    {lideres.filter(l => !editandoLider || l.id !== editandoLider.id).map(l => (
+                      <option key={l.id} value={l.id}>{l.nome} ({FUNCAO_LABEL[l.funcao] ?? l.funcao})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Telefone</label>
+                  <input
+                    value={novoLiderForm.telefone}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, telefone: e.target.value }))}
+                    placeholder="(00) 00000-0000"
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Email</label>
+                  <input
+                    value={novoLiderForm.email}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="email@exemplo.com"
+                    type="email"
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Meta de Votos</label>
+                  <input
+                    value={novoLiderForm.metaVotos}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, metaVotos: e.target.value }))}
+                    placeholder="Ex: 500"
+                    type="number"
+                    min="0"
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Bairros de atuação (separados por vírgula)</label>
+                  <input
+                    value={novoLiderForm.bairros}
+                    onChange={e => setNovoLiderForm(f => ({ ...f, bairros: e.target.value }))}
+                    placeholder="Centro, Vila Nova, Jardim das Flores..."
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              {erroLider && <p className="text-sm text-red-600 dark:text-red-400 mt-3">{erroLider}</p>}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => { setShowNovoLider(false); setEditandoLider(null); setNovoLiderForm(LIDER_FORM_INICIAL) }}
+                  className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={editandoLider ? salvarEdicaoLider : criarLider}
+                  disabled={salvandoLider}
+                  className="px-5 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-medium"
+                >
+                  {salvandoLider ? 'Salvando...' : editandoLider ? 'Salvar alterações' : 'Cadastrar Líder'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Stats Cards */}
           {stats && (
@@ -735,8 +931,13 @@ export default function LideresPage() {
                 {lideresFiltrados.length === 0 ? (
                   <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
                     <Trophy size={40} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400">Nenhum líder encontrado</p>
-                    <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Cadastre líderes na aba Equipe</p>
+                    <p className="text-gray-500 dark:text-gray-400">Nenhum líder cadastrado</p>
+                    <button
+                      onClick={() => { setShowNovoLider(true); setEditandoLider(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                      className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700"
+                    >
+                      <Plus size={14} className="inline mr-1" /> Cadastrar primeiro líder
+                    </button>
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -748,8 +949,7 @@ export default function LideresPage() {
                       return (
                         <div
                           key={lider.id}
-                          className={`flex items-center gap-4 px-5 py-4 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${isAlerta ? 'bg-orange-50/50 dark:bg-orange-950/10' : ''}`}
-                          onClick={() => setPerfilId(lider.id)}
+                          className={`flex items-center gap-4 px-5 py-4 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${isAlerta ? 'bg-orange-50/50 dark:bg-orange-950/10' : ''}`}
                         >
                           {/* Posição */}
                           <div className="w-8 shrink-0 text-center">
@@ -759,8 +959,8 @@ export default function LideresPage() {
                              <span className="text-sm font-medium text-gray-400">#{idx + 1}</span>}
                           </div>
 
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
+                          {/* Info — clicável para abrir perfil */}
+                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setPerfilId(lider.id)}>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-gray-900 dark:text-white">{lider.nome}</span>
                               <span className="text-xs text-gray-500 dark:text-gray-400">{FUNCAO_LABEL[lider.funcao] ?? lider.funcao}</span>
@@ -788,14 +988,27 @@ export default function LideresPage() {
                             )}
                           </div>
 
-                          {/* Métricas */}
-                          <div className="flex items-center gap-4 shrink-0">
+                          {/* Métricas e ações */}
+                          <div className="flex items-center gap-3 shrink-0">
                             <div className="text-center hidden sm:block">
                               <p className="text-lg font-bold text-green-600 dark:text-green-400">{lider.votosComprometidos}</p>
                               <p className="text-xs text-gray-400">votos</p>
                             </div>
                             <ScoreBadge score={lider.scoreAtividade} />
-                            <Eye size={16} className="text-gray-300 dark:text-gray-600" />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); abrirEdicaoLider(lider); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                              className="p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-950/30 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                              title="Editar líder"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPerfilId(lider.id) }}
+                              className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-700 transition-colors"
+                              title="Ver perfil"
+                            >
+                              <Eye size={14} />
+                            </button>
                           </div>
                         </div>
                       )

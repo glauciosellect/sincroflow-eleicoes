@@ -410,6 +410,7 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
 
     const data = z.object({
       nome: z.string().min(2).max(120).optional(),
+      email: z.string().email().optional(),
       telefone: z.string().optional(),
       cidade: z.string().optional().nullable(),
       bairros: z.array(z.string()).optional(),
@@ -420,6 +421,7 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
 
     const updateData: any = {}
     if (data.nome !== undefined) updateData.nome = data.nome
+    if (data.email !== undefined) updateData.email = data.email
     if (data.telefone !== undefined) updateData.telefone = data.telefone
     if (data.cidade !== undefined) updateData.cidade = data.cidade
     if (data.bairros !== undefined) updateData.bairros = data.bairros

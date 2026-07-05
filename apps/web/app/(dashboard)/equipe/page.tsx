@@ -10,6 +10,7 @@ import { validarCPF, formatarCPF } from '@/lib/cpf'
 
 const FUNCOES: Record<string, string> = {
   cabo_eleitoral: 'Cabo Eleitoral', coordenador: 'Coordenador',
+  supervisor: 'Supervisor de Campo',
   motorista: 'Motorista', assessor: 'Assessor', mesario: 'Mesário',
   fotografo: 'Fotógrafo/Videomaker', social_media: 'Social Media',
   advogado: 'Advogado Eleitoral', contador: 'Contador', outro: 'Outro',

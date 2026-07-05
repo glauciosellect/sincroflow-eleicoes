@@ -141,16 +141,78 @@ export async function lideresRoutes(app: FastifyInstance) {
     return reply.send({ ...lider, pesquisasColetadas })
   })
 
-  // PATCH /lideres/:id — atualizar meta de votos, bairros e dados do líder
+  // POST /lideres — criar líder diretamente (sem passar pela Equipe)
+  app.post('/lideres', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const body = z.object({
+      nome: z.string().min(2).max(120),
+      funcao: z.string().min(2).max(40).default('cabo_eleitoral'),
+      funcaoCustom: z.string().max(60).optional(),
+      telefone: z.string().max(20).optional(),
+      email: z.string().email().optional(),
+      cpf: z.string().max(14).optional(),
+      bairros: z.array(z.string()).optional().default([]),
+      metaVotos: z.number().int().min(0).optional(),
+      supervisorId: z.string().optional(),
+      observacao: z.string().max(500).optional(),
+    }).parse(req.body)
+
+    // supervisorId deve pertencer ao mesmo candidato
+    if (body.supervisorId) {
+      const sup = await prisma.colaboradorCampanha.findFirst({
+        where: { id: body.supervisorId, candidateId },
+      })
+      if (!sup) return reply.status(400).send({ error: 'Supervisor não encontrado' })
+    }
+
+    const lider = await prisma.colaboradorCampanha.create({
+      data: {
+        candidateId,
+        nome: body.nome,
+        funcao: body.funcao,
+        funcaoCustom: body.funcaoCustom ?? null,
+        telefone: body.telefone ?? null,
+        email: body.email ?? null,
+        cpf: body.cpf ?? null,
+        bairros: body.bairros ?? [],
+        metaVotos: body.metaVotos ?? null,
+        supervisorId: body.supervisorId ?? null,
+        observacao: body.observacao ?? null,
+        // Campos obrigatórios de RH — não usados no contexto de líderes
+        dataInicio: new Date(),
+        valorAcordado: 0,
+        periodicidade: 'mensal',
+        formaPagamento: 'pix',
+        status: 'ativo',
+        scoreAtividade: 0,
+        votosComprometidos: 0,
+        confiabilidade: 100,
+      },
+    })
+
+    return reply.status(201).send(lider)
+  })
+
+  // PATCH /lideres/:id — atualizar dados do líder
   app.patch('/lideres/:id', { onRequest: [requireModule('reports')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
 
     const body = z.object({
+      nome: z.string().min(2).max(120).optional(),
+      funcao: z.string().min(2).max(40).optional(),
+      funcaoCustom: z.string().max(60).optional(),
+      telefone: z.string().max(20).optional(),
+      email: z.string().email().optional(),
+      cpf: z.string().max(14).optional(),
       metaVotos: z.number().int().min(0).optional(),
       bairros: z.array(z.string()).optional(),
+      supervisorId: z.string().nullable().optional(),
       observacao: z.string().optional(),
+      status: z.enum(['ativo', 'inativo']).optional(),
     }).parse(req.body)
 
     const lider = await prisma.colaboradorCampanha.findFirst({
@@ -164,6 +226,19 @@ export async function lideresRoutes(app: FastifyInstance) {
     })
 
     return reply.send(atualizado)
+  })
+
+  // DELETE /lideres/:id — remover líder
+  app.delete('/lideres/:id', { onRequest: [requireModule('reports')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { id } = req.params as { id: string }
+
+    const lider = await prisma.colaboradorCampanha.findFirst({ where: { id, candidateId } })
+    if (!lider) return reply.status(404).send({ error: 'Líder não encontrado' })
+
+    await prisma.colaboradorCampanha.update({ where: { id }, data: { status: 'inativo' } })
+    return reply.send({ ok: true })
   })
 
   // ── ATIVIDADES ──────────────────────────────────────────────────────────────
