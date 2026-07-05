@@ -86,23 +86,16 @@ export async function doacoesRoutes(app: FastifyInstance) {
   })
 
   // POST /doacoes/gerar — gera QR code + registra doação pendente
-  app.post('/doacoes/gerar', {
-    schema: {
-      body: z.object({
-        valor: z.number().min(5).max(50000),
-        doadorNome: z.string().min(2).max(100),
-        doadorCpf: z.string().length(11),
-        doadorTelefone: z.string().optional(),
-        mensagem: z.string().max(200).optional(),
-      }),
-    },
-  }, async (req, reply) => {
+  app.post('/doacoes/gerar', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const body = req.body as {
-      valor: number; doadorNome: string; doadorCpf: string
-      doadorTelefone?: string; mensagem?: string
-    }
+    const body = z.object({
+      valor: z.number().min(5).max(50000),
+      doadorNome: z.string().min(2).max(100),
+      doadorCpf: z.string().length(11),
+      doadorTelefone: z.string().optional(),
+      mensagem: z.string().max(200).optional(),
+    }).parse(req.body)
 
     const pixKey = await getPixKey(candidateId)
     if (!pixKey) {
