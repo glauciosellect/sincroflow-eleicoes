@@ -1020,15 +1020,6 @@ function BillingTab() {
             </div>
             <p className="text-xs text-gray-400 mt-1.5">Mensagens passivas (eleitor escreve primeiro) nunca são limitadas.</p>
           </div>
-          {billing?.plan === 'CAMPAIGN' && !isCancelled && (
-            <div className="pt-2 border-t border-gray-100">
-              <p className="text-sm text-gray-500 mb-2">Foi eleito? Continue usando o sistema no pós-eleição sem perder nada do seu histórico.</p>
-              <Button size="sm" variant="outline" onClick={() => mandateMutation.mutate()} disabled={mandateMutation.isPending}>
-                {mandateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Seguir Mandato
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
