@@ -15,7 +15,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 function tok() {
   if (typeof window === 'undefined') return ''
-  return localStorage.getItem('accessToken') ?? ''
+  return localStorage.getItem('sf_token') ?? ''
 }
 
 async function apiFetch(path: string, opts: RequestInit = {}) {
