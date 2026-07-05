@@ -150,32 +150,40 @@ export function Sidebar() {
                 {visibleItems.map((item) => {
                   // Item especial: Portal do Eleitor para agente de campo — abre URL externa
                   if (item.href === '/portal_campo_externo') {
-                    const handlePortalClick = async (e: React.MouseEvent) => {
-                      e.preventDefault()
-                      if (portalUrl) {
-                        window.open(portalUrl, '_blank', 'noopener,noreferrer')
-                      } else {
-                        // Tenta buscar o slug na hora do clique
-                        try {
-                          const r = await api.get('/portal')
-                          if (r.data?.slug) {
-                            const url = `https://app.syncrofloweleicoes.com.br/eleitor/${r.data.slug}`
-                            setPortalUrl(url)
-                            window.open(url, '_blank', 'noopener,noreferrer')
-                          }
-                        } catch {}
-                      }
-                    }
+                    // Usa <a> com target="_blank" para funcionar em PWA/app instalado
+                    const href = portalUrl ?? '#'
                     return (
-                      <button
+                      <a
                         key={item.href}
-                        onClick={handlePortalClick}
-                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => {
+                          // Se ainda não tem URL, cancela e tenta buscar
+                          if (!portalUrl) {
+                            e.preventDefault()
+                            api.get('/portal').then(r => {
+                              if (r.data?.slug) {
+                                const url = `https://app.syncrofloweleicoes.com.br/eleitor/${r.data.slug}`
+                                setPortalUrl(url)
+                                // Cria link temporário para acionar corretamente no app
+                                const a = document.createElement('a')
+                                a.href = url
+                                a.target = '_blank'
+                                a.rel = 'noopener noreferrer'
+                                document.body.appendChild(a)
+                                a.click()
+                                document.body.removeChild(a)
+                              }
+                            }).catch(() => {})
+                          }
+                        }}
+                        className="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
                       >
                         <item.icon className="w-4 h-4 shrink-0 opacity-60" />
                         {item.label}
                         <ExternalLink className="ml-auto w-3 h-3 opacity-40 shrink-0" />
-                      </button>
+                      </a>
                     )
                   }
 
