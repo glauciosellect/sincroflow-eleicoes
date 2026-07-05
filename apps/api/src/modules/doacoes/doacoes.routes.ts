@@ -69,12 +69,10 @@ export async function doacoesRoutes(app: FastifyInstance) {
   })
 
   // POST /doacoes/config/pix — salvar chave Pix
-  app.post('/doacoes/config/pix', {
-    schema: { body: z.object({ pixKey: z.string().min(5) }) },
-  }, async (req, reply) => {
+  app.post('/doacoes/config/pix', async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { pixKey } = req.body as { pixKey: string }
+    const { pixKey } = z.object({ pixKey: z.string().min(5) }).parse(req.body)
 
     const existing = await prisma.envVariable.findFirst({ where: { candidateId, key: 'PIX_KEY' } })
     if (existing) {
