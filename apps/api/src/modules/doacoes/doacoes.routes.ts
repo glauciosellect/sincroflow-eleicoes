@@ -274,11 +274,17 @@ export async function doacoesRoutes(app: FastifyInstance) {
       prisma.lancamentoFinanceiro.findFirst({ where: { id, candidateId } }),
       prisma.candidate.findUnique({
         where: { id: candidateId },
-        select: { name: true, cpf: true, party: true, position: true, city: true, state: true },
+        select: { name: true, cpf: true, party: true, position: true, city: true, state: true, logradouro: true, numero: true, complemento: true, bairro: true, cep: true },
       }),
     ])
 
     if (!doacao || !candidate) return reply.code(404).send({ error: 'Não encontrado' })
+
+    const endereco = [
+      candidate.logradouro, candidate.numero, candidate.complemento,
+      candidate.bairro, `${candidate.city ?? ''}/${candidate.state ?? ''}`,
+      candidate.cep,
+    ].filter(Boolean).join(', ')
 
     const recibo = {
       numero: `REC-${doacao.id.slice(-8).toUpperCase()}`,
@@ -289,6 +295,7 @@ export async function doacoesRoutes(app: FastifyInstance) {
         partido: candidate.party,
         cargo: candidate.position,
         municipio: `${candidate.city}/${candidate.state}`,
+        endereco: endereco || 'Não informado',
       },
       doacao: {
         valor: Number(doacao.valor),

@@ -40,6 +40,12 @@ function ProfileTab() {
     position: candidate?.position || '',
     state: candidate?.state || '',
     city: candidate?.city || '',
+    cpf: (candidate as any)?.cpf || '',
+    logradouro: (candidate as any)?.logradouro || '',
+    numero: (candidate as any)?.numero || '',
+    complemento: (candidate as any)?.complemento || '',
+    bairro: (candidate as any)?.bairro || '',
+    cep: (candidate as any)?.cep || '',
   })
   const [weeklyBriefingEnabled, setWeeklyBriefingEnabled] = useState(candidate?.weeklyBriefingEnabled ?? true)
 
@@ -166,9 +172,16 @@ function ProfileTab() {
             <Label>Nome completo do candidato</Label>
             <Input className="mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           </div>
-          <div>
-            <Label>Número do candidato</Label>
-            <Input className="mt-1" value={form.candidateNumber} onChange={e => setForm({ ...form, candidateNumber: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>CPF do candidato <span className="text-red-500 text-xs">(obrigatório TSE)</span></Label>
+              <Input className="mt-1" value={form.cpf} placeholder="000.000.000-00" maxLength={14}
+                onChange={e => setForm({ ...form, cpf: e.target.value })} />
+            </div>
+            <div>
+              <Label>Número do candidato</Label>
+              <Input className="mt-1" value={form.candidateNumber} onChange={e => setForm({ ...form, candidateNumber: e.target.value })} />
+            </div>
           </div>
           <div>
             <Label>WhatsApp</Label>
@@ -207,6 +220,42 @@ function ProfileTab() {
               <Input className="mt-1" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
             </div>
           </div>
+
+          <div className="pt-2 border-t">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Endereço — Prestação de Contas TSE</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Label>CEP</Label>
+                  <Input className="mt-1" value={form.cep} placeholder="00000-000" maxLength={9}
+                    onChange={e => setForm({ ...form, cep: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Número</Label>
+                  <Input className="mt-1" value={form.numero} placeholder="123"
+                    onChange={e => setForm({ ...form, numero: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <Label>Logradouro</Label>
+                <Input className="mt-1" value={form.logradouro} placeholder="Rua, Avenida, Travessa..."
+                  onChange={e => setForm({ ...form, logradouro: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Bairro</Label>
+                  <Input className="mt-1" value={form.bairro} placeholder="Nome do bairro"
+                    onChange={e => setForm({ ...form, bairro: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Complemento</Label>
+                  <Input className="mt-1" value={form.complemento} placeholder="Apto, Sala..."
+                    onChange={e => setForm({ ...form, complemento: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Button onClick={() => candidateMutation.mutate()} disabled={candidateMutation.isPending} style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }} className="text-white">
             {candidateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Salvar

@@ -98,6 +98,12 @@ model Candidate {
   // suspende automaticamente (ver compliance.worker.ts, mesmo padrão).
   campaignPaymentMethod String?
   campaignPaidUntil    DateTime?
+  // Endereço do candidato — obrigatório para prestação de contas TSE (SPCE)
+  logradouro           String?
+  numero               String?
+  complemento          String?
+  bairro               String?
+  cep                  String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @default(now()) @updatedAt
 
