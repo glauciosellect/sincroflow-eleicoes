@@ -37,19 +37,22 @@ const CARGOS = [
   {
     value: 'DEP_ESTADUAL',
     label: 'Deputado(a) Estadual',
-    total: 4790,
+    total: 5990,
+    asaasKey: 'deputado_estadual',
     desc: 'Eleições 2026 — pagamento único',
   },
   {
     value: 'DEP_FEDERAL',
     label: 'Deputado(a) Federal',
-    total: 7200,
+    total: 7490,
+    asaasKey: 'deputado_federal',
     desc: 'Eleições 2026 — pagamento único',
   },
   {
     value: 'SENADOR_GOV',
     label: 'Senador(a) / Governador(a)',
-    total: 10800,
+    total: 10990,
+    asaasKey: 'senador_governador',
     desc: 'Eleições 2026 — pagamento único',
   },
 ] as const
@@ -120,13 +123,19 @@ function RegisterForm() {
     }
     setLoading(true)
     try {
-      const res = await api.post('/auth/register/checkout', {
+      const cargoSelecionado = CARGOS.find(c => c.value === cargo)!
+      const res = await api.post('/auth/register/checkout-asaas', {
         pendingId,
-        cargo,
-        paymentMethod,
-        installments: paymentMethod === 'card' ? installments : 1,
+        plano: cargoSelecionado.asaasKey,
+        formaPagamento: paymentMethod === 'card' ? 'cartao' : 'pix',
+        parcelas: paymentMethod === 'card' ? installments : 1,
       })
-      window.location.href = res.data.url
+      if (res.data.invoiceUrl) {
+        window.location.href = res.data.invoiceUrl
+      } else if (res.data.type === 'pix') {
+        // Pix: redireciona para página de aguardo com QR
+        window.location.href = `/aguardando-pagamento?id=${res.data.paymentId}`
+      }
     } catch (err: any) {
       toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
       setLoading(false)
@@ -163,7 +172,7 @@ function RegisterForm() {
             <p className="text-gray-400 mt-1 text-sm">Sua conta é criada após a confirmação do pagamento.</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmitStep1)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmitStep1)} className="space-y-4" autoComplete="off">
             <div>
               <Label htmlFor="name">Nome completo *</Label>
               <Input id="name" placeholder="Seu nome completo" className="mt-1" {...register('name')} />
@@ -356,7 +365,7 @@ function RegisterForm() {
           </Button>
 
           <p className="text-center text-xs text-gray-400 mt-3">
-            Pagamento processado com segurança via Stripe
+            Pagamento processado com segurança via Asaas
           </p>
         </div>
       )}

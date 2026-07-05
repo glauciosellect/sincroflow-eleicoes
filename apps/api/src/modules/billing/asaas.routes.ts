@@ -109,6 +109,15 @@ export async function asaasRoutes(app: FastifyInstance) {
   })
 }
 
+// Rotas públicas do Asaas (sem auth JWT) — status de pagamento para polling do Pix
+export async function asaasPublicRoutes(app: FastifyInstance) {
+  app.get('/billing/asaas/status-public/:paymentId', async (req, reply) => {
+    const { paymentId } = req.params as { paymentId: string }
+    const res = await asaas.get(`/payments/${paymentId}`)
+    return reply.send({ status: res.data.status })
+  })
+}
+
 // POST /billing/asaas/webhook — recebe notificações do Asaas (sem auth JWT)
 export async function asaasWebhookRoutes(app: FastifyInstance) {
   app.post('/billing/asaas/webhook', async (req, reply) => {
@@ -128,42 +137,51 @@ export async function asaasWebhookRoutes(app: FastifyInstance) {
 
     if (!payment?.externalReference) return reply.send({ ok: true })
 
-    const candidateId = payment.externalReference
+    const ref = payment.externalReference as string
+    const isPending = ref.startsWith('pending:')
+    const pendingId = isPending ? ref.replace('pending:', '') : null
+    const candidateId = isPending ? null : ref
 
-    // PAYMENT_CONFIRMED ou PAYMENT_RECEIVED → ativa o candidato
+    // PAYMENT_CONFIRMED ou PAYMENT_RECEIVED
     if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
-      const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
-      if (!candidate) return reply.send({ ok: true })
-
-      // Ativa por 365 dias (campanha eleitoral tem duração fixa)
       const paidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      const payMethod = payment.billingType === 'PIX' ? 'pix' : 'cartao'
 
-      await prisma.candidate.update({
-        where: { id: candidateId },
-        data: {
-          status: 'ACTIVE',
-          campaignPaymentMethod: payment.billingType === 'PIX' ? 'pix' : 'cartao',
-          campaignPaidUntil: paidUntil,
-        },
-      })
+      if (isPending && pendingId) {
+        // Onboarding: ativa o pending e cria a conta
+        const { getPendingRegistration, activatePendingRegistration } = await import('../auth/auth.service')
+        const pending = await getPendingRegistration(pendingId)
+        if (pending) {
+          await activatePendingRegistration(pendingId, {
+            campaignPaymentMethod: payMethod,
+            campaignPaidUntil: paidUntil,
+          } as any)
+          logger.info('[ASAAS] Conta criada via webhook onboarding', { pendingId })
+        }
+      } else if (candidateId) {
+        // Renovação de candidato existente
+        const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
+        if (candidate) {
+          await prisma.candidate.update({
+            where: { id: candidateId },
+            data: { status: 'ACTIVE', campaignPaymentMethod: payMethod, campaignPaidUntil: paidUntil },
+          })
+          await prisma.agentConfig.updateMany({
+            where: { candidateId, isActive: false },
+            data: { isActive: true, deactivatedAt: null, deactivationReason: null },
+          })
+          logger.info('[ASAAS] Candidato ativado após pagamento', { candidateId, paidUntil })
+        }
+      }
 
-      // Atualiza fatura
       await prisma.invoice.updateMany({
         where: { externalId: payment.id },
         data: { status: 'paid' },
       })
-
-      // Reativa agente se estava suspenso
-      await prisma.agentConfig.updateMany({
-        where: { candidateId, isActive: false },
-        data: { isActive: true, deactivatedAt: null, deactivationReason: null },
-      })
-
-      logger.info('[ASAAS] Candidato ativado após pagamento', { candidateId, paidUntil })
     }
 
-    // PAYMENT_OVERDUE → suspende
-    if (event === 'PAYMENT_OVERDUE') {
+    // PAYMENT_OVERDUE → suspende candidato existente
+    if (event === 'PAYMENT_OVERDUE' && candidateId) {
       await prisma.candidate.update({
         where: { id: candidateId },
         data: { status: 'SUSPENDED' },

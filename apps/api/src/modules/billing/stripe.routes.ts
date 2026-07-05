@@ -6,6 +6,7 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { getPendingRegistration, activatePendingRegistration, updatePendingRegistrationPayment } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 import { requireAdmin } from '../../lib/rbac'
+import { PLANOS_CAMPANHA, PlanoCampanhaKey, upsertClienteAsaas, criarCobrancaAsaas, getPixQrCode } from '../../lib/asaas'
 
 // apiVersion forçada explicitamente: o SDK não atualiza isso automaticamente,
 // e branding_settings (nome customizado por sessão de checkout) só funciona em
@@ -128,6 +129,60 @@ export async function stripeRoutes(app: FastifyInstance) {
 
     const session = await stripe.checkout.sessions.create(sessionParams)
     return reply.send({ url: session.url })
+  })
+
+  // Checkout via Asaas — fluxo principal de onboarding (Pix ou cartão parcelado)
+  app.post('/auth/register/checkout-asaas', async (req, reply) => {
+    const { pendingId, plano, formaPagamento, parcelas = 1 } = req.body as {
+      pendingId: string
+      plano: PlanoCampanhaKey
+      formaPagamento: 'pix' | 'cartao'
+      parcelas?: 1 | 2 | 3
+    }
+
+    const pending = await getPendingRegistration(pendingId)
+    if (!pending) return reply.status(400).send({ error: 'Cadastro expirado ou inválido. Recomece o registro.' })
+
+    const planoDados = PLANOS_CAMPANHA[plano]
+    if (!planoDados) return reply.status(400).send({ error: 'Plano inválido.' })
+
+    const billingType = formaPagamento === 'pix' ? 'PIX' : 'CREDIT_CARD'
+    const parcelasNum = formaPagamento === 'pix' ? 1 : Math.min(3, Math.max(1, parcelas)) as 1 | 2 | 3
+
+    // Cria cliente no Asaas com os dados do pending
+    const asaasCustomerId = await upsertClienteAsaas({
+      name: pending.name,
+      cpf: pending.cpf,
+      email: pending.email,
+      whatsapp: pending.whatsapp,
+    })
+
+    // Cria cobrança — externalReference = pendingId para o webhook saber quem ativar
+    const cobranca = await criarCobrancaAsaas({
+      customerId: asaasCustomerId,
+      valor: planoDados.valor,
+      parcelas: parcelasNum,
+      billingType,
+      descricao: planoDados.nome,
+      externalReference: `pending:${pendingId}`,
+    })
+
+    if (billingType === 'PIX') {
+      const qr = await getPixQrCode(cobranca.id)
+      return reply.send({
+        type: 'pix',
+        paymentId: cobranca.id,
+        qrCodeImage: qr?.encodedImage ?? null,
+        qrCodePayload: qr?.payload ?? null,
+        invoiceUrl: cobranca.invoiceUrl ?? null,
+      })
+    }
+
+    return reply.send({
+      type: 'card',
+      paymentId: cobranca.id,
+      invoiceUrl: cobranca.invoiceUrl,
+    })
   })
 
   // Recarga avulsa de mensagens ativas (candidato já com conta ativa) — quantity é o
