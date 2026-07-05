@@ -40,9 +40,9 @@ const navItems = [
 
   { section: 'CAMPO & PESQUISA', items: [
     { href: '/pesquisa', label: 'Pesquisa de Voto', icon: ClipboardList, module: 'field_agent' },
-    { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'field_agent' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
+    { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'reports' },
     { href: '/portal_campo_externo', label: 'Portal do Eleitor', icon: Globe, module: 'portal_campo' },
   ] },
 
@@ -150,19 +150,32 @@ export function Sidebar() {
                 {visibleItems.map((item) => {
                   // Item especial: Portal do Eleitor para agente de campo — abre URL externa
                   if (item.href === '/portal_campo_externo') {
-                    const href = portalUrl ?? '#'
+                    const handlePortalClick = async (e: React.MouseEvent) => {
+                      e.preventDefault()
+                      if (portalUrl) {
+                        window.open(portalUrl, '_blank', 'noopener,noreferrer')
+                      } else {
+                        // Tenta buscar o slug na hora do clique
+                        try {
+                          const r = await api.get('/portal')
+                          if (r.data?.slug) {
+                            const url = `https://app.syncrofloweleicoes.com.br/eleitor/${r.data.slug}`
+                            setPortalUrl(url)
+                            window.open(url, '_blank', 'noopener,noreferrer')
+                          }
+                        } catch {}
+                      }
+                    }
                     return (
-                      <a
+                      <button
                         key={item.href}
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
+                        onClick={handlePortalClick}
+                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
                       >
                         <item.icon className="w-4 h-4 shrink-0 opacity-60" />
                         {item.label}
                         <ExternalLink className="ml-auto w-3 h-3 opacity-40 shrink-0" />
-                      </a>
+                      </button>
                     )
                   }
 
