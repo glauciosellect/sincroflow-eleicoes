@@ -411,12 +411,16 @@ export async function portalRoutes(app: FastifyInstance) {
     const apiBase = process.env.API_URL || 'https://api.syncrofloweleicoes.com.br'
     const url = `${apiBase}/uploads/portal/${filename}`
 
-    const updateData = tipo === 'hero' ? { fotoUrl: url } : { fotoSobre: url }
-    await prisma.portalEleitor.upsert({
-      where: { candidateId },
-      create: { candidateId, slug: candidateId, titulo: 'Portal', ...updateData },
-      update: updateData,
-    })
+    // Atualiza apenas se já existir — não tenta criar portal com upsert
+    // (evita falha quando migrations ainda não rodaram no servidor)
+    const existing = await prisma.portalEleitor.findUnique({ where: { candidateId } })
+    if (existing) {
+      const updateData = tipo === 'hero' ? { fotoUrl: url } : { fotoSobre: url }
+      await prisma.portalEleitor.update({ where: { candidateId }, data: updateData }).catch(() => {
+        // fotoSobre pode não existir se migration 000005 ainda não rodou — salva só fotoUrl nesse caso
+        if (tipo === 'sobre') return prisma.portalEleitor.update({ where: { candidateId }, data: { fotoUrl: url } })
+      })
+    }
 
     return reply.send({ url })
   })
