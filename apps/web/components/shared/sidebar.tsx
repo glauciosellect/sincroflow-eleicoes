@@ -1,10 +1,11 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
+import api from '@/lib/api'
 
 type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO' | 'COORDENADOR'
 
@@ -15,7 +16,7 @@ const ROLE_MODULES: Record<TeamRole, string[]> = {
   ATENDIMENTO:   ['chat', 'contacts', 'agenda'],
   CONTEUDO:      ['story', 'platform', 'agenda'],
   RELATORIOS:    ['contacts', 'reports'],
-  AGENTE_CAMPO:  ['field_agent'],
+  AGENTE_CAMPO:  ['field_agent', 'portal_campo'],
 }
 
 const navItems = [
@@ -42,6 +43,7 @@ const navItems = [
     { href: '/mapa-apoiadores', label: 'Mapa de Apoiadores', icon: Map, module: 'field_agent' },
     { href: '/meu-desempenho', label: 'Meu Desempenho', icon: Award, module: 'field_agent' },
     { href: '/consultor-fatos', label: 'Consultor de Fatos', icon: ShieldCheck, module: 'field_agent' },
+    { href: '/portal_campo_externo', label: 'Portal do Eleitor', icon: Globe, module: 'portal_campo' },
   ] },
 
   { section: 'INTELIGÊNCIA', items: [
@@ -73,6 +75,17 @@ export function Sidebar() {
   const tabParam = searchParams.get('tab')
   const { candidate, role } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [portalUrl, setPortalUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (role === 'AGENTE_CAMPO') {
+      api.get('/portal').then(r => {
+        if (r.data?.slug) {
+          setPortalUrl(`https://app.syncrofloweleicoes.com.br/eleitor/${r.data.slug}`)
+        }
+      }).catch(() => {})
+    }
+  }, [role])
 
   // null = candidato-dono (sem role de TeamMember) → acesso total como ADMINISTRADOR
   const allowedModules = role ? ROLE_MODULES[role as TeamRole] ?? [] : ROLE_MODULES['ADMINISTRADOR']
@@ -135,6 +148,24 @@ export function Sidebar() {
               </div>
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
+                  // Item especial: Portal do Eleitor para agente de campo — abre URL externa
+                  if (item.href === '/portal_campo_externo') {
+                    const href = portalUrl ?? '#'
+                    return (
+                      <a
+                        key={item.href}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
+                      >
+                        <item.icon className="w-4 h-4 shrink-0 opacity-60" />
+                        {item.label}
+                        <ExternalLink className="ml-auto w-3 h-3 opacity-40 shrink-0" />
+                      </a>
+                    )
+                  }
+
                   const [itemPath, itemQuery] = item.href.split('?')
                   const itemTab = itemQuery ? new URLSearchParams(itemQuery).get('tab') : null
                   const active = pathname === itemPath && (itemTab ? tabParam === itemTab : !tabParam)

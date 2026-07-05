@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import crypto from 'crypto'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule } from '../../lib/rbac'
+import { sendEmail, teamInviteEmail } from '../../lib/mailer'
 import { startOfWeek, endOfWeek, subDays, startOfDay } from 'date-fns'
 
 export async function lideresRoutes(app: FastifyInstance) {
@@ -157,6 +159,8 @@ export async function lideresRoutes(app: FastifyInstance) {
       metaVotos: z.number().int().min(0).optional(),
       supervisorId: z.string().optional(),
       observacao: z.string().max(500).optional(),
+      enviarConvite: z.boolean().optional().default(false),
+      emailConvite: z.string().email().optional(),
     }).parse(req.body)
 
     // supervisorId deve pertencer ao mesmo candidato
@@ -192,7 +196,49 @@ export async function lideresRoutes(app: FastifyInstance) {
       },
     })
 
-    return reply.status(201).send(lider)
+    // Enviar convite de acesso como Agente de Campo
+    let conviteEnviado = false
+    if (body.enviarConvite && body.emailConvite) {
+      const candidate = await prisma.candidate.findUnique({
+        where: { id: candidateId },
+        select: { name: true },
+      })
+
+      const token = crypto.randomBytes(32).toString('hex')
+      const emailConvite = body.emailConvite
+
+      await prisma.teamMember.upsert({
+        where: { candidateId_email: { candidateId, email: emailConvite } },
+        update: {
+          name: body.nome,
+          whatsapp: body.telefone ?? '',
+          role: 'AGENTE_CAMPO',
+          inviteToken: token,
+          status: 'PENDING',
+          acceptedAt: null,
+          invitedAt: new Date(),
+        },
+        create: {
+          candidateId,
+          name: body.nome,
+          email: emailConvite,
+          whatsapp: body.telefone ?? '',
+          role: 'AGENTE_CAMPO',
+          inviteToken: token,
+        },
+      })
+
+      // Vincula o lider ao TeamMember pelo email (após aceite o teamMemberId será preenchido)
+      const acceptUrl = `${process.env.FRONTEND_URL}/accept-invite?token=${token}`
+      await sendEmail(
+        emailConvite,
+        `Convite para a campanha de ${candidate?.name ?? 'candidato'} — SyncroFlowEleições`,
+        teamInviteEmail(candidate?.name ?? 'Administrador', candidate?.name ?? '', 'AGENTE_CAMPO', acceptUrl),
+      )
+      conviteEnviado = true
+    }
+
+    return reply.status(201).send({ ...lider, conviteEnviado })
   })
 
   // PATCH /lideres/:id — atualizar dados do líder

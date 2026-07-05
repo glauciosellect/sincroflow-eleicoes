@@ -584,6 +584,7 @@ const LIDER_FORM_INICIAL = {
   nome: '', funcao: 'cabo_eleitoral', funcaoCustom: '',
   telefone: '', email: '', cpf: '', bairros: '',
   metaVotos: '', supervisorId: '', observacao: '',
+  enviarConvite: false, emailConvite: '',
 }
 
 export default function LideresPage() {
@@ -649,6 +650,8 @@ export default function LideresPage() {
           metaVotos: novoLiderForm.metaVotos ? parseInt(novoLiderForm.metaVotos) : undefined,
           supervisorId: novoLiderForm.supervisorId || undefined,
           observacao: novoLiderForm.observacao || undefined,
+          enviarConvite: novoLiderForm.enviarConvite,
+          emailConvite: novoLiderForm.enviarConvite ? (novoLiderForm.emailConvite || novoLiderForm.email || undefined) : undefined,
         }),
       })
       setShowNovoLider(false)
@@ -704,6 +707,8 @@ export default function LideresPage() {
       metaVotos: lider.metaVotos ? String(lider.metaVotos) : '',
       supervisorId: lider.supervisor?.id ?? '',
       observacao: '',
+      enviarConvite: false,
+      emailConvite: '',
     })
     setErroLider('')
     setShowNovoLider(false)
@@ -827,6 +832,39 @@ export default function LideresPage() {
                   />
                 </div>
               </div>
+
+              {/* Convite de acesso — só mostra ao criar novo líder */}
+              {!editandoLider && (
+                <div className="mt-4 p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={novoLiderForm.enviarConvite}
+                      onChange={e => setNovoLiderForm(f => ({ ...f, enviarConvite: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">Enviar convite de acesso ao app</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">O líder receberá um email para criar sua senha e acessar Pesquisa de Voto, Consultor de Fatos e Portal do Eleitor</p>
+                    </div>
+                  </label>
+                  {novoLiderForm.enviarConvite && (
+                    <div>
+                      <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                        Email para o convite {novoLiderForm.email ? <span className="text-gray-400 font-normal">(pré-preenchido do campo Email acima)</span> : '*'}
+                      </label>
+                      <input
+                        value={novoLiderForm.emailConvite || novoLiderForm.email}
+                        onChange={e => setNovoLiderForm(f => ({ ...f, emailConvite: e.target.value }))}
+                        type="email"
+                        placeholder="email@exemplo.com"
+                        className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {erroLider && <p className="text-sm text-red-600 dark:text-red-400 mt-3">{erroLider}</p>}
               <div className="flex gap-3 mt-4">
                 <button
