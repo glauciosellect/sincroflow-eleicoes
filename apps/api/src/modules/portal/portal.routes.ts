@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
@@ -191,13 +190,13 @@ export async function portalRoutes(app: FastifyInstance) {
 
     const portalData = {
       ...data,
-      trajetoria: data.trajetoria ?? Prisma.JsonNull,
-      depoimentos: data.depoimentos ?? Prisma.JsonNull,
+      trajetoria: (data.trajetoria ?? null) as any,
+      depoimentos: (data.depoimentos ?? null) as any,
     }
     const portal = await prisma.portalEleitor.upsert({
       where: { candidateId },
-      create: { candidateId, ...portalData },
-      update: portalData,
+      create: { candidateId, ...portalData } as any,
+      update: portalData as any,
     })
 
     await auditLog({ candidateId, eventType: 'portal_config_updated', metadata: { slug: data.slug } })
