@@ -98,6 +98,10 @@ model Candidate {
   // suspende automaticamente (ver compliance.worker.ts, mesmo padrão).
   campaignPaymentMethod String?
   campaignPaidUntil    DateTime?
+  // Asaas — pagamento campanha eleitoral
+  asaasCustomerId      String?
+  asaasPaymentId       String?
+  asaasPlano           String?
   // Endereço do candidato — obrigatório para prestação de contas TSE (SPCE)
   logradouro           String?
   numero               String?
@@ -460,13 +464,16 @@ model TermsAcceptance {
 }
 
 model Invoice {
-  id          String    @id @default(cuid())
-  candidateId String
-  amount      Int
-  status      String
-  externalId  String?
-  createdAt   DateTime  @default(now())
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  id           String    @id @default(cuid())
+  candidateId  String
+  amount       Int
+  status       String
+  externalId   String?
+  provider     String    @default("stripe")
+  description  String?
+  installments Int       @default(1)
+  createdAt    DateTime  @default(now())
+  candidate    Candidate @relation(fields: [candidateId], references: [id])
 }
 
 // Configuração global do sistema — linha única (id fixo "global"), editável

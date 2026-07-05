@@ -41,6 +41,7 @@ import { alertRoutes } from './modules/alerts/alerts.routes'
 import { surveyRoutes } from './modules/surveys/surveys.routes'
 import { factCheckRoutes } from './modules/factcheck/factcheck.routes'
 import { portalRoutes, portalPublicRoutes } from './modules/portal/portal.routes'
+import { asaasRoutes, asaasWebhookRoutes } from './modules/billing/asaas.routes'
 import { coordenadorAuthRoutes, coordenadorRoutes, coordenadorPainelRoutes } from './modules/coordenador/coordenador.routes'
 import { conteudoRoutes } from './modules/conteudo/conteudo.routes'
 import { radarRoutes } from './modules/radar/radar.routes'
@@ -173,6 +174,8 @@ async function bootstrap() {
   await app.register(analyticsRoutes)
   await app.register(billingRoutes)
   await app.register(stripeRoutes)
+  await app.register(asaasRoutes)
+  await app.register(asaasWebhookRoutes)
   await app.register(metaIntegrationRoutes)
   await app.register(metaWhatsAppSignupRoutes)
   await app.register(salvyRoutes)
