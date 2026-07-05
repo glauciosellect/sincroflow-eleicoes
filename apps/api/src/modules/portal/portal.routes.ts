@@ -1,9 +1,42 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
 import { uploadPortalPhoto } from '../../lib/storage'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+// Cache em memória: evita chamar IA a cada page view. Chave = hash do story
+const bioCache = new Map<string, string>()
+
+async function gerarBioPortal(story: string, name: string, position?: string | null): Promise<string> {
+  const cacheKey = `${name}:${story.slice(0, 100)}`
+  if (bioCache.has(cacheKey)) return bioCache.get(cacheKey)!
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: `Você é redator de campanha política. Com base na história/trajetória abaixo, escreva uma bio em 2 a 3 parágrafos curtos para o site público do candidato. Use linguagem acessível, inspiradora e na 3ª pessoa. NÃO mencione slogans, NÃO use markdown, NÃO inclua títulos. Apenas os parágrafos corridos.
+
+Candidato: ${name}${position ? ` — ${position}` : ''}
+
+História:
+${story.slice(0, 1200)}`,
+      }],
+    })
+    const block = msg.content[0]
+    const bio = block.type === 'text' ? block.text.trim() : story
+    bioCache.set(cacheKey, bio)
+    return bio
+  } catch {
+    return story
+  }
+}
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +94,7 @@ export async function portalPublicRoutes(app: FastifyInstance) {
         subtitulo: true,
         descricao: true,
         fotoUrl: true,
+        fotoSobre: true,
         corPrimaria: true,
         corDestaque: true,
         numero: true,
@@ -89,12 +123,22 @@ export async function portalPublicRoutes(app: FastifyInstance) {
 
     if (!portal || !portal.ativo) return reply.status(404).send({ error: 'Portal não encontrado ou inativo' })
 
-    // Foto: prioriza fotoUrl do portal, depois photoUrl do candidato
-    const fotoFinal = portal.fotoUrl ?? portal.candidate.photoUrl ?? null
+    // Foto hero: prioriza fotoUrl do portal, depois photoUrl do perfil do candidato
+    const fotoHero = portal.fotoUrl ?? portal.candidate.photoUrl ?? null
+    // Foto sobre: prioriza fotoSobre do portal, depois fotoUrl do portal, depois photoUrl do perfil
+    const fotoSobre = (portal as any).fotoSobre ?? portal.fotoUrl ?? portal.candidate.photoUrl ?? null
+
+    // Texto "Quem é": reescreve com IA para soar mais profissional no site público
+    const rawStory = portal.candidate.agentConfig?.story ?? null
+    let story: string | null = null
+    if (rawStory?.trim()) {
+      story = await gerarBioPortal(rawStory, portal.candidate.name, portal.candidate.position)
+    }
 
     return reply.send({
       ...portal,
-      fotoUrl: fotoFinal,
+      fotoUrl: fotoHero,
+      fotoSobre: fotoSobre,
       trajetoria: (portal.trajetoria as any[]) ?? [],
       depoimentos: (portal.depoimentos as any[]) ?? [],
       candidate: {
@@ -103,7 +147,7 @@ export async function portalPublicRoutes(app: FastifyInstance) {
         party: portal.candidate.party,
         state: portal.candidate.state,
         city: portal.candidate.city,
-        story: portal.candidate.agentConfig?.story ?? null,
+        story,
         propostas: portal.candidate.platformTopics,
       },
     })

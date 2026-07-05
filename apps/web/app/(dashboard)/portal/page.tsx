@@ -314,6 +314,7 @@ export default function PortalPage() {
                     <input {...register('slug')} placeholder="nome-candidato45" className="flex-1 px-3 py-2 text-sm outline-none" />
                   </div>
                   {errors.slug && <p className="text-xs text-red-600">{errors.slug.message}</p>}
+                  <p className="text-xs text-blue-600">Pode ser alterado a qualquer momento — basta digitar o novo slug e salvar.</p>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Número eleitoral</label>

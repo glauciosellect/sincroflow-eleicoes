@@ -31,7 +31,7 @@ interface DepoimentoItem { texto: string; autor: string }
 
 interface Portal {
   slug: string; titulo: string; subtitulo?: string; descricao?: string
-  fotoUrl?: string; corPrimaria: string; corDestaque: string; totalCadastros: number
+  fotoUrl?: string; fotoSobre?: string; corPrimaria: string; corDestaque: string; totalCadastros: number
   numero?: string; instagram?: string; facebook?: string; tiktok?: string; whatsapp?: string
   trajetoria: TrajetoriaItem[]; depoimentos: DepoimentoItem[]
   candidate: {
@@ -271,17 +271,17 @@ export default function PortalPublicoPage() {
       {temHistoria && (
         <section id="sobre" style={{ background: '#F7F8FA', borderBottom: '1px solid #e2e8f0', padding: '80px 24px' }}>
           <div style={{ maxWidth: 1140, margin: '0 auto', display: 'grid', gridTemplateColumns: '.8fr 1.2fr', gap: 48, alignItems: 'start' }}>
-            {/* Foto lateral */}
+            {/* Foto lateral — usa fotoSobre se disponível, senão fotoUrl */}
             <div style={{ borderRadius: 14, overflow: 'hidden', background: '#e2e8f0', aspectRatio: '1/1' }}>
-              {portal.fotoUrl
-                ? <img src={portal.fotoUrl} alt={portal.candidate.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {(portal.fotoSobre || portal.fotoUrl)
+                ? <img src={portal.fotoSobre ?? portal.fotoUrl} alt={portal.candidate.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 60, color: '#9aa0aa' }}>{portal.candidate.name[0]}</div>
               }
             </div>
             <div>
               <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: 12, fontWeight: 700, color: dest }}>Quem é</span>
               <h2 style={{ fontSize: 32, fontWeight: 900, margin: '8px 0 18px', color: darken(cor, 20) }}>{portal.candidate.name}</h2>
-              {portal.candidate.story?.split('\n\n').map((p, i) => (
+              {(portal.candidate.story ?? '').split('\n\n').filter(Boolean).map((p, i) => (
                 <p key={i} style={{ color: '#475569', marginBottom: 14, fontSize: 16, lineHeight: 1.75 }}>{p}</p>
               ))}
             </div>
