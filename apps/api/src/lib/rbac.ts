@@ -16,6 +16,8 @@ export type Module =
   | 'portal' // Portal do Eleitor
   | 'financeiro' // Controle Financeiro
   | 'gabinete' // Gabinete 360
+  | 'equipe' // Equipe de Campanha / Coordenadores
+  | 'prestacao' // Prestação de Contas
 
 // Tabela fixa de acesso por role (seção 4.10 da spec) — Administrador tem acesso
 // total; os demais roles têm um conjunto fixo e não-configurável de módulos.

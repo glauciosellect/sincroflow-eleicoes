@@ -86,7 +86,7 @@ export async function doacoesRoutes(app: FastifyInstance) {
       },
     })
 
-    await auditLog(candidateId, sub, 'doacoes_config_pix', { pixKey })
+    await auditLog({ candidateId, eventType: 'doacoes_config_pix', metadata: { pixKey } })
     return reply.send({ ok: true })
   })
 
@@ -165,7 +165,7 @@ export async function doacoesRoutes(app: FastifyInstance) {
       data: { status: 'confirmado' },
     })
 
-    await auditLog(candidateId, sub, 'doacoes_confirmar', { id })
+    await auditLog({ candidateId, eventType: 'doacoes_confirmar', metadata: { id } })
     return reply.send({ ok: true, lancamento: atualizado })
   })
 
