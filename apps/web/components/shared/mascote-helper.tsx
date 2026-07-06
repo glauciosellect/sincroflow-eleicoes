@@ -122,6 +122,56 @@ export function MascoteHelper() {
   const [tutorialStep, setTutorialStep] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Posição arrastável — começa no canto inferior direito
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const dragging = useRef(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const hasMoved = useRef(false)
+
+  // Inicializa posição depois de montar (evita SSR mismatch)
+  useEffect(() => {
+    setPos({ x: window.innerWidth - 88, y: window.innerHeight - 88 })
+  }, [])
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    dragging.current = true
+    hasMoved.current = false
+    dragOffset.current = {
+      x: e.clientX - (pos?.x ?? 0),
+      y: e.clientY - (pos?.y ?? 0),
+    }
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return
+      hasMoved.current = true
+      const x = Math.min(Math.max(0, e.clientX - dragOffset.current.x), window.innerWidth - 64)
+      const y = Math.min(Math.max(0, e.clientY - dragOffset.current.y), window.innerHeight - 64)
+      setPos({ x, y })
+    }
+    const onUp = () => { dragging.current = false }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [])
+
+  // Posição da janela: abre acima/esquerda do botão conforme espaço disponível
+  const windowStyle = pos ? (() => {
+    const spaceBelow = window.innerHeight - pos.y - 64
+    const spaceRight = window.innerWidth - pos.x - 64
+    return {
+      position: 'fixed' as const,
+      top: spaceBelow > 580 ? pos.y + 72 : Math.max(8, pos.y - 580),
+      left: spaceRight > 320 ? pos.x : Math.max(8, pos.x - 320 + 64),
+      zIndex: 50,
+      width: 320,
+      maxHeight: 560,
+    }
+  })() : {}
+
   useEffect(() => {
     if (expandedFaq !== null) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -142,12 +192,17 @@ export function MascoteHelper() {
     if (stepIndex >= 0) openTutorial(stepIndex)
   }
 
+  if (!pos) return null
+
   return (
     <>
-      {/* Botão flutuante */}
+      {/* Botão flutuante arrastável */}
       <button
-        onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-2xl overflow-hidden border-2 border-white hover:scale-110 transition-transform"
+        ref={btnRef}
+        onMouseDown={onMouseDown}
+        onClick={() => { if (!hasMoved.current) setOpen(o => !o) }}
+        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 50, cursor: dragging.current ? 'grabbing' : 'grab' }}
+        className="w-16 h-16 rounded-full shadow-2xl overflow-hidden border-2 border-white hover:scale-110 transition-transform select-none"
         title="Ajuda — SyncroFlowEleições"
       >
         <img src="/mascote-eleicoes.png" alt="Mascote SyncroFlowEleições" className="w-full h-full object-cover object-top" />
@@ -155,7 +210,7 @@ export function MascoteHelper() {
 
       {/* Janela do assistente */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden" style={{ maxHeight: '560px' }}>
+        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden" style={{ ...windowStyle, maxHeight: '560px' }}>
           {/* Header */}
           <div className="flex items-center gap-3 p-4 text-white shrink-0" style={{ background: 'linear-gradient(135deg, #002776, #009C3B)' }}>
             <img src="/mascote-eleicoes.png" alt="" className="w-9 h-9 rounded-full object-cover object-top border-2 border-white/30" />
