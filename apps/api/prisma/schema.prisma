@@ -702,24 +702,26 @@ model CadastroPortal {
 // ─── Área do Coordenador — M2 ─────────────────────────────────────────────────
 
 model Coordenador {
-  id           String    @id @default(cuid())
-  candidateId  String
-  nome         String
-  telefone     String?
-  email        String    @unique
-  senhaHash    String
-  cidade       String?
-  bairros      String[]
-  metaVotos    Int?
-  ativo        Boolean   @default(true)
-  ultimoAcesso DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  candidateId    String
+  nome           String
+  telefone       String?
+  email          String    @unique
+  senhaHash      String
+  cidade         String?
+  bairros        String[]
+  metaVotos      Int?
+  ativo          Boolean   @default(true)
+  ultimoAcesso   DateTime?
+  colaboradorId  String?   // vínculo com ColaboradorCampanha para ver subordinados
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   candidate  Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   checkIns   CheckInLider[]
 
   @@index([candidateId, ativo])
+  @@index([colaboradorId])
 }
 
 model CheckInLider {

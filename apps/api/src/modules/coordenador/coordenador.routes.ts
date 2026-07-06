@@ -354,62 +354,91 @@ export async function coordenadorRoutes(app: FastifyInstance) {
     return reply.send({ total, intencoes, ultimas })
   })
 
-  // GET /coordenador/minha-equipe — todos os agentes de campo e líderes da campanha
+  // GET /coordenador/minha-equipe — subordinados diretos via ColaboradorCampanha
   app.get('/coordenador/minha-equipe', { onRequest: [requireCoordenador] }, async (req, reply) => {
     const payload = req.user as unknown as CoordenadorPayload
 
-    // Busca todos os agentes de campo e coordenadores da equipe
-    const membros = await prisma.teamMember.findMany({
-      where: {
-        candidateId: payload.candidateId,
-        status: 'ACTIVE',
-        role: { in: ['AGENTE_CAMPO', 'COORDENADOR'] },
-      },
-      select: { id: true, name: true, email: true, role: true, whatsapp: true },
+    // Busca o coordenador e seu vínculo com ColaboradorCampanha
+    const coord = await prisma.coordenador.findUnique({
+      where: { id: payload.coordenadorId },
+      select: { colaboradorId: true, cidade: true },
     })
+
+    let subordinados: any[] = []
+
+    if (coord?.colaboradorId) {
+      // Busca subordinados diretos via hierarquia (supervisorId aponta para este coordenador)
+      subordinados = await prisma.colaboradorCampanha.findMany({
+        where: {
+          candidateId: payload.candidateId,
+          supervisorId: coord.colaboradorId,
+          status: 'ativo',
+        },
+        select: {
+          id: true, nome: true, email: true, telefone: true, funcao: true,
+          bairros: true, scoreAtividade: true, ultimaAtividade: true,
+          teamMember: { select: { id: true, role: true } },
+        },
+        orderBy: { nome: 'asc' },
+      })
+    }
+    // Se não há colaboradorId vinculado, retorna lista vazia com aviso (semVinculo=true)
 
     const desde7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-    const equipe = await Promise.all(membros.map(async (m) => {
-      const [pesquisasTotal, pesquisas7d, ultimaPesquisa, porIntencao] = await Promise.all([
-        prisma.voteSurveyResponse.count({
-          where: { candidateId: payload.candidateId, collectedById: m.id },
-        }),
-        prisma.voteSurveyResponse.count({
-          where: { candidateId: payload.candidateId, collectedById: m.id, createdAt: { gte: desde7dias } },
-        }),
-        prisma.voteSurveyResponse.findFirst({
-          where: { candidateId: payload.candidateId, collectedById: m.id },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true, city: true, neighborhood: true },
-        }),
-        prisma.voteSurveyResponse.groupBy({
-          by: ['intention'],
-          where: { candidateId: payload.candidateId, collectedById: m.id },
-          _count: true,
-        }),
-      ])
+    const equipe = await Promise.all(subordinados.map(async (s) => {
+      const teamMemberId = s.teamMember?.id ?? null
 
-      const diasSemAtividade = ultimaPesquisa
-        ? Math.floor((Date.now() - ultimaPesquisa.createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      // Pesquisas de voto (só se tiver acesso ao sistema como agente)
+      const [pesquisasTotal, pesquisas7d, porIntencao, ultimaPesquisa] = teamMemberId
+        ? await Promise.all([
+            prisma.voteSurveyResponse.count({ where: { candidateId: payload.candidateId, collectedById: teamMemberId } }),
+            prisma.voteSurveyResponse.count({ where: { candidateId: payload.candidateId, collectedById: teamMemberId, createdAt: { gte: desde7dias } } }),
+            prisma.voteSurveyResponse.groupBy({ by: ['intention'], where: { candidateId: payload.candidateId, collectedById: teamMemberId }, _count: true }),
+            prisma.voteSurveyResponse.findFirst({ where: { candidateId: payload.candidateId, collectedById: teamMemberId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true, city: true, neighborhood: true } }),
+          ])
+        : [0, 0, [], null]
+
+      // Cadastros de eleitores feitos por esta pessoa (via canal CAMPO)
+      const cadastros7d = await prisma.cadastroPortal.count({
+        where: {
+          portal: { candidateId: payload.candidateId },
+          createdAt: { gte: desde7dias },
+        },
+      })
+
+      const ultimaAtiv = (ultimaPesquisa as any)?.createdAt ?? s.ultimaAtividade ?? null
+      const diasSemAtividade = ultimaAtiv
+        ? Math.floor((Date.now() - new Date(ultimaAtiv).getTime()) / (1000 * 60 * 60 * 24))
         : null
 
-      const intencaoMap = Object.fromEntries(porIntencao.map(i => [i.intention, i._count]))
+      const intencaoMap = Object.fromEntries((porIntencao as any[]).map((i: any) => [i.intention, i._count]))
+
+      const FUNCOES_LABEL: Record<string, string> = {
+        cabo_eleitoral: 'Cabo Eleitoral', coordenador: 'Coordenador',
+        supervisor: 'Supervisor de Campo', motorista: 'Motorista',
+        assessor: 'Assessor', mesario: 'Mesário', fotografo: 'Fotógrafo/Videomaker',
+        social_media: 'Social Media', advogado: 'Advogado Eleitoral',
+        contador: 'Contador', outro: 'Outro',
+      }
 
       return {
-        id: m.id,
-        nome: m.name,
-        email: m.email,
-        whatsapp: m.whatsapp,
-        role: m.role,
-        regiao: ultimaPesquisa?.neighborhood ?? ultimaPesquisa?.city ?? null,
+        id: s.id,
+        nome: s.nome,
+        email: s.email,
+        telefone: s.telefone,
+        funcao: FUNCOES_LABEL[s.funcao] ?? s.funcao,
+        bairros: s.bairros,
+        scoreAtividade: s.scoreAtividade,
         pesquisasTotal,
         pesquisas7d,
+        cadastros7d,
         apoiadores: intencaoMap['APOIADOR'] ?? 0,
         indecisos: intencaoMap['INDECISO'] ?? 0,
         criticos: intencaoMap['CRITICO'] ?? 0,
-        ultimaAtividade: ultimaPesquisa?.createdAt ?? null,
+        ultimaAtividade: ultimaAtiv,
         diasSemAtividade,
+        temAcessoSistema: !!teamMemberId,
         statusAtividade: diasSemAtividade === null ? 'nunca'
           : diasSemAtividade === 0 ? 'hoje'
           : diasSemAtividade <= 2 ? 'ativo'
@@ -420,7 +449,9 @@ export async function coordenadorRoutes(app: FastifyInstance) {
 
     equipe.sort((a, b) => (b.pesquisas7d - a.pesquisas7d) || (b.pesquisasTotal - a.pesquisasTotal))
 
-    return reply.send({ equipe, total: equipe.length })
+    const semVinculo = !coord?.colaboradorId
+
+    return reply.send({ equipe, total: equipe.length, semVinculo })
   })
 }
 
@@ -439,12 +470,27 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
       select: {
         id: true, nome: true, email: true, telefone: true, cidade: true,
         bairros: true, metaVotos: true, ativo: true, ultimoAcesso: true, createdAt: true,
+        colaboradorId: true,
         _count: { select: { checkIns: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
 
     return reply.send(coordenadores)
+  })
+
+  // GET /painel/coordenadores/colaboradores-options — lista colaboradores para vínculo
+  app.get('/painel/coordenadores/colaboradores-options', { onRequest: [requireModule('settings')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+
+    const colaboradores = await prisma.colaboradorCampanha.findMany({
+      where: { candidateId, status: 'ativo' },
+      select: { id: true, nome: true, funcao: true, telefone: true },
+      orderBy: { nome: 'asc' },
+    })
+
+    return reply.send(colaboradores)
   })
 
   // POST /painel/coordenadores — cria novo coordenador
@@ -460,6 +506,7 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
       cidade: z.string().optional(),
       bairros: z.array(z.string()).default([]),
       metaVotos: z.number().int().positive().optional(),
+      colaboradorId: z.string().optional().nullable(),
     }).parse(req.body)
 
     const exists = await prisma.coordenador.findUnique({ where: { email: data.email } })
@@ -468,8 +515,8 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
     const senhaHash = await bcrypt.hash(data.senha, 10)
 
     const coord = await prisma.coordenador.create({
-      data: { candidateId, nome: data.nome, email: data.email, senhaHash, telefone: data.telefone, cidade: data.cidade, bairros: data.bairros, metaVotos: data.metaVotos },
-      select: { id: true, nome: true, email: true, cidade: true, bairros: true, metaVotos: true, ativo: true, createdAt: true },
+      data: { candidateId, nome: data.nome, email: data.email, senhaHash, telefone: data.telefone, cidade: data.cidade, bairros: data.bairros, metaVotos: data.metaVotos, colaboradorId: data.colaboradorId ?? null },
+      select: { id: true, nome: true, email: true, cidade: true, bairros: true, metaVotos: true, ativo: true, createdAt: true, colaboradorId: true },
     })
 
     await auditLog({ candidateId, eventType: 'coordenador_created', metadata: { coordenadorId: coord.id, email: data.email } })
@@ -503,6 +550,7 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
       metaVotos: z.number().int().positive().optional().nullable(),
       ativo: z.boolean().optional(),
       novaSenha: z.string().min(6).optional(),
+      colaboradorId: z.string().optional().nullable(),
     }).parse(req.body)
 
     const updateData: any = {}
@@ -514,11 +562,12 @@ export async function coordenadorPainelRoutes(app: FastifyInstance) {
     if (data.metaVotos !== undefined) updateData.metaVotos = data.metaVotos
     if (data.ativo !== undefined) updateData.ativo = data.ativo
     if (data.novaSenha) updateData.senhaHash = await bcrypt.hash(data.novaSenha, 10)
+    if (data.colaboradorId !== undefined) updateData.colaboradorId = data.colaboradorId
 
     const updated = await prisma.coordenador.update({
       where: { id },
       data: updateData,
-      select: { id: true, nome: true, email: true, cidade: true, bairros: true, metaVotos: true, ativo: true },
+      select: { id: true, nome: true, email: true, cidade: true, bairros: true, metaVotos: true, ativo: true, colaboradorId: true },
     })
 
     return reply.send(updated)

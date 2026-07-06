@@ -30,22 +30,26 @@ interface MembroEquipe {
   id: string
   nome: string
   email: string
-  whatsapp?: string
-  role: string
-  regiao?: string
+  telefone?: string
+  funcao: string
+  bairros: string[]
+  scoreAtividade: number
   pesquisasTotal: number
   pesquisas7d: number
+  cadastros7d: number
   apoiadores: number
   indecisos: number
   criticos: number
   ultimaAtividade?: string
   diasSemAtividade?: number
+  temAcessoSistema: boolean
   statusAtividade: 'hoje' | 'ativo' | 'regular' | 'inativo' | 'nunca'
 }
 
 interface Equipe {
   equipe: MembroEquipe[]
   total: number
+  semVinculo: boolean
 }
 
 const INTENCAO_CONFIG: Record<string, { label: string; icon: typeof ThumbsUp; color: string; bg: string }> = {
@@ -219,15 +223,20 @@ export default function CoordenadorDashboard() {
         <div className="px-4 py-5 space-y-3">
           {!equipe ? (
             <div className="text-center py-12 text-gray-400 text-sm">Carregando...</div>
+          ) : equipe.semVinculo ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              <AlertCircle className="w-10 h-10 mx-auto mb-3 text-amber-300" />
+              <p className="font-medium text-amber-600">Equipe não configurada</p>
+              <p className="text-xs mt-1 text-gray-400">O administrador da campanha precisa vincular seu perfil à equipe nas configurações.</p>
+            </div>
           ) : equipe.total === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               <UserCheck className="w-10 h-10 mx-auto mb-3 text-gray-200" />
-              <p>Nenhum agente de campo cadastrado ainda.</p>
-              <p className="text-xs mt-1">Os agentes aparecem aqui quando tiverem o papel "Agente de Campo" na equipe.</p>
+              <p>Nenhum colaborador cadastrado na sua equipe ainda.</p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-gray-400 text-center">{equipe.total} membros · últimos 7 dias</p>
+              <p className="text-xs text-gray-400 text-center">{equipe.total} colaboradores · últimos 7 dias</p>
               {equipe.equipe.map((m) => {
                 const statusCor = m.statusAtividade === 'hoje' ? 'bg-green-500'
                   : m.statusAtividade === 'ativo' ? 'bg-green-400'
@@ -239,6 +248,7 @@ export default function CoordenadorDashboard() {
                   : m.statusAtividade === 'regular' ? `${m.diasSemAtividade}d atrás`
                   : m.statusAtividade === 'inativo' ? `${m.diasSemAtividade}d sem ativ.`
                   : 'Sem atividade'
+                const regiao = m.bairros?.length > 0 ? m.bairros.slice(0, 2).join(', ') : null
 
                 return (
                   <div key={m.id} className="bg-white rounded-2xl shadow-sm border p-4">
@@ -249,7 +259,7 @@ export default function CoordenadorDashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">{m.nome}</p>
-                        <p className="text-xs text-gray-400">{m.role === 'AGENTE_CAMPO' ? 'Agente de Campo' : 'Coordenador'}{m.regiao ? ` · ${m.regiao}` : ''}</p>
+                        <p className="text-xs text-gray-400">{m.funcao}{regiao ? ` · ${regiao}` : ''}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <div className={`w-2 h-2 rounded-full ${statusCor}`} />
@@ -261,11 +271,11 @@ export default function CoordenadorDashboard() {
                     <div className="grid grid-cols-4 gap-2">
                       <div className="bg-gray-50 rounded-xl p-2 text-center">
                         <p className="text-lg font-bold text-[#002776]">{m.pesquisas7d}</p>
-                        <p className="text-xs text-gray-400">7 dias</p>
+                        <p className="text-xs text-gray-400">Pesq. 7d</p>
                       </div>
                       <div className="bg-gray-50 rounded-xl p-2 text-center">
-                        <p className="text-lg font-bold text-gray-700">{m.pesquisasTotal}</p>
-                        <p className="text-xs text-gray-400">Total</p>
+                        <p className="text-lg font-bold text-gray-700">{m.cadastros7d}</p>
+                        <p className="text-xs text-gray-400">Cadast.</p>
                       </div>
                       <div className="bg-green-50 rounded-xl p-2 text-center">
                         <p className="text-lg font-bold text-green-600">{m.apoiadores}</p>
@@ -278,9 +288,9 @@ export default function CoordenadorDashboard() {
                     </div>
 
                     {/* Contato rápido */}
-                    {m.whatsapp && (
+                    {m.telefone && (
                       <a
-                        href={`https://wa.me/${m.whatsapp.replace(/\D/g, '')}`}
+                        href={`https://wa.me/55${m.telefone.replace(/\D/g, '')}`}
                         target="_blank"
                         rel="noreferrer"
                         className="mt-3 flex items-center justify-center gap-2 w-full py-2 rounded-xl border border-green-200 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"

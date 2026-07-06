@@ -38,6 +38,7 @@ const editSchema = z.object({
   bairros: z.string().optional(),
   metaVotos: z.string().optional(),
   novaSenha: z.string().min(6, 'Mínimo 6 caracteres').optional().or(z.literal('')),
+  colaboradorId: z.string().optional().nullable(),
 })
 type EditForm = z.infer<typeof editSchema>
 
@@ -45,7 +46,12 @@ interface Coord {
   id: string; nome: string; email: string; telefone?: string
   cidade?: string; bairros: string[]; metaVotos?: number
   ativo: boolean; ultimoAcesso?: string; createdAt: string
+  colaboradorId?: string
   _count: { checkIns: number }
+}
+
+interface ColabOption {
+  id: string; nome: string; funcao: string; telefone?: string
 }
 
 export default function CoordenadoresPage() {
@@ -111,6 +117,7 @@ export default function CoordenadoresPage() {
       cidade: data.cidade || undefined,
       bairros: data.bairros ? data.bairros.split(',').map(b => b.trim()).filter(Boolean) : [],
       metaVotos: data.metaVotos ? parseInt(data.metaVotos) : undefined,
+      colaboradorId: data.colaboradorId || null,
       ...(data.novaSenha ? { novaSenha: data.novaSenha } : {}),
     }),
     onSuccess: () => {
@@ -357,6 +364,10 @@ export default function CoordenadoresPage() {
                       )}
                       <span className="flex items-center gap-1"><Activity className="w-3 h-3" />{coord._count.checkIns} check-ins</span>
                       {coord.ultimoAcesso && <span>Último acesso: {formatDate(coord.ultimoAcesso)}</span>}
+                      {coord.colaboradorId
+                        ? <span className="flex items-center gap-1 text-green-600"><CheckCircle className="w-3 h-3" />Equipe vinculada</span>
+                        : <span className="flex items-center gap-1 text-amber-500"><AlertTriangle className="w-3 h-3" />Sem vínculo de equipe</span>
+                      }
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -426,7 +437,13 @@ function ModalEditarCoord({
       cidade: coord.cidade ?? '',
       bairros: coord.bairros.join(', '),
       metaVotos: coord.metaVotos ? String(coord.metaVotos) : '',
+      colaboradorId: coord.colaboradorId ?? '',
     },
+  })
+
+  const { data: colaboradores = [] } = useQuery<ColabOption[]>({
+    queryKey: ['colaboradores-options'],
+    queryFn: () => api.get('/painel/coordenadores/colaboradores-options').then(r => r.data),
   })
 
   return (
@@ -468,6 +485,16 @@ function ModalEditarCoord({
               <label className="text-sm font-medium text-gray-700">Nova senha <span className="text-gray-400 font-normal">(deixe em branco para manter)</span></label>
               <Input {...register('novaSenha')} type="password" placeholder="Mínimo 6 caracteres" />
               {errors.novaSenha && <p className="text-xs text-red-600">{errors.novaSenha.message}</p>}
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-sm font-medium text-gray-700">Vínculo de equipe <span className="text-gray-400 font-normal">(subordinados diretos)</span></label>
+              <select {...register('colaboradorId')} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#002776]">
+                <option value="">— Nenhum vínculo —</option>
+                {colaboradores.map(c => (
+                  <option key={c.id} value={c.id}>{c.nome} ({c.funcao})</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400">Quem é este coordenador na lista de colaboradores? Os subordinados desta pessoa aparecerão na aba "Equipe" do painel do coordenador.</p>
             </div>
           </div>
           <div className="flex gap-3 pt-2">
