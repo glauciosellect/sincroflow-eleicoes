@@ -1,5 +1,6 @@
 import { createWorker, briefingQueue } from '../../lib/queue'
 import { sendWeeklyBriefingEmails } from './briefing.service'
+import { sendWeeklyRelatorioCoord, sendWeeklyRelatorioLideres } from './relatorio-campo.service'
 import { logger } from '../../lib/logger'
 
 export function startBriefingWorker() {
@@ -7,6 +8,8 @@ export function startBriefingWorker() {
     'weekly-briefing',
     async () => {
       await sendWeeklyBriefingEmails()
+      await sendWeeklyRelatorioCoord()
+      await sendWeeklyRelatorioLideres()
     },
     1,
   )

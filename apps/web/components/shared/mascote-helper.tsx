@@ -12,7 +12,7 @@ const TUTORIAL_STEPS = [
   {
     step: 2,
     title: 'Personalizar o disclaimer',
-    content: 'Na aba **Disclaimer**, defina a mensagem de apresentação do assistente. Por exigência da Resolução TSE, ele sempre se identifica como assistente virtual na primeira interação com cada eleitor.',
+    content: 'Na aba **Disclaimer**, defina a mensagem de apresentação do assistente. Por exigência da Resolução TSE nº 23.755/2026, ele sempre se identifica como assistente virtual na primeira interação com cada eleitor.',
   },
   {
     step: 3,
@@ -62,12 +62,12 @@ const TUTORIAL_STEPS = [
   {
     step: 12,
     title: 'Acompanhar Compliance TSE',
-    content: 'Em **Configurações → Compliance TSE** você vê quando o assistente será desativado automaticamente (72h antes de cada turno), conforme exige a Resolução TSE nº 23.755/2026.',
+    content: 'Em **Configurações → Compliance TSE** você vê quando o assistente será desativado automaticamente (72h antes de cada turno), conforme exige a Resolução TSE nº 23.755/2026. Após a eleição, o sistema administrativo continua disponível para análises e fechamento financeiro.',
   },
   {
     step: 13,
     title: 'Gerenciar Financeiro',
-    content: 'Em **Configurações → Financeiro** você acompanha seu plano, compra linhas extras de WhatsApp, recarrega mensagens ativas, e — se for eleito — pode clicar em **Seguir Mandato** para continuar usando o sistema sem perder nada do seu histórico.',
+    content: 'Em **Financeiro** você lança receitas e despesas da campanha, controla o orçamento e exporta relatórios para prestação de contas ao TSE. Use as categorias TSE para garantir conformidade.',
   },
   {
     step: 14,
@@ -76,18 +76,48 @@ const TUTORIAL_STEPS = [
   },
   {
     step: 15,
+    title: 'Coordenadores de Campo',
+    content: 'Em **Equipe → Coordenadores** você cadastra coordenadores que supervisionam grupos de agentes. Cada coordenador acessa um painel próprio em **/coordenador** com o desempenho da sua equipe, check-ins e ranking semanal. Vincule o coordenador à sua equipe no painel administrativo para que ele veja apenas seus subordinados.',
+  },
+  {
+    step: 16,
+    title: 'Gestor de Líderes',
+    content: 'Em **Equipe → Líderes** você gerencia os membros de campo: define territórios (bairros), metas de votos, acompanha o score de atividade semanal (pesquisas + check-ins + contatos) e vê o ranking completo. Líderes com mais de 7 dias sem atividade aparecem com alerta vermelho.',
+  },
+  {
+    step: 17,
     title: 'Pesquisa de Intenção de Voto',
     content: 'Em **Meu Desempenho**, agentes de campo registram eleitores pesquisados com nome, telefone, **CEP** (preenchimento automático de bairro e cidade) e intenção de voto (Apoiador, Indeciso ou Crítico). Também é possível registrar preferências por cargo (Vereador, Dep. Estadual, Dep. Federal, Senador, Governador, Presidente).',
   },
   {
-    step: 16,
+    step: 18,
     title: 'Mapa de Apoiadores',
-    content: 'Em **Mapa de Apoiadores** você visualiza no mapa onde estão seus apoiadores, indecisos e críticos. Cada círculo representa um bairro ou cidade — o tamanho é proporcional ao volume e a cor indica a intenção predominante. Clique para ver o detalhamento. Para **Vereadores** agrupa por bairro; para **Deputados, Senadores, Governadores e Presidente** agrupa por cidade.',
+    content: 'Em **Mapa de Apoiadores** você visualiza no mapa onde estão seus apoiadores, indecisos e críticos. Cada círculo representa um bairro ou cidade — o tamanho é proporcional ao volume e a cor indica a intenção predominante. Para **Vereadores** agrupa por bairro; para **Deputados, Senadores, Governadores e Presidente** agrupa por cidade. Filtre por 7, 30, 60 ou 90 dias.',
   },
   {
-    step: 17,
+    step: 19,
     title: 'Consultor de Fatos com IA',
-    content: 'Em **Consultor de Fatos**, agentes de campo colam uma dúvida ou boato recebido de um eleitor. A IA analisa com base em fontes públicas (TSE, IBGE, legislação, veículos reconhecidos) e retorna um **veredicto** (Verdadeiro, Falso, Parcialmente verdadeiro ou Inconclusivo), uma **análise** e uma **resposta pronta** para usar com o eleitor. Respostas podem ser salvas na **Biblioteca** para reuso quando o mesmo boato aparecer novamente.',
+    content: 'Em **Consultor de Fatos**, agentes de campo colam uma dúvida ou boato recebido de um eleitor. A IA analisa com base em fontes públicas (TSE, IBGE, legislação, veículos reconhecidos) e retorna um **veredicto** (Verdadeiro, Falso, Parcialmente verdadeiro ou Inconclusivo), uma **análise** e uma **resposta pronta** para usar com o eleitor. Respostas podem ser salvas na **Biblioteca** para reuso.',
+  },
+  {
+    step: 20,
+    title: 'Discurso de Palanque com IA',
+    content: 'Em **Discurso de Palanque**, escolha o tema, o tom (entusiasta, técnico, emocional) e o público-alvo. A IA gera um discurso personalizado com base na sua história e propostas cadastradas. Você pode salvar, editar e exportar como PDF para usar em eventos.',
+  },
+  {
+    step: 21,
+    title: 'Radar de Notícias',
+    content: 'Em **Radar de Notícias** a IA monitora notícias relevantes para sua campanha e área de atuação. Acompanhe os temas em alta no seu município, veja o que os eleitores estão comentando e use como base para seus posicionamentos.',
+  },
+  {
+    step: 22,
+    title: 'Relatórios Semanais Automáticos',
+    content: 'Todo **segunda-feira às 8h** você recebe por e-mail o briefing semanal da campanha. Coordenadores recebem o resumo da sua equipe (ativos, inativos, cadastros, pesquisas). Líderes recebem seu próprio desempenho individual com posição no ranking e progresso da meta de votos.',
+  },
+  {
+    step: 23,
+    title: 'Portal do Eleitor',
+    content: 'Em **Portal do Eleitor** você cria uma página pública personalizada onde eleitores podem se cadastrar, enviar mensagens e acompanhar suas propostas. Cada cadastro feito no portal é automaticamente sincronizado com sua base de contatos.',
   },
 ]
 
@@ -102,11 +132,15 @@ const FAQ = [
   { q: 'Como vejo as Solicitações?', step: 10 },
   { q: 'Como exporto um relatório em PDF?', step: 11 },
   { q: 'Quando o assistente é desativado pelo TSE?', step: 12 },
-  { q: 'Como compro mais linhas de WhatsApp?', step: 13 },
   { q: 'Como adiciono agentes de campo?', step: 14 },
-  { q: 'Como registrar pesquisa de intenção de voto?', step: 15 },
-  { q: 'Como funciona o Mapa de Apoiadores?', step: 16 },
-  { q: 'O que é o Consultor de Fatos?', step: 17 },
+  { q: 'Como funciona o Gestor de Líderes?', step: 16 },
+  { q: 'Como cadastro coordenadores?', step: 15 },
+  { q: 'Como registrar pesquisa de intenção de voto?', step: 17 },
+  { q: 'Como funciona o Mapa de Apoiadores?', step: 18 },
+  { q: 'O que é o Consultor de Fatos?', step: 19 },
+  { q: 'Como gero um discurso de palanque?', step: 20 },
+  { q: 'Como funciona o relatório semanal?', step: 22 },
+  { q: 'Como criar um Portal do Eleitor?', step: 23 },
 ]
 
 function renderMarkdown(text: string) {

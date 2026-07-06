@@ -69,8 +69,7 @@ function RegisterForm() {
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
   const [cargo, setCargo] = useState<CargoValue>('DEP_ESTADUAL')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card')
-  const [installments, setInstallments] = useState<1 | 2 | 3>(1)
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('pix')
   const [pendingId, setPendingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -86,13 +85,6 @@ function RegisterForm() {
   const passwordValue = watch('password', '')
 
   const selectedCargo = CARGOS.find(c => c.value === cargo)!
-
-  const getInstallmentLabel = (n: 1 | 2 | 3) => {
-    const total = selectedCargo.total
-    if (n === 1) return `1x de ${formatBRL(total)} (à vista)`
-    const parcel = total / n
-    return `${n}x de ${formatBRL(parcel)} sem juros`
-  }
 
   const onSubmitStep1 = async (data: AccountData) => {
     setLoading(true)
@@ -128,7 +120,7 @@ function RegisterForm() {
         pendingId,
         plano: cargoSelecionado.asaasKey,
         formaPagamento: paymentMethod === 'card' ? 'cartao' : 'pix',
-        parcelas: paymentMethod === 'card' ? installments : 1,
+        parcelas: 1,
       })
       if (res.data.invoiceUrl) {
         window.location.href = res.data.invoiceUrl
@@ -309,8 +301,8 @@ function RegisterForm() {
               )}
             >
               <CreditCard className={cn('w-5 h-5', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-400')} />
-              <span className={cn('text-sm font-semibold', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-700')}>Cartão</span>
-              <span className="text-xs text-gray-400">até 3x sem juros</span>
+              <span className={cn('text-sm font-semibold', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-700')}>Cartão de Débito</span>
+              <span className="text-xs text-gray-400">à vista</span>
             </button>
             <button
               onClick={() => setPaymentMethod('pix')}
@@ -325,23 +317,12 @@ function RegisterForm() {
             </button>
           </div>
 
-          {/* Parcelas (só cartão) */}
           {paymentMethod === 'card' && (
-            <div className="space-y-2 mb-6">
-              {([1, 2, 3] as const).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setInstallments(n)}
-                  className={cn(
-                    'w-full text-left px-4 py-2.5 rounded-xl border-2 transition-all',
-                    installments === n ? 'border-[#009C3B] bg-green-50' : 'border-gray-100 hover:border-gray-200'
-                  )}
-                >
-                  <span className={cn('text-sm font-medium', installments === n ? 'text-[#009C3B]' : 'text-gray-700')}>
-                    {getInstallmentLabel(n)}
-                  </span>
-                </button>
-              ))}
+            <div className="mb-6 px-4 py-3 rounded-xl bg-green-50 border border-green-200">
+              <p className="text-sm text-green-800 font-medium">
+                {formatBRL(selectedCargo.total)} à vista no débito
+              </p>
+              <p className="text-xs text-green-600 mt-0.5">Aprovação imediata após o pagamento</p>
             </div>
           )}
 
