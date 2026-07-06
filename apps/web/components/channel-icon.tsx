@@ -53,6 +53,20 @@ export function ChannelIcon({ type, className = 'w-9 h-9' }: { type: string; cla
       <path d="M7 10.5l9 6.5 9-6.5" stroke="#EA4335" strokeWidth="1.5" fill="none"/>
     </svg>
   )
+  if (type === 'PORTAL') return (
+    <svg viewBox="0 0 32 32" className={className} fill="none">
+      <rect width="32" height="32" rx="8" fill="#002776"/>
+      <path d="M16 7l7 4v10l-7 4-7-4V11l7-4z" stroke="white" strokeWidth="1.5" fill="none"/>
+      <circle cx="16" cy="16" r="2.5" fill="white"/>
+    </svg>
+  )
+  if (type === 'CAMPO') return (
+    <svg viewBox="0 0 32 32" className={className} fill="none">
+      <rect width="32" height="32" rx="8" fill="#009C3B"/>
+      <path d="M16 8c-3.31 0-6 2.69-6 6 0 4.5 6 11 6 11s6-6.5 6-11c0-3.31-2.69-6-6-6z" fill="white"/>
+      <circle cx="16" cy="14" r="2" fill="#009C3B"/>
+    </svg>
+  )
   return (
     <svg viewBox="0 0 32 32" className={className} fill="none">
       <rect width="32" height="32" rx="8" fill="#94A3B8"/>

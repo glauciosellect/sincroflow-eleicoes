@@ -21,6 +21,7 @@ export function channelLabel(type: string) {
   const map: Record<string, string> = {
     WHATSAPP: 'WhatsApp', INSTAGRAM: 'Instagram', FACEBOOK: 'Facebook',
     TELEGRAM: 'Telegram', WIDGET: 'Widget', EMAIL: 'Email', SMS: 'SMS',
+    PORTAL: 'Portal do Eleitor', CAMPO: 'Campo',
   }
   return map[type] || type
 }

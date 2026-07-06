@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, requireAdmin, auditLog } from '../../lib/rbac'
+import { syncContactFromField } from '../../lib/sync-contact'
 
 export async function surveyRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
@@ -53,6 +54,20 @@ export async function surveyRoutes(app: FastifyInstance) {
     })
 
     await auditLog({ candidateId, eventType: 'vote_survey_created', metadata: { intention, collectedById: member?.id } })
+
+    // Sincroniza com tabela Contact se o eleitor informou nome ou telefone
+    if (voterName || voterPhone) {
+      const agentName = member?.name ?? 'Agente de Campo'
+      await syncContactFromField({
+        candidateId,
+        channelType: 'CAMPO',
+        sourceName: agentName,
+        nome: voterName ?? 'Eleitor (pesquisa)',
+        telefone: voterPhone || null,
+        bairro: neighborhood || null,
+        cidade: city || null,
+      }).catch(() => {})
+    }
 
     return reply.status(201).send(response)
   })

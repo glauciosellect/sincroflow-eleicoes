@@ -540,6 +540,7 @@ enum ChannelType {
   TELEGRAM
   EMAIL
   PORTAL
+  CAMPO
 }
 
 enum ContactType {

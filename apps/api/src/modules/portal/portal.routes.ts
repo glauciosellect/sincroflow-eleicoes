@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
 import { uploadPortalPhoto } from '../../lib/storage'
+import { syncContactFromField } from '../../lib/sync-contact'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -178,6 +179,22 @@ export async function portalPublicRoutes(app: FastifyInstance) {
       where: { id: portal.id },
       data: { totalCadastros: { increment: 1 } },
     })
+
+    // Sincroniza com tabela Contact — aparece em Contatos e pode receber broadcasts
+    const contactId = await syncContactFromField({
+      candidateId: portal.candidateId,
+      channelType: 'PORTAL',
+      sourceName: portal.slug,
+      nome: data.nome,
+      telefone: (data as any).telefone || null,
+      email: (data as any).email || null,
+      bairro: (data as any).bairro || null,
+      cidade: (data as any).cidade || null,
+    }).catch(() => null)
+
+    if (contactId) {
+      await prisma.cadastroPortal.update({ where: { id: cadastro.id }, data: { contactId } }).catch(() => {})
+    }
 
     // Gera protocolo automaticamente se o eleitor informou assunto ou mensagem
     if (data.assunto || data.mensagem) {

@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, auditLog } from '../../lib/rbac'
 import { sendEmail } from '../../lib/mailer'
+import { syncContactFromField } from '../../lib/sync-contact'
 
 const APP_URL = process.env.FRONTEND_URL || 'https://app.syncrofloweleicoes.com.br'
 
@@ -218,6 +219,23 @@ export async function coordenadorRoutes(app: FastifyInstance) {
     })
 
     await prisma.portalEleitor.update({ where: { id: portal.id }, data: { totalCadastros: { increment: 1 } } })
+
+    // Sincroniza com tabela Contact para aparecer em Contatos e Broadcasts
+    const coord = await prisma.coordenador.findUnique({ where: { id: payload.coordenadorId }, select: { nome: true } })
+    const contactId = await syncContactFromField({
+      candidateId: payload.candidateId,
+      channelType: 'CAMPO',
+      sourceName: coord?.nome ?? 'Coordenador de Campo',
+      nome: data.nome,
+      telefone: data.telefone,
+      email: data.email || null,
+      bairro: data.bairro || null,
+      cidade: data.cidade ?? payload.cidade ?? null,
+    }).catch(() => null)
+
+    if (contactId) {
+      await prisma.cadastroPortal.update({ where: { id: cadastro.id }, data: { contactId } }).catch(() => {})
+    }
 
     // Gera protocolo automaticamente se o coordenador informou assunto ou mensagem
     if (data.assunto || data.mensagem) {
