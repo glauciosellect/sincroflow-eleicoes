@@ -510,7 +510,7 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
-                      {isAlerta && <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" title="Sem atividade há +7 dias" />}
+                      {isAlerta && <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
                     </div>
                   )
                 })}
