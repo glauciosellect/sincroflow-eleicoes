@@ -12,7 +12,9 @@ import {
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar, Legend,
+  PieChart, Pie, Cell, BarChart, Bar,
+  RadialBarChart, RadialBar,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from 'recharts'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -291,80 +293,108 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── KPIs do Período ──────────────────────────────────────── */}
-      <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Período: {periodOptions.find(o => o.days === period)?.label}</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPICard
-            title="Conversas"
-            value={overview?.conversations ?? '—'}
-            icon={MessageSquare}
-            prevValue={prevOverview?.conversations}
-            gradient="linear-gradient(135deg, #1e3a5f, #002776)"
-            loading={loadingOverview}
-          />
-          <KPICard
-            title="Novos Eleitores"
-            value={overview?.newContacts ?? '—'}
-            icon={UserCheck}
-            prevValue={prevOverview?.newContacts}
-            gradient="linear-gradient(135deg, #166534, #009C3B)"
-            href="/contacts"
-            loading={loadingOverview}
-          />
-          <KPICard
-            title="Solicitações"
-            value={overview?.requests ?? '—'}
-            icon={FileWarning}
-            prevValue={prevOverview?.requests}
-            gradient="linear-gradient(135deg, #92400e, #E65100)"
-            loading={loadingOverview}
-          />
-          <KPICard
-            title="Taxa de Resolução"
-            value={overview ? `${overview.resolutionRate}%` : '—'}
-            icon={Activity}
-            gradient="linear-gradient(135deg, #4A148C, #6A1B9A)"
-            loading={loadingOverview}
-          />
-        </div>
-      </div>
+      {/* ── Período: RadialBar (métricas) + Radar (campo) ────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-      {/* ── KPIs de Campo ────────────────────────────────────────── */}
-      {lideresStats && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Campo & Equipe</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KPICard
-              title="Membros de Campo"
-              value={lideresStats.totalLideres ?? 0}
-              icon={Users}
-              gradient="linear-gradient(135deg, #0f4c75, #1b6ca8)"
-              href="/lideres"
-            />
-            <KPICard
-              title="Votos Comprometidos"
-              value={lideresStats.totalVotosComprometidos ?? 0}
-              icon={Target}
-              gradient="linear-gradient(135deg, #155724, #28a745)"
-              href="/lideres"
-            />
-            <KPICard
-              title="Ações esta semana"
-              value={lideresStats.atividadesSemana ?? 0}
-              icon={TrendingUp}
-              gradient="linear-gradient(135deg, #7c3aed, #a855f7)"
-            />
-            <KPICard
-              title="Sem atividade (7d)"
-              value={lideresStats.semAtividadeSemana ?? 0}
-              icon={AlertTriangle}
-              gradient={lideresStats.semAtividadeSemana > 0 ? 'linear-gradient(135deg, #991b1b, #dc2626)' : 'linear-gradient(135deg, #166534, #009C3B)'}
-              href="/lideres"
-            />
-          </div>
-        </div>
-      )}
+        {/* RadialBarChart — métricas do período */}
+        <Card>
+          <CardHeader className="pb-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold">Métricas do Período</CardTitle>
+            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{periodOptions.find(o => o.days === period)?.label}</span>
+          </CardHeader>
+          <CardContent>
+            {loadingOverview ? (
+              <div className="h-48 bg-gray-50 animate-pulse rounded-xl" />
+            ) : (
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width="55%" height={200}>
+                  <RadialBarChart
+                    cx="50%" cy="50%" innerRadius="25%" outerRadius="90%"
+                    data={[
+                      { name: 'Taxa Resolução', value: overview?.resolutionRate ?? 0, fill: '#6A1B9A' },
+                      { name: 'Conversas', value: Math.min(100, Math.round(((overview?.conversations ?? 0) / Math.max(1, (prevOverview?.conversations ?? 1) * 1.2)) * 100)), fill: '#002776' },
+                      { name: 'Eleitores', value: Math.min(100, Math.round(((overview?.newContacts ?? 0) / Math.max(1, (prevOverview?.newContacts ?? 1) * 1.2)) * 100)), fill: '#009C3B' },
+                      { name: 'Solicitações', value: Math.min(100, Math.round(((overview?.requests ?? 0) / Math.max(1, 50)) * 100)), fill: '#E65100' },
+                    ]}
+                    startAngle={90} endAngle={-270}
+                  >
+                    <RadialBar dataKey="value" cornerRadius={6} animationDuration={1000} />
+                    <Tooltip formatter={(v: any, name: any) => [`${v}%`, name]} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-3">
+                  {[
+                    { label: 'Conversas', value: overview?.conversations ?? 0, prev: prevOverview?.conversations, color: '#002776' },
+                    { label: 'Novos Eleitores', value: overview?.newContacts ?? 0, prev: prevOverview?.newContacts, color: '#009C3B' },
+                    { label: 'Solicitações', value: overview?.requests ?? 0, prev: prevOverview?.requests, color: '#E65100' },
+                    { label: 'Resolução', value: `${overview?.resolutionRate ?? 0}%`, color: '#6A1B9A' },
+                  ].map((m, i) => (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs text-gray-500">{m.label}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-bold text-gray-900">{m.value}</span>
+                          {typeof m.prev === 'number' && <Trend value={Number(m.value)} prev={m.prev} />}
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1">
+                        <div className="h-1 rounded-full" style={{ width: `${Math.min(100, (Number(m.value) / Math.max(1, Number(m.value) * 1.3)) * 100)}%`, background: m.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* RadarChart — perfil da equipe de campo */}
+        <Card>
+          <CardHeader className="pb-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold">Radar da Equipe de Campo</CardTitle>
+            <Link href="/lideres" className="text-xs text-[#002776] hover:underline">Ver →</Link>
+          </CardHeader>
+          <CardContent>
+            {lideresStats ? (
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width="60%" height={200}>
+                  <RadarChart data={[
+                    { metric: 'Membros', A: Math.min(100, (lideresStats.totalLideres ?? 0) * 10) },
+                    { metric: 'Votos', A: Math.min(100, (lideresStats.totalVotosComprometidos ?? 0) / 10) },
+                    { metric: 'Ações/sem', A: Math.min(100, (lideresStats.atividadesSemana ?? 0) * 5) },
+                    { metric: 'Ativos', A: lideresStats.totalLideres > 0 ? Math.round(((lideresStats.totalLideres - (lideresStats.semAtividadeSemana ?? 0)) / lideresStats.totalLideres) * 100) : 0 },
+                    { metric: 'Cobertura', A: Math.min(100, (lideresStats.totalLideres ?? 0) * 8) },
+                  ]} cx="50%" cy="50%" outerRadius="70%">
+                    <PolarGrid stroke="#e5e7eb" />
+                    <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: '#6b7280' }} />
+                    <Radar name="Campo" dataKey="A" stroke="#002776" fill="#002776" fillOpacity={0.15} animationDuration={1000} />
+                    <Tooltip formatter={(v: any) => [`${v}`, 'Score']} />
+                  </RadarChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-2.5">
+                  {[
+                    { label: 'Membros ativos', value: lideresStats.totalLideres ?? 0, color: '#002776', icon: '👥' },
+                    { label: 'Votos comprometidos', value: lideresStats.totalVotosComprometidos ?? 0, color: '#009C3B', icon: '🗳️' },
+                    { label: 'Ações esta semana', value: lideresStats.atividadesSemana ?? 0, color: '#7c3aed', icon: '⚡' },
+                    { label: 'Sem atividade (7d)', value: lideresStats.semAtividadeSemana ?? 0, color: lideresStats.semAtividadeSemana > 0 ? '#dc2626' : '#009C3B', icon: lideresStats.semAtividadeSemana > 0 ? '⚠️' : '✅' },
+                  ].map((m, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><span>{m.icon}</span>{m.label}</span>
+                      <span className="text-sm font-bold" style={{ color: m.color }}>{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 text-gray-300">
+                <Users className="w-8 h-8 mb-2" />
+                <span className="text-sm text-center">Cadastre líderes para ver o radar</span>
+                <Link href="/lideres" className="text-xs text-[#002776] mt-2 hover:underline">Ir para líderes →</Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── Gráficos Linha 1: Conversas + Intenção de Voto ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
