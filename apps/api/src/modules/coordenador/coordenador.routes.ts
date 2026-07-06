@@ -122,16 +122,15 @@ export async function coordenadorRoutes(app: FastifyInstance) {
   app.get('/coordenador/dashboard', { onRequest: [requireCoordenador] }, async (req, reply) => {
     const payload = req.user as unknown as CoordenadorPayload
 
-    const [totalCadastros, checkIns] = await Promise.all([
-      prisma.cadastroPortal.count({
-        where: {
-          portal: { candidateId: payload.candidateId },
-          ...(payload.cidade ? { cidade: payload.cidade } : {}),
-          ...(payload.bairros.length > 0 ? { bairro: { in: payload.bairros } } : {}),
-        },
-      }),
-      prisma.checkInLider.count({ where: { coordenadorId: payload.coordenadorId } }),
-    ])
+    const totalCadastros = await prisma.cadastroPortal.count({
+      where: {
+        portal: { candidateId: payload.candidateId },
+        ...(payload.cidade ? { cidade: payload.cidade } : {}),
+        ...(payload.bairros.length > 0 ? { bairro: { in: payload.bairros } } : {}),
+      },
+    })
+    // Check-in = cada eleitor cadastrado pelo coordenador
+    const checkIns = totalCadastros
 
     const coord = await prisma.coordenador.findUnique({
       where: { id: payload.coordenadorId },
