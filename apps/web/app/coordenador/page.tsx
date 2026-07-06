@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
-import { Users, MapPin, Target, TrendingUp, Plus, LogOut, Phone, CheckCircle, Trophy, BarChart2, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
+import { Users, MapPin, Target, TrendingUp, Plus, LogOut, Phone, CheckCircle, Trophy, BarChart2, ThumbsUp, ThumbsDown, Minus, UserCheck, AlertCircle, Clock, Activity } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.syncrofloweleicoes.com.br'
@@ -26,6 +26,28 @@ interface Pesquisas {
   ultimas: { id: string; voterName?: string; intention: string; neighborhood?: string; city?: string; createdAt: string }[]
 }
 
+interface MembroEquipe {
+  id: string
+  nome: string
+  email: string
+  whatsapp?: string
+  role: string
+  regiao?: string
+  pesquisasTotal: number
+  pesquisas7d: number
+  apoiadores: number
+  indecisos: number
+  criticos: number
+  ultimaAtividade?: string
+  diasSemAtividade?: number
+  statusAtividade: 'hoje' | 'ativo' | 'regular' | 'inativo' | 'nunca'
+}
+
+interface Equipe {
+  equipe: MembroEquipe[]
+  total: number
+}
+
 const INTENCAO_CONFIG: Record<string, { label: string; icon: typeof ThumbsUp; color: string; bg: string }> = {
   FAVORAVEL: { label: 'Favorável', icon: ThumbsUp, color: 'text-green-600', bg: 'bg-green-100' },
   DESFAVORAVEL: { label: 'Desfavorável', icon: ThumbsDown, color: 'text-red-500', bg: 'bg-red-100' },
@@ -38,7 +60,8 @@ export default function CoordenadorDashboard() {
   const [data, setData] = useState<DashData | null>(null)
   const [ranking, setRanking] = useState<RankingItem[]>([])
   const [pesquisas, setPesquisas] = useState<Pesquisas | null>(null)
-  const [tab, setTab] = useState<'home' | 'ranking' | 'pesquisas'>('home')
+  const [tab, setTab] = useState<'home' | 'ranking' | 'pesquisas' | 'equipe'>('home')
+  const [equipe, setEquipe] = useState<Equipe | null>(null)
   const [loading, setLoading] = useState(true)
 
   const token = getToken()
@@ -59,6 +82,9 @@ export default function CoordenadorDashboard() {
     }
     if (tab === 'pesquisas' && !pesquisas) {
       axios.get(`${API_URL}/coordenador/pesquisas`, { headers }).then(r => setPesquisas(r.data)).catch(() => {})
+    }
+    if (tab === 'equipe' && !equipe) {
+      axios.get(`${API_URL}/coordenador/minha-equipe`, { headers }).then(r => setEquipe(r.data)).catch(() => {})
     }
   }, [tab])
 
@@ -99,6 +125,7 @@ export default function CoordenadorDashboard() {
       <div className="flex bg-white border-b sticky top-0 z-10">
         {[
           { key: 'home', label: 'Início', icon: Users },
+          { key: 'equipe', label: 'Equipe', icon: UserCheck },
           { key: 'ranking', label: 'Ranking', icon: Trophy },
           { key: 'pesquisas', label: 'Pesquisas', icon: BarChart2 },
         ].map(t => (
@@ -184,6 +211,89 @@ export default function CoordenadorDashboard() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── EQUIPE ── */}
+      {tab === 'equipe' && (
+        <div className="px-4 py-5 space-y-3">
+          {!equipe ? (
+            <div className="text-center py-12 text-gray-400 text-sm">Carregando...</div>
+          ) : equipe.total === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              <UserCheck className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+              <p>Nenhum agente de campo cadastrado ainda.</p>
+              <p className="text-xs mt-1">Os agentes aparecem aqui quando tiverem o papel "Agente de Campo" na equipe.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-gray-400 text-center">{equipe.total} membros · últimos 7 dias</p>
+              {equipe.equipe.map((m) => {
+                const statusCor = m.statusAtividade === 'hoje' ? 'bg-green-500'
+                  : m.statusAtividade === 'ativo' ? 'bg-green-400'
+                  : m.statusAtividade === 'regular' ? 'bg-amber-400'
+                  : m.statusAtividade === 'inativo' ? 'bg-red-400'
+                  : 'bg-gray-300'
+                const statusLabel = m.statusAtividade === 'hoje' ? 'Ativo hoje'
+                  : m.statusAtividade === 'ativo' ? `${m.diasSemAtividade}d atrás`
+                  : m.statusAtividade === 'regular' ? `${m.diasSemAtividade}d atrás`
+                  : m.statusAtividade === 'inativo' ? `${m.diasSemAtividade}d sem ativ.`
+                  : 'Sem atividade'
+
+                return (
+                  <div key={m.id} className="bg-white rounded-2xl shadow-sm border p-4">
+                    {/* Cabeçalho do membro */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-[#002776]/10 flex items-center justify-center shrink-0 font-bold text-[#002776]">
+                        {m.nome.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{m.nome}</p>
+                        <p className="text-xs text-gray-400">{m.role === 'AGENTE_CAMPO' ? 'Agente de Campo' : 'Coordenador'}{m.regiao ? ` · ${m.regiao}` : ''}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className={`w-2 h-2 rounded-full ${statusCor}`} />
+                        <span className="text-xs text-gray-500">{statusLabel}</span>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="bg-gray-50 rounded-xl p-2 text-center">
+                        <p className="text-lg font-bold text-[#002776]">{m.pesquisas7d}</p>
+                        <p className="text-xs text-gray-400">7 dias</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-2 text-center">
+                        <p className="text-lg font-bold text-gray-700">{m.pesquisasTotal}</p>
+                        <p className="text-xs text-gray-400">Total</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-2 text-center">
+                        <p className="text-lg font-bold text-green-600">{m.apoiadores}</p>
+                        <p className="text-xs text-gray-400">Apoia</p>
+                      </div>
+                      <div className="bg-amber-50 rounded-xl p-2 text-center">
+                        <p className="text-lg font-bold text-amber-600">{m.indecisos}</p>
+                        <p className="text-xs text-gray-400">Indec.</p>
+                      </div>
+                    </div>
+
+                    {/* Contato rápido */}
+                    {m.whatsapp && (
+                      <a
+                        href={`https://wa.me/${m.whatsapp.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 flex items-center justify-center gap-2 w-full py-2 rounded-xl border border-green-200 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        Cobrar via WhatsApp
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
 

@@ -353,6 +353,75 @@ export async function coordenadorRoutes(app: FastifyInstance) {
 
     return reply.send({ total, intencoes, ultimas })
   })
+
+  // GET /coordenador/minha-equipe — todos os agentes de campo e líderes da campanha
+  app.get('/coordenador/minha-equipe', { onRequest: [requireCoordenador] }, async (req, reply) => {
+    const payload = req.user as unknown as CoordenadorPayload
+
+    // Busca todos os agentes de campo e coordenadores da equipe
+    const membros = await prisma.teamMember.findMany({
+      where: {
+        candidateId: payload.candidateId,
+        status: 'ACTIVE',
+        role: { in: ['AGENTE_CAMPO', 'COORDENADOR'] },
+      },
+      select: { id: true, name: true, email: true, role: true, whatsapp: true },
+    })
+
+    const desde7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+    const equipe = await Promise.all(membros.map(async (m) => {
+      const [pesquisasTotal, pesquisas7d, ultimaPesquisa, porIntencao] = await Promise.all([
+        prisma.voteSurveyResponse.count({
+          where: { candidateId: payload.candidateId, collectedById: m.id },
+        }),
+        prisma.voteSurveyResponse.count({
+          where: { candidateId: payload.candidateId, collectedById: m.id, createdAt: { gte: desde7dias } },
+        }),
+        prisma.voteSurveyResponse.findFirst({
+          where: { candidateId: payload.candidateId, collectedById: m.id },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true, city: true, neighborhood: true },
+        }),
+        prisma.voteSurveyResponse.groupBy({
+          by: ['intention'],
+          where: { candidateId: payload.candidateId, collectedById: m.id },
+          _count: true,
+        }),
+      ])
+
+      const diasSemAtividade = ultimaPesquisa
+        ? Math.floor((Date.now() - ultimaPesquisa.createdAt.getTime()) / (1000 * 60 * 60 * 24))
+        : null
+
+      const intencaoMap = Object.fromEntries(porIntencao.map(i => [i.intention, i._count]))
+
+      return {
+        id: m.id,
+        nome: m.name,
+        email: m.email,
+        whatsapp: m.whatsapp,
+        role: m.role,
+        regiao: ultimaPesquisa?.neighborhood ?? ultimaPesquisa?.city ?? null,
+        pesquisasTotal,
+        pesquisas7d,
+        apoiadores: intencaoMap['APOIADOR'] ?? 0,
+        indecisos: intencaoMap['INDECISO'] ?? 0,
+        criticos: intencaoMap['CRITICO'] ?? 0,
+        ultimaAtividade: ultimaPesquisa?.createdAt ?? null,
+        diasSemAtividade,
+        statusAtividade: diasSemAtividade === null ? 'nunca'
+          : diasSemAtividade === 0 ? 'hoje'
+          : diasSemAtividade <= 2 ? 'ativo'
+          : diasSemAtividade <= 7 ? 'regular'
+          : 'inativo',
+      }
+    }))
+
+    equipe.sort((a, b) => (b.pesquisas7d - a.pesquisas7d) || (b.pesquisasTotal - a.pesquisasTotal))
+
+    return reply.send({ equipe, total: equipe.length })
+  })
 }
 
 // ─── Rotas do painel do candidato para gestão de coordenadores ───────────────
