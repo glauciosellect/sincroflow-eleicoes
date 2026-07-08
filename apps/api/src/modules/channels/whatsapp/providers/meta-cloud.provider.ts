@@ -1,5 +1,5 @@
 ﻿import axios from 'axios'
-import { logger } from '../../../lib/logger'
+import { logger } from '../../../../lib/logger'
 import type { WhatsAppProvider, WhatsAppMessage } from '../provider.interface'
 import { prisma } from '../../../../lib/prisma'
 

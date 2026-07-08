@@ -101,7 +101,7 @@ async function processBroadcastJob(job: Job<BroadcastJobData>) {
       prisma.broadcastRecipient.create({ data: { broadcastId, contactId } }),
     ])
   } catch (err: any) {
-    logger.error('[BROADCAST] Falha ao enviar para contato', contactId, err?.response?.data || err?.message)
+    logger.error('[BROADCAST] Falha ao enviar para contato', { contactId, error: err?.response?.data || err?.message })
     await prisma.broadcast.update({ where: { id: broadcastId }, data: { failedCount: { increment: 1 } } })
   }
 
