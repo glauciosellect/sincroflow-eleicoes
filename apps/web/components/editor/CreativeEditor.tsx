@@ -279,23 +279,35 @@ export default function CreativeEditor({ name, number, position, party, photo, c
   }, [format, colors, photoB64, nameEdit, numEdit, posEdit, partyEdit, slogan, locEdit, photoY, showNum])
 
   const exportPng = useCallback(async () => {
-    const el = containerRef.current?.querySelector('[data-tpl]') as HTMLElement
-    if (!el) return
     setExporting(true)
     try {
       const h2c = (await import('html2canvas')).default
-      const canvas = await h2c(el, {
-        scale: 2, useCORS: true, allowTaint: true,
-        backgroundColor: null, logging: false,
-        width: FORMATS[format].w, height: FORMATS[format].h,
-      })
-      const dataUrl = canvas.toDataURL('image/png')
-      const filename = `criativo-${format}-${Date.now()}.png`
-      if (onExport) onExport(dataUrl, filename)
-      else { const a = document.createElement('a'); a.href = dataUrl; a.download = filename; a.click() }
+      const fmt = FORMATS[format]
+
+      // Cria container temporário fora da tela, no tamanho REAL (sem escala CSS)
+      // para que html2canvas capture exatamente o que o HTML define — sem distorção
+      // de object-fit/object-position nem clipping pela escala de preview.
+      const offscreen = document.createElement('div')
+      offscreen.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${fmt.w}px;height:${fmt.h}px;overflow:hidden;`
+      offscreen.innerHTML = html
+      document.body.appendChild(offscreen)
+
+      try {
+        const canvas = await h2c(offscreen, {
+          scale: 2, useCORS: true, allowTaint: true,
+          backgroundColor: null, logging: false,
+          width: fmt.w, height: fmt.h,
+        })
+        const dataUrl = canvas.toDataURL('image/png')
+        const filename = `criativo-${format}-${Date.now()}.png`
+        if (onExport) onExport(dataUrl, filename)
+        else { const a = document.createElement('a'); a.href = dataUrl; a.download = filename; a.click() }
+      } finally {
+        document.body.removeChild(offscreen)
+      }
     } catch (e) { console.error(e) }
     finally { setExporting(false) }
-  }, [format, onExport])
+  }, [format, html, onExport])
 
   const fmt = FORMATS[format]
   // preview: cabe na coluna direita, máximo 460px de largura
