@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../../lib/logger'
 import { z } from 'zod'
 import { prisma } from '../../../lib/prisma'
 import { getWorkspaceId } from '../../../lib/workspace'
@@ -88,7 +89,7 @@ export async function emailChannelRoutes(app: FastifyInstance) {
 
       return reply.redirect(`${redirectBase}&email=success`)
     } catch (err) {
-      console.error('[EMAIL] Erro no callback de conexão:', err)
+      logger.error('[EMAIL] Erro no callback de conexão:', err)
       return reply.redirect(`${redirectBase}&email=error`)
     }
   })

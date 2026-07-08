@@ -1,4 +1,5 @@
-import type { Job } from 'bullmq'
+﻿import type { Job } from 'bullmq'
+import { logger } from '../../lib/logger'
 import { prisma } from '../../lib/prisma'
 import { createWorker } from '../../lib/queue'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
@@ -100,7 +101,7 @@ async function processBroadcastJob(job: Job<BroadcastJobData>) {
       prisma.broadcastRecipient.create({ data: { broadcastId, contactId } }),
     ])
   } catch (err: any) {
-    console.error('[BROADCAST] Falha ao enviar para contato', contactId, err?.response?.data || err?.message)
+    logger.error('[BROADCAST] Falha ao enviar para contato', contactId, err?.response?.data || err?.message)
     await prisma.broadcast.update({ where: { id: broadcastId }, data: { failedCount: { increment: 1 } } })
   }
 

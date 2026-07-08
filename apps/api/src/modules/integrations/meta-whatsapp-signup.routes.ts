@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import axios from 'axios'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
@@ -29,7 +30,7 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
   } catch (err: any) {
-    console.error('[META-WA-SIGNUP] Erro ao assinar app no WABA:', err?.response?.data || err?.message)
+    logger.error('[META-WA-SIGNUP] Erro ao assinar app no WABA:', err?.response?.data || err?.message)
   }
 }
 
@@ -72,7 +73,7 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
     try {
       accessToken = await exchangeEmbeddedSignupCode(code)
     } catch (err: any) {
-      console.error('[META-WA-SIGNUP] Erro ao trocar code por token:', err?.response?.data || err?.message)
+      logger.error('[META-WA-SIGNUP] Erro ao trocar code por token:', err?.response?.data || err?.message)
       return reply.status(400).send({ error: 'Não foi possível validar a conexão com a Meta' })
     }
 
@@ -83,7 +84,7 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
       })
       displayPhoneNumber = phoneRes.data?.display_phone_number
     } catch (err: any) {
-      console.error('[META-WA-SIGNUP] Erro ao buscar número:', err?.response?.data || err?.message)
+      logger.error('[META-WA-SIGNUP] Erro ao buscar número:', err?.response?.data || err?.message)
     }
 
     const channelData = {
@@ -100,9 +101,9 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
     const provider = new MetaCloudApiProvider()
     try {
       const status = await provider.getStatus(channel.id)
-      if (status !== 'connected') console.error(`[META-WA-SIGNUP] Canal ${channel.id} criado mas status não é 'connected':`, status)
+      if (status !== 'connected') logger.error(`[META-WA-SIGNUP] Canal ${channel.id} criado mas status não é 'connected':`, status)
     } catch (err: any) {
-      console.error('[META-WA-SIGNUP] Erro ao validar status do canal recém-criado:', err?.message)
+      logger.error('[META-WA-SIGNUP] Erro ao validar status do canal recém-criado:', err?.message)
     }
 
     return reply.status(201).send(channel)

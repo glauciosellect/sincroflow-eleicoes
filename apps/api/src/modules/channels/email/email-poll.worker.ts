@@ -1,4 +1,5 @@
-import { createWorker, emailPollQueue, messageQueue } from '../../../lib/queue'
+﻿import { createWorker, emailPollQueue, messageQueue } from '../../../lib/queue'
+import { logger } from '../../../lib/logger'
 import { prisma } from '../../../lib/prisma'
 import { getValidGmailToken, listNewMessages, getMessage, markAsRead } from '../../../lib/gmail'
 
@@ -34,7 +35,7 @@ export function startEmailPollingWorker() {
   // Agenda o job repetitivo (idempotente — BullMQ não duplica se já existir
   // um repeat job idêntico registrado).
   emailPollQueue.add('poll', {}, { repeat: { every: POLL_INTERVAL_MS }, jobId: 'email-poll-recurring' }).catch((err) => {
-    console.error('[EMAIL-POLL] Erro ao agendar job recorrente:', err?.message)
+    logger.error('[EMAIL-POLL] Erro ao agendar job recorrente:', err?.message)
   })
 
   return createWorker<Record<string, never>>(
@@ -48,7 +49,7 @@ export function startEmailPollingWorker() {
 
         const accessToken = await getValidGmailToken(channel.id)
         if (!accessToken) {
-          console.error(`[EMAIL-POLL] Token inválido para canal ${channel.id} — pulando`)
+          logger.error(`[EMAIL-POLL] Token inválido para canal ${channel.id} — pulando`)
           continue
         }
 

@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 
@@ -150,7 +152,7 @@ export async function createCalendarEvent(
     }
   )
   const data = await res.json() as any
-  if (!data.id) console.error('[Google Calendar] Erro ao criar evento:', JSON.stringify(data))
+  if (!data.id) logger.error('[Google Calendar] Erro ao criar evento:', JSON.stringify(data))
   return data.id ?? null
 }
 

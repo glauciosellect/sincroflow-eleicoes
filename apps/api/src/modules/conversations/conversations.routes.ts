@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
@@ -168,7 +169,7 @@ export async function conversationRoutes(app: FastifyInstance) {
       }
     } catch (err: any) {
       // Log mas não falha — mensagem já está salva no banco
-      console.error('[chat] Erro ao enviar mensagem pelo canal:', err?.message)
+      logger.error('[chat] Erro ao enviar mensagem pelo canal:', err?.message)
     }
 
     return reply.status(201).send(message)

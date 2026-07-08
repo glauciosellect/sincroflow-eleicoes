@@ -1,4 +1,5 @@
-import OpenAI from 'openai'
+﻿import OpenAI from 'openai'
+import { logger } from '../../lib/logger'
 import axios from 'axios'
 import * as fs from 'fs'
 import * as os from 'os'
@@ -69,7 +70,7 @@ export async function generateSpeech(text: string, voice?: string): Promise<Buff
       )
       return Buffer.from(res.data)
     } catch (err: any) {
-      console.error('[TTS] ElevenLabs falhou:', err?.response?.status, err?.response?.data ? Buffer.from(err.response.data).toString() : err?.message)
+      logger.error('[TTS] ElevenLabs falhou:', err?.response?.status, err?.response?.data ? Buffer.from(err.response.data).toString() : err?.message)
       // Fallback para OpenAI se ElevenLabs falhar
     }
   }
@@ -87,7 +88,7 @@ export async function generateSpeech(text: string, voice?: string): Promise<Buff
     const buffer = Buffer.from(await response.arrayBuffer())
     return buffer
   } catch (err: any) {
-    console.error('[TTS] OpenAI TTS falhou:', err?.message, err?.status)
+    logger.error('[TTS] OpenAI TTS falhou:', err?.message, err?.status)
     return null
   }
 }

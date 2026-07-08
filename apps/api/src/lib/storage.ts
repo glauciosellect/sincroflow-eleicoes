@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+﻿import { createClient } from '@supabase/supabase-js'
+import { logger } from './logger'
 import ws from 'ws'
 
 // Usamos só o Storage (upload de criativos), nunca o Realtime — mas o client
@@ -28,7 +29,7 @@ export async function deleteCreativeFile(fileUrl: string): Promise<void> {
     if (!path) return
     await supabase.storage.from(BUCKET_CREATIVES).remove([path])
   } catch (err) {
-    console.error('[STORAGE] Erro ao remover arquivo do bucket (ignorado):', err)
+    logger.error('[STORAGE] Erro ao remover arquivo do bucket (ignorado):', err)
   }
 }
 

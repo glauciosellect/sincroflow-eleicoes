@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import { z } from 'zod'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../../lib/prisma'
@@ -77,8 +78,8 @@ Retorne SOMENTE JSON válido:
 export async function conteudoRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
-  // POST /conteudo/gerar
-  app.post('/conteudo/gerar', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+  // POST /conteudo/gerar — rate limit: 10 req/min por IP (chamada paga à IA)
+  app.post('/conteudo/gerar', { onRequest: [requireModule('platform')], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
@@ -101,8 +102,8 @@ export async function conteudoRoutes(app: FastifyInstance) {
     return reply.status(201).send({ ...record, texto: parsed.texto, hashtags: parsed.hashtags })
   })
 
-  // POST /conteudo/:id/regenerar
-  app.post('/conteudo/:id/regenerar', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+  // POST /conteudo/:id/regenerar — rate limit: 10 req/min por IP
+  app.post('/conteudo/:id/regenerar', { onRequest: [requireModule('platform')], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { id } = req.params as { id: string }
@@ -202,7 +203,7 @@ export async function conteudoRoutes(app: FastifyInstance) {
   })
 
   // POST /conteudo/discurso — gera discurso de palanque com contexto das propostas
-  app.post('/conteudo/discurso', { onRequest: [requireModule('platform')] }, async (req, reply) => {
+  app.post('/conteudo/discurso', { onRequest: [requireModule('platform')], config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     try {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
@@ -291,7 +292,7 @@ FORMATO DE SAÍDA — JSON válido:
 
     const textBlock = message.content.find((b: any) => b.type === 'text') as { type: string; text: string } | undefined
     if (!textBlock?.text) {
-      console.error('[discurso] content vazio ou sem bloco text:', JSON.stringify(message.content))
+      logger.error('[discurso] content vazio ou sem bloco text:', JSON.stringify(message.content))
       throw { statusCode: 500, message: 'IA retornou resposta vazia — tente novamente' }
     }
     const raw = textBlock.text
@@ -336,7 +337,7 @@ FORMATO DE SAÍDA — JSON válido:
 
     return reply.status(201).send({ id: record.id, ...parsed, textoCompleto })
     } catch (err: any) {
-      console.error('[discurso] ERRO CAPTURADO:', err)
+      logger.error('[discurso] ERRO CAPTURADO:', err)
       const statusCode = err?.statusCode ?? 500
       const message = err?.message ?? 'Erro interno ao gerar discurso'
       return reply.status(statusCode).send({ message, error: message })

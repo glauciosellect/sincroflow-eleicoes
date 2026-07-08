@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import Stripe from 'stripe'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
@@ -313,7 +314,7 @@ export async function stripeRoutes(app: FastifyInstance) {
             session.customer as string,
             session.subscription as string,
           )
-          if (!result) console.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
+          if (!result) logger.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
           break
         }
 
@@ -337,7 +338,7 @@ export async function stripeRoutes(app: FastifyInstance) {
             null,
             { method: (meta.paymentMethod || 'card') as any, paidUntil, cargo: meta.cargo },
           )
-          if (!result) console.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
+          if (!result) logger.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
           break
         }
 

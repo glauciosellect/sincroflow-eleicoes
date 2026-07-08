@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import { prisma } from '../../lib/prisma'
 import {
   getOAuthUrl,
@@ -82,7 +83,7 @@ export async function googleRoutes(app: FastifyInstance) {
 
       return reply.redirect(`${redirectBase}?google=success`)
     } catch (err) {
-      console.error('[Google Calendar Callback]', err)
+      logger.error('[Google] Calendar Callback]', err)
       return reply.redirect(`${redirectBase}?google=error`)
     }
   })

@@ -10,13 +10,21 @@ export async function enforceCampaignPaymentExpiry(): Promise<{ suspended: numbe
     select: { id: true },
   })
 
-  for (const candidate of expired) {
-    await prisma.agentConfig.updateMany({
-      where: { candidateId: candidate.id, isActive: true },
-      data: { isActive: false, deactivatedAt: new Date(), deactivationReason: 'CAMPAIGN_PAYMENT_EXPIRED' },
-    })
-    await prisma.candidate.update({ where: { id: candidate.id }, data: { status: 'SUSPENDED' } })
-  }
+  if (expired.length === 0) return { suspended: 0 }
+
+  const expiredIds = expired.map(c => c.id)
+  const now = new Date()
+
+  await prisma.$transaction([
+    prisma.agentConfig.updateMany({
+      where: { candidateId: { in: expiredIds }, isActive: true },
+      data: { isActive: false, deactivatedAt: now, deactivationReason: 'CAMPAIGN_PAYMENT_EXPIRED' },
+    }),
+    prisma.candidate.updateMany({
+      where: { id: { in: expiredIds } },
+      data: { status: 'SUSPENDED' },
+    }),
+  ])
 
   return { suspended: expired.length }
 }

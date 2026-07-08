@@ -1,4 +1,5 @@
-import axios from 'axios'
+﻿import axios from 'axios'
+import { logger } from '../../../lib/logger'
 import type { WhatsAppProvider, WhatsAppMessage } from '../provider.interface'
 import { prisma } from '../../../../lib/prisma'
 
@@ -203,7 +204,7 @@ export class MetaCloudApiProvider implements WhatsAppProvider {
       // A URL de mídia da Meta exige o mesmo Bearer token para download.
       return { fileURL: url, mimetype, authHeader: `Bearer ${accessToken}` }
     } catch (err: any) {
-      console.error('[META-CLOUD] downloadMedia ERRO:', err?.response?.data || err?.message)
+      logger.error('[META-CLOUD] downloadMedia ERRO:', err?.response?.data || err?.message)
       return {}
     }
   }

@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import { Webhook } from 'svix'
 import { z } from 'zod'
 import axios from 'axios'
@@ -62,7 +63,7 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
   } catch (err: any) {
-    console.error('[SALVY] Erro ao assinar app no WABA:', err?.response?.data || err?.message)
+    logger.error('[SALVY] Erro ao assinar app no WABA:', err?.response?.data || err?.message)
   }
 }
 
@@ -150,7 +151,7 @@ export async function salvyRoutes(app: FastifyInstance) {
     try {
       wabaData = await registerNumberOnWaba(phoneNumber, verificationCode)
     } catch (err: any) {
-      console.error('[SALVY] Erro ao registrar número na WABA:', err?.response?.data || err?.message)
+      logger.error('[SALVY] Erro ao registrar número na WABA:', err?.response?.data || err?.message)
       return reply.status(400).send({ error: 'Código de verificação inválido ou expirado. Tente solicitar um novo SMS.' })
     }
 
@@ -216,7 +217,7 @@ export async function salvyRoutes(app: FastifyInstance) {
     try {
       payload = wh.verify((req as any).rawBody, req.headers as Record<string, string>)
     } catch (err) {
-      console.error('[SALVY-WEBHOOK] Falha na verificação de assinatura:', err)
+      logger.error('[SALVY-WEBHOOK] Falha na verificação de assinatura', { error: (err as any)?.message })
       return reply.status(401).send({ error: 'Assinatura inválida' })
     }
 
@@ -224,7 +225,7 @@ export async function salvyRoutes(app: FastifyInstance) {
       const { virtualPhoneAccountId, message, detections } = payload.data
       const verificationCode: string | undefined = detections?.whatsapp?.verificationCode
 
-      console.log(`[SALVY-WEBHOOK] SMS recebido para ${virtualPhoneAccountId}: "${message}"${verificationCode ? ` (código WhatsApp: ${verificationCode})` : ''}`)
+      logger.info(`[SALVY-WEBHOOK] SMS recebido para ${virtualPhoneAccountId}: "${message}"${verificationCode ? ` (código WhatsApp: ${verificationCode})` : ''}`)
 
       if (verificationCode) {
         // Localiza o canal pelo salvyVirtualPhoneAccountId e salva o código para o candidato usar na tela
@@ -248,9 +249,9 @@ export async function salvyRoutes(app: FastifyInstance) {
               },
             },
           })
-          console.log(`[SALVY-WEBHOOK] Código ${verificationCode} salvo no canal ${channel.id}`)
+          logger.info(`[SALVY-WEBHOOK] Código ${verificationCode} salvo no canal ${channel.id}`)
         } else {
-          console.warn(`[SALVY-WEBHOOK] Canal não encontrado para salvyVirtualPhoneAccountId: ${virtualPhoneAccountId}`)
+          logger.warn(`[SALVY-WEBHOOK] Canal não encontrado para salvyVirtualPhoneAccountId: ${virtualPhoneAccountId}`)
         }
       }
     }

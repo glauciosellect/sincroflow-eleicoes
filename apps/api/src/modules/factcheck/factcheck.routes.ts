@@ -33,7 +33,7 @@ export async function factCheckRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
   // Analisa uma dúvida/boato usando IA
-  app.post('/factcheck/analyze', { onRequest: [requireModule('field_agent')] }, async (req, reply) => {
+  app.post('/factcheck/analyze', { onRequest: [requireModule('field_agent')], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 

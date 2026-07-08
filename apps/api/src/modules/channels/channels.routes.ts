@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+﻿import type { FastifyInstance } from 'fastify'
+import { logger } from '../../lib/logger'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
@@ -34,7 +35,7 @@ export async function channelRoutes(app: FastifyInstance) {
       const axios = (await import('axios')).default
       await axios.post(`https://api.telegram.org/bot${botToken}/setWebhook`, { url: webhookUrl })
     } catch (err: any) {
-      console.error('[TELEGRAM] Falha ao registrar webhook:', err?.response?.data || err?.message)
+      logger.error('[TELEGRAM] Falha ao registrar webhook:', err?.response?.data || err?.message)
       return reply.status(201).send({ ...channel, webhookWarning: 'Canal salvo, mas não foi possível confirmar o webhook com o Telegram. Verifique se o token do bot está correto.' })
     }
     return reply.status(201).send(channel)
