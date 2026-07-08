@@ -39,6 +39,7 @@ export async function billingRoutes(app: FastifyInstance) {
     const invoices = await prisma.invoice.findMany({
       where: { candidateId },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     })
     return reply.send(invoices)
   })

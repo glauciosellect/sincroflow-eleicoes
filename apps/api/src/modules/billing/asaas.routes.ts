@@ -110,9 +110,16 @@ export async function asaasRoutes(app: FastifyInstance) {
 }
 
 // Rotas públicas do Asaas (sem auth JWT) — status de pagamento para polling do Pix
+// O paymentId é validado contra o banco para impedir enumeração de pagamentos de outros candidatos
 export async function asaasPublicRoutes(app: FastifyInstance) {
   app.get('/billing/asaas/status-public/:paymentId', async (req, reply) => {
     const { paymentId } = req.params as { paymentId: string }
+    // Verifica se este paymentId pertence a algum registro de pagamento pendente no banco
+    const payment = await prisma.campaignPayment.findFirst({
+      where: { asaasPaymentId: paymentId },
+      select: { id: true },
+    })
+    if (!payment) return reply.status(404).send({ error: 'Pagamento não encontrado' })
     const res = await asaas.get(`/payments/${paymentId}`)
     return reply.send({ status: res.data.status })
   })

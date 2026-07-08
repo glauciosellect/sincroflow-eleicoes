@@ -134,7 +134,7 @@ async function bootstrap() {
 
   app.setErrorHandler((error, req, reply) => {
     logger.error('Request error', { url: req.url, error: error.message, stack: error.stack })
-    console.error('[ERRO DETALHADO]', error)
+    logger.error('[ERRO DETALHADO]', { message: error.message, stack: error.stack })
     if (error.name === 'ZodError') {
       return reply.status(400).send({ error: 'Dados inválidos', details: JSON.parse(error.message) })
     }

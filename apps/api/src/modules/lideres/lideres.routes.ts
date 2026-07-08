@@ -414,35 +414,35 @@ export async function lideresRoutes(app: FastifyInstance) {
       orderBy: { nome: 'asc' },
     })
 
-    // Para cada território, busca o responsável e calcula votos reais
-    const resultado = await Promise.all(
-      territorios.map(async t => {
-        const responsavel = t.responsavelId
-          ? await prisma.colaboradorCampanha.findUnique({
-              where: { id: t.responsavelId },
-              select: { id: true, nome: true, funcao: true, votosComprometidos: true, scoreAtividade: true },
-            })
-          : null
+    // Busca todos os responsáveis e colaboradores ativos em uma única query — evita N+1
+    const responsavelIds = territorios.map(t => t.responsavelId).filter(Boolean) as string[]
+    const [responsaveisMap, colaboradoresAtivos] = await Promise.all([
+      responsavelIds.length > 0
+        ? prisma.colaboradorCampanha.findMany({
+            where: { id: { in: responsavelIds } },
+            select: { id: true, nome: true, funcao: true, votosComprometidos: true, scoreAtividade: true },
+          }).then(list => Object.fromEntries(list.map(r => [r.id, r])))
+        : Promise.resolve({} as Record<string, any>),
+      prisma.colaboradorCampanha.findMany({
+        where: { candidateId, status: 'ativo', bairros: { isEmpty: false } },
+        select: { bairros: true, votosComprometidos: true },
+      }),
+    ])
 
-        const votosNoTerritorio = await prisma.colaboradorCampanha.aggregate({
-          where: {
-            candidateId,
-            status: 'ativo',
-            bairros: { hasSome: t.bairros },
-          },
-          _sum: { votosComprometidos: true },
-        })
-
-        return {
-          ...t,
-          responsavel,
-          votosReais: votosNoTerritorio._sum.votosComprometidos ?? 0,
-          percentualMeta: t.metaVotos > 0
-            ? Math.round(((votosNoTerritorio._sum.votosComprometidos ?? 0) / t.metaVotos) * 100)
-            : 0,
-        }
-      })
-    )
+    const resultado = territorios.map(t => {
+      const responsavel = t.responsavelId ? (responsaveisMap[t.responsavelId] ?? null) : null
+      const votosNoTerritorio = colaboradoresAtivos
+        .filter(c => c.bairros.some((b: string) => t.bairros.includes(b)))
+        .reduce((sum, c) => sum + c.votosComprometidos, 0)
+      return {
+        ...t,
+        responsavel,
+        votosReais: votosNoTerritorio,
+        percentualMeta: t.metaVotos > 0
+          ? Math.round((votosNoTerritorio / t.metaVotos) * 100)
+          : 0,
+      }
+    })
 
     return reply.send(resultado)
   })
@@ -573,6 +573,7 @@ export async function lideresRoutes(app: FastifyInstance) {
         ultimaAtividade: true,
         supervisor: { select: { id: true, nome: true } },
       },
+      take: 100,
     })
 
     const metaEmRisco = await prisma.colaboradorCampanha.findMany({
@@ -588,6 +589,7 @@ export async function lideresRoutes(app: FastifyInstance) {
         metaVotos: true,
         votosComprometidos: true,
       },
+      take: 100,
     })
 
     const lideresMetaEmRisco = metaEmRisco.filter(

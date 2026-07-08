@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { refreshAccessToken } from './google'
+import { logger } from './logger'
 
 const GMAIL_API = 'https://www.googleapis.com/gmail/v1/users/me'
 const GMAIL_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024 // limite da própria Gmail API
@@ -100,7 +101,7 @@ export async function listNewMessages(accessToken: string, query: string): Promi
   })
   const data = await res.json() as any
   if (!res.ok) {
-    console.error('[GMAIL] listNewMessages erro:', JSON.stringify(data))
+    logger.error('[GMAIL] listNewMessages erro:', JSON.stringify(data))
     return []
   }
   return (data.messages || []).map((m: any) => m.id)
@@ -112,7 +113,7 @@ export async function getMessage(accessToken: string, messageId: string): Promis
   })
   const data = await res.json() as any
   if (!res.ok) {
-    console.error('[GMAIL] getMessage erro:', JSON.stringify(data))
+    logger.error('[GMAIL] getMessage erro:', JSON.stringify(data))
     return null
   }
 
@@ -167,7 +168,7 @@ export async function sendReply(accessToken: string, params: {
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    console.error('[GMAIL] sendReply erro:', JSON.stringify(data))
+    logger.error('[GMAIL] sendReply erro:', JSON.stringify(data))
     throw new Error('Falha ao enviar resposta por e-mail')
   }
 }
@@ -208,11 +209,11 @@ async function downloadAttachmentForGmail(attachmentUrl: string): Promise<Buffer
     const res = await axios.get(attachmentUrl, { responseType: 'arraybuffer', timeout: 30000 })
     attachmentBuffer = Buffer.from(res.data)
   } catch (err: any) {
-    console.error('[GMAIL] Falha ao baixar anexo:', err?.message)
+    logger.error('[GMAIL] Falha ao baixar anexo:', err?.message)
     return null
   }
   if (attachmentBuffer.byteLength > GMAIL_MAX_ATTACHMENT_BYTES) {
-    console.error(`[GMAIL] Anexo excede 25MB (${attachmentBuffer.byteLength} bytes)`)
+    logger.warn('[GMAIL] Anexo excede 25MB, ignorado', { bytes: attachmentBuffer.byteLength })
     return null
   }
   return attachmentBuffer
@@ -286,7 +287,7 @@ export async function sendReplyWithAttachment(accessToken: string, params: {
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    console.error('[GMAIL] sendReplyWithAttachment erro:', JSON.stringify(data))
+    logger.error('[GMAIL] sendReplyWithAttachment erro:', JSON.stringify(data))
     throw new Error('Falha ao enviar resposta com anexo por e-mail')
   }
 }
@@ -323,7 +324,7 @@ export async function sendNewEmailWithAttachment(accessToken: string, params: {
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    console.error('[GMAIL] sendNewEmailWithAttachment erro:', JSON.stringify(data))
+    logger.error('[GMAIL] sendNewEmailWithAttachment erro:', JSON.stringify(data))
     throw new Error('Falha ao enviar e-mail com anexo')
   }
 }

@@ -124,6 +124,7 @@ export async function contactRoutes(app: FastifyInstance) {
     const conversations = await prisma.conversation.findMany({
       where: { contactId: id, candidateId },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     })
     return reply.send(conversations)
   })

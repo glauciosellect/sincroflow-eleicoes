@@ -10,6 +10,7 @@ import { getValidGmailToken, sendReply, sendReplyWithAttachment } from '../../li
 import { createRequest, getRequestStatusMessage } from '../requests/requests.service'
 import { buildWelcomeMessage } from '../../lib/tse-disclaimer'
 import axios from 'axios'
+import { logger } from '../../lib/logger'
 
 // Detecta se o remetente é um grupo do WhatsApp (@g.us)
 function isWhatsAppGroup(from: string): boolean {
@@ -101,12 +102,12 @@ export function startMessageWorker() {
 
         const silenceKey = `silence:${channelId}:${from}`
         const isSilenced = await redis.get(silenceKey)
-        if (isSilenced) { console.log(`[WORKER] conversa silenciada (chave ${silenceKey}) — descartada`); return }
+        if (isSilenced) { logger.info('[WORKER] conversa silenciada — descartada', { silenceKey }); return }
 
         const farewell = isFarewellMessage(text)
         if (farewell) {
           await redis.set(silenceKey, '1', 'EX', 2 * 60 * 60)
-          console.log(`[WORKER] Despedida detectada de ${from} — silenciando por 2h após esta resposta`)
+          logger.info('[WORKER] Despedida detectada — silenciando por 2h', { from })
         }
 
       } else if (channelType === 'TELEGRAM') {
@@ -234,7 +235,7 @@ export function startMessageWorker() {
       if (classification.isUrgent) {
         const urgentConv = await prisma.conversation.update({ where: { id: conversation.id }, data: { status: 'URGENT' } })
         try { emitConversationUpdated(candidate.id, urgentConv) } catch {}
-        console.log(`[WORKER] Conversa ${conversation.id} marcada como urgente automaticamente`)
+        logger.info('[WORKER] Conversa marcada como urgente', { conversationId: conversation.id })
       }
 
       // ── Atribuição de eleitor a Agente de Campo (captação em rua) ──────────
@@ -242,7 +243,7 @@ export function startMessageWorker() {
         const matchedAgent = fieldAgents.find(a => a.name === classification.mentionedAgentName)
         if (matchedAgent) {
           await prisma.contact.update({ where: { id: contact.id }, data: { referredByTeamMemberId: matchedAgent.id } })
-          console.log(`[WORKER] Contato ${contact.id} atribuído ao Agente de Campo ${matchedAgent.name}`)
+          logger.info('[WORKER] Contato atribuído ao Agente de Campo', { contactId: contact.id, agent: matchedAgent.name })
         }
       }
 
@@ -250,7 +251,7 @@ export function startMessageWorker() {
       // entre a leitura inicial e este ponto (condição de corrida).
       const freshConversation = await prisma.conversation.findUnique({ where: { id: conversation.id }, select: { status: true, assignedToId: true } })
       if (freshConversation?.assignedToId) {
-        console.log(`[WORKER] Silenciado: conversa ${conversation.id} foi assumida pela equipe`)
+        logger.info('[WORKER] Silenciado: conversa assumida pela equipe', { conversationId: conversation.id })
         return
       }
 
@@ -416,7 +417,7 @@ export function startMessageWorker() {
             messaging_type: 'RESPONSE',
           }, { params: { access_token: pageToken } })
         } catch (sendErr: any) {
-          console.error('[META-SEND] ERRO:', sendErr?.response?.data || sendErr?.message)
+          logger.error('[META-SEND] ERRO ao enviar', { error: sendErr?.response?.data || sendErr?.message })
           throw sendErr
         }
       } else if (channelType === 'EMAIL' && emailMetadata) {
@@ -449,12 +450,12 @@ export function startMessageWorker() {
             })
           }
         } else {
-          console.error('[EMAIL-SEND] Token inválido para canal', channelId)
+          logger.error('[EMAIL-SEND] Token inválido para canal', { channelId })
         }
       }
 
       } catch (err: any) {
-        console.error('[WORKER] ERRO:', err?.message || err, '| status:', err?.status ?? err?.response?.status, '| detalhe:', JSON.stringify(err?.error ?? err?.response?.data ?? {}))
+        logger.error('[WORKER] ERRO no processamento', { message: err?.message, status: err?.status ?? err?.response?.status, detail: err?.error ?? err?.response?.data })
         throw err // re-throw para BullMQ registrar como falha e fazer retry
       }
     },

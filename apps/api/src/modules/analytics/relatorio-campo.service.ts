@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { sendEmail } from '../../lib/mailer'
+import { logger } from '../../lib/logger'
 import { subDays, startOfWeek, endOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -178,49 +179,54 @@ export async function sendWeeklyRelatorioCoord(): Promise<void> {
     select: { id: true, nome: true, email: true, candidateId: true, colaboradorId: true },
   })
 
+  // Busca todos os subordinados de todos os coordenadores de uma vez — evita N+1
+  const colaboradorIds = coordenadores.map(c => c.colaboradorId).filter(Boolean) as string[]
+  const todosSubordinados = colaboradorIds.length > 0
+    ? await prisma.colaboradorCampanha.findMany({
+        where: { supervisorId: { in: colaboradorIds }, status: 'ativo' },
+        select: { id: true, nome: true, scoreAtividade: true, votosComprometidos: true, ultimaAtividade: true, supervisorId: true, teamMemberId: true },
+      })
+    : []
+
+  const subordinadosBySupervisor: Record<string, typeof todosSubordinados> = {}
+  for (const s of todosSubordinados) {
+    if (!s.supervisorId) continue
+    if (!subordinadosBySupervisor[s.supervisorId]) subordinadosBySupervisor[s.supervisorId] = []
+    subordinadosBySupervisor[s.supervisorId].push(s)
+  }
+
+  const todosSubIds = todosSubordinados.map(s => s.id)
+  const todosMemberIds = todosSubordinados.map(s => s.teamMemberId).filter(Boolean) as string[]
+
+  // Busca contagens em batch — uma query por métrica para todos os coordenadores
+  const [pesquisasPorSub, atividadesPorSub] = await Promise.all([
+    todosSubIds.length > 0
+      ? prisma.voteSurveyResponse.groupBy({
+          by: ['collectedById'],
+          where: { collectedById: { in: todosMemberIds }, createdAt: semana },
+          _count: true,
+        }).then(rows => Object.fromEntries(rows.map(r => [r.collectedById, r._count])))
+      : Promise.resolve({} as Record<string, number>),
+    todosSubIds.length > 0
+      ? prisma.atividadeLider.groupBy({
+          by: ['colaboradorId'],
+          where: { colaboradorId: { in: todosSubIds }, dataAtividade: semana },
+          _count: true,
+        }).then(rows => Object.fromEntries(rows.map(r => [r.colaboradorId, r._count])))
+      : Promise.resolve({} as Record<string, number>),
+  ])
+
+  const limiteInativo = subDays(new Date(), 7)
+
   for (const coord of coordenadores) {
     try {
-      // Subordinados diretos
-      const subordinados = coord.colaboradorId
-        ? await prisma.colaboradorCampanha.findMany({
-            where: { candidateId: coord.candidateId, supervisorId: coord.colaboradorId, status: 'ativo' },
-            select: { id: true, nome: true, scoreAtividade: true, votosComprometidos: true, ultimaAtividade: true },
-          })
-        : []
-
+      const subordinados = coord.colaboradorId ? (subordinadosBySupervisor[coord.colaboradorId] ?? []) : []
       if (subordinados.length === 0) continue
 
-      const subordinadoIds = subordinados.map(s => s.id)
-      const limiteInativo = subDays(new Date(), 7)
+      const pesquisasSemana = subordinados.reduce((sum, s) => sum + (pesquisasPorSub[s.teamMemberId ?? ''] ?? 0), 0)
+      const checkInsSemana = subordinados.reduce((sum, s) => sum + (atividadesPorSub[s.id] ?? 0), 0)
 
-      const [cadastrosSemana, pesquisasSemana, checkInsSemana] = await Promise.all([
-        // Pesquisas (VoteSurveyResponse) coletadas pelos subordinados na semana
-        prisma.voteSurveyResponse.count({
-          where: {
-            candidateId: coord.candidateId,
-            collectedById: { in: subordinadoIds },
-            createdAt: semana,
-          },
-        }),
-        prisma.voteSurveyResponse.count({
-          where: {
-            candidateId: coord.candidateId,
-            collectedById: { in: subordinadoIds },
-            createdAt: semana,
-          },
-        }),
-        prisma.atividadeLider.count({
-          where: {
-            candidateId: coord.candidateId,
-            colaboradorId: { in: subordinadoIds },
-            dataAtividade: semana,
-          },
-        }),
-      ])
-
-      const ativos = subordinados.filter(s =>
-        s.ultimaAtividade && s.ultimaAtividade >= limiteInativo
-      ).length
+      const ativos = subordinados.filter(s => s.ultimaAtividade && s.ultimaAtividade >= limiteInativo).length
       const inativos = subordinados.length - ativos
 
       const alertas: string[] = subordinados
@@ -239,7 +245,7 @@ export async function sendWeeklyRelatorioCoord(): Promise<void> {
         totalSubordinados: subordinados.length,
         ativos,
         inativos,
-        cadastrosSemana,
+        cadastrosSemana: pesquisasSemana,
         pesquisasSemana,
         checkInsSemana,
         topEquipe,
@@ -247,8 +253,8 @@ export async function sendWeeklyRelatorioCoord(): Promise<void> {
       })
 
       await sendEmail(coord.email, `Relatório semanal da sua equipe — ${fmt(semana.gte)} a ${fmt(semana.lte)}`, html)
-    } catch {
-      // Segue para o próximo coordenador sem travar
+    } catch (err: any) {
+      logger.error('[RELATORIO-COORD] Falha ao enviar email', { coordId: coord.id, error: err?.message })
     }
   }
 }
@@ -261,11 +267,11 @@ export async function sendWeeklyRelatorioLideres(): Promise<void> {
     select: {
       id: true, nome: true, email: true, candidateId: true,
       scoreAtividade: true, votosComprometidos: true, metaVotos: true,
-      supervisorId: true,
+      teamMemberId: true,
     },
   })
 
-  // Ranking por candidato (para posição relativa)
+  // Ranking por candidato — uma query, sem loop
   const rankingPorCandidato: Record<string, string[]> = {}
   const todosPorCandidato = await prisma.colaboradorCampanha.findMany({
     where: { status: 'ativo' },
@@ -277,17 +283,31 @@ export async function sendWeeklyRelatorioLideres(): Promise<void> {
     rankingPorCandidato[l.candidateId].push(l.id)
   }
 
+  // Contagens em batch — uma query por métrica para todos os líderes
+  const todosIds = lideres.map(l => l.id)
+  const todosMemberIds = lideres.map(l => l.teamMemberId).filter(Boolean) as string[]
+
+  const [atividadesPorLider, pesquisasPorMember] = await Promise.all([
+    prisma.atividadeLider.groupBy({
+      by: ['colaboradorId'],
+      where: { colaboradorId: { in: todosIds }, dataAtividade: semana },
+      _count: true,
+    }).then(rows => Object.fromEntries(rows.map(r => [r.colaboradorId, r._count]))),
+    todosMemberIds.length > 0
+      ? prisma.voteSurveyResponse.groupBy({
+          by: ['collectedById'],
+          where: { collectedById: { in: todosMemberIds }, createdAt: semana },
+          _count: true,
+        }).then(rows => Object.fromEntries(rows.map(r => [r.collectedById, r._count])))
+      : Promise.resolve({} as Record<string, number>),
+  ])
+
   for (const lider of lideres) {
     if (!lider.email) continue
     try {
-      const [atividades, pesquisas] = await Promise.all([
-        prisma.atividadeLider.count({
-          where: { colaboradorId: lider.id, dataAtividade: semana },
-        }),
-        prisma.voteSurveyResponse.count({
-          where: { collectedById: lider.id, createdAt: semana },
-        }),
-      ])
+      const atividades = atividadesPorLider[lider.id] ?? 0
+      // collectedById referencia TeamMember.id, não ColaboradorCampanha.id
+      const pesquisas = lider.teamMemberId ? (pesquisasPorMember[lider.teamMemberId] ?? 0) : 0
 
       const ranking = rankingPorCandidato[lider.candidateId] || []
       const posicao = ranking.indexOf(lider.id) + 1
@@ -305,8 +325,8 @@ export async function sendWeeklyRelatorioLideres(): Promise<void> {
       })
 
       await sendEmail(lider.email, `Seu desempenho semanal — SyncroFlow Eleições`, html)
-    } catch {
-      // Segue para o próximo
+    } catch (err: any) {
+      logger.error('[RELATORIO-LIDER] Falha ao enviar email', { liderId: lider.id, error: err?.message })
     }
   }
 }

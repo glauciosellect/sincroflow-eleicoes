@@ -286,6 +286,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
       where: { topicKey, createdAt: range, conversation: { candidateId } },
       select: { conversation: { select: { id: true, contact: { select: { id: true, name: true, phone: true } } } } },
       distinct: ['conversationId'],
+      take: 200,
     })
 
     return reply.send(
@@ -344,6 +345,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         contact: { select: { id: true, name: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     })
 
     return reply.send(requests)

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import axios from 'axios'
 import { prisma } from '../../lib/prisma'
 import { requireAdmin } from '../../lib/rbac'
+import { logger } from '../../lib/logger'
 
 const META_APP_ID = process.env.META_APP_ID!
 const META_APP_SECRET = process.env.META_APP_SECRET!
@@ -18,7 +19,7 @@ async function exchangeCodeForLongLivedToken(code: string, redirectUri: string):
       code,
     },
   })
-  console.log('[META-OAUTH] short token response:', JSON.stringify(shortRes.data).slice(0, 200))
+  logger.info('[META-OAUTH] short token obtido com sucesso')
   const shortToken: string = shortRes.data.access_token
 
   const longRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
@@ -48,9 +49,9 @@ async function getPagesWithInstagram(userToken: string): Promise<MetaPage[]> {
       params: { access_token: userToken, fields: 'id,name' },
     })
     userName = meRes.data?.name || meRes.data?.id || 'desconhecido'
-    console.log('[META-OAUTH] me:', JSON.stringify(meRes.data))
+    logger.info('[META-OAUTH] usuário autenticado', { user: userName })
   } catch (e: any) {
-    console.log('[META-OAUTH] me error:', e?.response?.data || e?.message)
+    logger.warn('[META-OAUTH] erro ao buscar /me', { error: e?.message })
   }
 
   const pageFields = 'id,name,access_token,instagram_business_account{id,name,username,profile_picture_url}'
@@ -61,10 +62,10 @@ async function getPagesWithInstagram(userToken: string): Promise<MetaPage[]> {
     const res = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
       params: { access_token: userToken, fields: pageFields },
     })
-    console.log('[META-OAUTH] /me/accounts raw:', JSON.stringify(res.data))
+    logger.info('[META-OAUTH] /me/accounts obtido', { count: res.data?.data?.length ?? 0 })
     for (const p of (res.data.data || [])) pagesMap.set(p.id, p)
   } catch (e: any) {
-    console.log('[META-OAUTH] /me/accounts error:', e?.response?.data || e?.message)
+    logger.warn('[META-OAUTH] /me/accounts error', { error: e?.message })
   }
 
   // 2. Páginas via portfólios empresariais (Business Manager)
@@ -72,37 +73,37 @@ async function getPagesWithInstagram(userToken: string): Promise<MetaPage[]> {
     const bizRes = await axios.get('https://graph.facebook.com/v21.0/me/businesses', {
       params: { access_token: userToken, fields: 'id,name' },
     })
-    console.log('[META-OAUTH] /me/businesses raw:', JSON.stringify(bizRes.data).slice(0, 400))
+    logger.info('[META-OAUTH] /me/businesses obtido', { count: bizRes.data?.data?.length ?? 0 })
     for (const biz of (bizRes.data?.data || [])) {
       try {
         const ownedRes = await axios.get(`https://graph.facebook.com/v21.0/${biz.id}/owned_pages`, {
           params: { access_token: userToken, fields: pageFields },
         })
-        console.log(`[META-OAUTH] business ${biz.name} owned_pages:`, JSON.stringify(ownedRes.data).slice(0, 400))
+        logger.info(`[META-OAUTH] business owned_pages`, { biz: biz.name, count: ownedRes.data?.data?.length ?? 0 })
         for (const p of (ownedRes.data?.data || [])) {
           if (!pagesMap.has(p.id)) pagesMap.set(p.id, p)
         }
       } catch (e: any) {
-        console.log(`[META-OAUTH] owned_pages error for ${biz.id}:`, e?.response?.data || e?.message)
+        logger.warn(`[META-OAUTH] owned_pages error`, { bizId: biz.id, error: e?.message })
       }
       try {
         const clientRes = await axios.get(`https://graph.facebook.com/v21.0/${biz.id}/client_pages`, {
           params: { access_token: userToken, fields: pageFields },
         })
-        console.log(`[META-OAUTH] business ${biz.name} client_pages:`, JSON.stringify(clientRes.data).slice(0, 400))
+        logger.info(`[META-OAUTH] business client_pages`, { biz: biz.name, count: clientRes.data?.data?.length ?? 0 })
         for (const p of (clientRes.data?.data || [])) {
           if (!pagesMap.has(p.id)) pagesMap.set(p.id, p)
         }
       } catch (e: any) {
-        console.log(`[META-OAUTH] client_pages error for ${biz.id}:`, e?.response?.data || e?.message)
+        logger.warn(`[META-OAUTH] client_pages error`, { bizId: biz.id, error: e?.message })
       }
     }
   } catch (e: any) {
-    console.log('[META-OAUTH] /me/businesses error:', e?.response?.data || e?.message)
+    logger.warn('[META-OAUTH] /me/businesses error', { error: e?.message })
   }
 
   const pages = Array.from(pagesMap.values())
-  console.log(`[META-OAUTH] total páginas encontradas para "${userName}":`, pages.length)
+  logger.info('[META-OAUTH] total páginas encontradas', { user: userName, count: pages.length })
   return pages
 }
 
@@ -161,7 +162,7 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
           select: { userId: true, expiresAt: true },
         })
         if (!session || session.expiresAt <= new Date()) {
-          console.log('[META-OAUTH] token inválido — nem JWT nem refreshToken válido')
+          logger.warn('[META-OAUTH] token inválido — nem JWT nem refreshToken válido')
           return reply.redirect(`${FRONTEND_URL}/settings?meta_error=invalid_token`)
         }
         userId = session.userId
@@ -179,7 +180,7 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
     try {
       const longToken = await exchangeCodeForLongLivedToken(code, redirectUri)
       const pages = await getPagesWithInstagram(longToken)
-      console.log('[META-OAUTH] páginas encontradas:', JSON.stringify(pages).slice(0, 800))
+      logger.info('[META-OAUTH] páginas para processamento', { count: pages.length })
 
       if (pages.length === 0) {
         // Diagnóstico detalhado
@@ -190,7 +191,7 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
           ])
           const granted = (permRes.data?.data || []).filter((p: any) => p.status === 'granted').map((p: any) => p.permission)
           const meUser = meRes.data?.name || meRes.data?.id || 'desconhecido'
-          console.log('[META-OAUTH] diagnóstico — usuário:', meUser, '| permissões:', granted.join(', '))
+          logger.info('[META-OAUTH] diagnóstico sem páginas', { user: meUser, permissions: granted })
           const hasPages = granted.includes('pages_show_list')
           const errMsg = hasPages
             ? `Nenhuma Página encontrada para o usuário "${meUser}". Você precisa ser ADMINISTRADOR da Página no Facebook. Acesse facebook.com/[sua-pagina] → Configurações → Funções da Página e verifique se sua conta é Admin.`
@@ -254,7 +255,7 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
 
       return reply.redirect(`${FRONTEND_URL}/settings?meta_success=${encodeURIComponent(successMsg)}`)
     } catch (err: any) {
-      console.error('[META-OAUTH] Erro:', err?.response?.data || err?.message)
+      logger.error('[META-OAUTH] Erro no callback', { error: err?.response?.data || err?.message })
       const errMsg = err?.response?.data?.error?.message || 'Erro ao conectar com Meta'
       return reply.redirect(`${FRONTEND_URL}/settings?meta_error=${encodeURIComponent(errMsg)}`)
     }
@@ -310,8 +311,8 @@ async function setupMetaWebhook(pageId: string, pageToken: string, channelId: st
       { subscribed_fields: ['messages', 'messaging_postbacks'] },
       { params: { access_token: pageToken } }
     )
-    console.log(`[META-OAUTH] Webhook configurado para página ${pageId} → ${webhookUrl}`)
+    logger.info(`[META-OAUTH] Webhook configurado`, { pageId, webhookUrl })
   } catch (err: any) {
-    console.error('[META-OAUTH] Erro ao configurar webhook:', err?.response?.data || err?.message)
+    logger.error('[META-OAUTH] Erro ao configurar webhook', { pageId, error: err?.response?.data || err?.message })
   }
 }

@@ -8,6 +8,7 @@ import * as path from 'path'
 import mammoth from 'mammoth'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 import { prisma } from '../../lib/prisma'
+import { logger } from '../../lib/logger'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -140,7 +141,8 @@ Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do p
     })
     const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
     return { isRequest: !!parsed.isRequest, subject: parsed.subject, neighborhood: parsed.neighborhood || undefined }
-  } catch {
+  } catch (err: any) {
+    logger.warn('[AI] classifyRequest falhou', { error: err?.message })
     return { isRequest: false }
   }
 }
@@ -175,7 +177,8 @@ Nenhum texto adicional.`,
     const sentiment = ['POSITIVE', 'NEUTRAL', 'NEGATIVE'].includes(parsed.sentiment) ? parsed.sentiment : 'NEUTRAL'
     const mentionedAgentName = typeof parsed.mentionedAgentName === 'string' && fieldAgentNames.includes(parsed.mentionedAgentName) ? parsed.mentionedAgentName : null
     return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent, sentiment, mentionedAgentName }
-  } catch {
+  } catch (err: any) {
+    logger.warn('[AI] classifyMessageForAlerts falhou', { error: err?.message })
     return { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL', mentionedAgentName: null }
   }
 }
