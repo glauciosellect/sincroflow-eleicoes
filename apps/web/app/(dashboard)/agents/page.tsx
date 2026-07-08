@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, Send, MessageSquareText, Image as ImageIcon, Upload, Trash2, Megaphone, AlertTriangle, Plus, Wand2, X } from 'lucide-react'
+import { Loader2, Send, MessageSquareText, Image as ImageIcon, Upload, Trash2, Megaphone, AlertTriangle, Plus, Wand2, X, Film, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -467,9 +467,15 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                     <CardContent className="p-3">
                       {c.fileType === 'image' ? (
                         <img src={c.fileUrl} alt={c.title} className="w-full h-32 object-cover rounded-lg mb-2" />
+                      ) : c.fileType === 'video' ? (
+                        <div className="w-full h-32 bg-gray-800 rounded-lg mb-2 flex flex-col items-center justify-center gap-1">
+                          <Film className="w-8 h-8 text-white opacity-80" />
+                          <span className="text-xs text-white opacity-60 font-medium uppercase tracking-wide">Vídeo</span>
+                        </div>
                       ) : (
-                        <div className="w-full h-32 bg-gray-100 rounded-lg mb-2 flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8 text-gray-300" />
+                        <div className="w-full h-32 bg-red-50 rounded-lg mb-2 flex flex-col items-center justify-center gap-1">
+                          <FileText className="w-8 h-8 text-red-400" />
+                          <span className="text-xs text-red-400 font-medium uppercase tracking-wide">PDF</span>
                         </div>
                       )}
                       <div className="font-medium text-sm text-gray-900">{c.title}</div>
@@ -524,9 +530,15 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                   <div>
                     {selectedCreative.fileType === 'image' ? (
                       <img src={selectedCreative.fileUrl} alt={selectedCreative.title} className="w-full h-40 object-cover rounded-lg mb-2" />
+                    ) : selectedCreative.fileType === 'video' ? (
+                      <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex flex-col items-center justify-center gap-2">
+                        <Film className="w-10 h-10 text-white opacity-80" />
+                        <span className="text-sm text-white opacity-60 font-medium uppercase tracking-wide">Vídeo</span>
+                      </div>
                     ) : (
-                      <div className="w-full h-40 bg-gray-100 rounded-lg mb-2 flex items-center justify-center">
-                        <ImageIcon className="w-10 h-10 text-gray-300" />
+                      <div className="w-full h-40 bg-red-50 rounded-lg mb-2 flex flex-col items-center justify-center gap-2">
+                        <FileText className="w-10 h-10 text-red-400" />
+                        <span className="text-sm text-red-400 font-medium uppercase tracking-wide">PDF</span>
                       </div>
                     )}
                     <Label className="text-base font-semibold">{selectedCreative.title}</Label>
