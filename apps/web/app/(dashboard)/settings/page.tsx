@@ -954,16 +954,27 @@ function ComplianceTab() {
 }
 
 // ─── ABA: FINANCEIRO (compra de linhas extra de WhatsApp e recarga de mensagens) ──
+const CARGO_TO_PLANO: Record<string, { plano: string; label: string; valor: number }> = {
+  DEP_ESTADUAL: { plano: 'deputado_estadual', label: 'Deputado(a) Estadual', valor: 5990 },
+  DEP_FEDERAL: { plano: 'deputado_federal', label: 'Deputado(a) Federal', valor: 7490 },
+  SENADOR_GOV: { plano: 'senador_governador', label: 'Senador(a) / Governador(a)', valor: 10990 },
+}
+
 function BillingTab() {
   const { toast } = useToast()
   const qc = useQueryClient()
   const [lineQty, setLineQty] = useState(1)
   const [rechargeQty, setRechargeQty] = useState(1)
+  const [selectedCargo, setSelectedCargo] = useState<string>('DEP_ESTADUAL')
 
   const { data: billing, isLoading } = useQuery({
     queryKey: ['billing'],
     queryFn: () => api.get('/billing').then(r => r.data),
   })
+
+  useEffect(() => {
+    if (billing?.position && CARGO_TO_PLANO[billing.position]) setSelectedCargo(billing.position)
+  }, [billing?.position])
 
   const { data: invoices } = useQuery({
     queryKey: ['billing-invoices'],
@@ -988,12 +999,6 @@ function BillingTab() {
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
 
-  const CARGO_TO_PLANO: Record<string, { plano: string; label: string; valor: number }> = {
-    DEP_ESTADUAL: { plano: 'deputado_estadual', label: 'Deputado(a) Estadual', valor: 5990 },
-    DEP_FEDERAL: { plano: 'deputado_federal', label: 'Deputado(a) Federal', valor: 7490 },
-    SENADOR_GOV: { plano: 'senador_governador', label: 'Senador(a) / Governador(a)', valor: 10990 },
-  }
-
   const rechargeMutation = useMutation({
     mutationFn: (quantity: number) => api.post('/billing/checkout-active-msgs', { quantity }).then(r => r.data),
     onSuccess: (data) => { if (data.url) window.location.href = data.url },
@@ -1016,7 +1021,7 @@ function BillingTab() {
   const isCancelled = billing?.status === 'CANCELLED'
   const campaignActivated = !!billing?.campaignActivated
   const daysLeft = billing?.daysUntilActivationDeadline ?? null
-  const cargoInfo = billing?.position ? CARGO_TO_PLANO[billing.position] : undefined
+  const selectedCargoInfo = CARGO_TO_PLANO[selectedCargo]
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -1031,23 +1036,33 @@ function BillingTab() {
               )}
               {daysLeft === 0 && <> O prazo de ativação gratuita terminou — ative agora para recuperar o acesso completo.</>}
             </p>
-            {cargoInfo ? (
-              <div className="flex items-center justify-between gap-3 p-3 bg-white rounded-lg border border-amber-200">
+            <div className="p-3 bg-white rounded-lg border border-amber-200 space-y-3">
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Cargo</Label>
+                <select
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={selectedCargo}
+                  onChange={(e) => setSelectedCargo(e.target.value)}
+                >
+                  {Object.entries(CARGO_TO_PLANO).map(([key, info]) => (
+                    <option key={key} value={key}>{info.label} — R$ {info.valor.toLocaleString('pt-BR')}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-gray-900">{cargoInfo.label}</div>
+                  <div className="text-sm font-semibold text-gray-900">{selectedCargoInfo.label}</div>
                   <div className="text-xs text-gray-500">Pagamento único — todo o período eleitoral</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-gray-900">R$ {cargoInfo.valor.toLocaleString('pt-BR')}</div>
-                  <Button size="sm" className="mt-1" onClick={() => activationCheckoutMutation.mutate(cargoInfo.plano)} disabled={activationCheckoutMutation.isPending}>
+                  <div className="text-lg font-bold text-gray-900">R$ {selectedCargoInfo.valor.toLocaleString('pt-BR')}</div>
+                  <Button size="sm" className="mt-1" onClick={() => activationCheckoutMutation.mutate(selectedCargoInfo.plano)} disabled={activationCheckoutMutation.isPending}>
                     {activationCheckoutMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Ativar agora
                   </Button>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-amber-700">Cargo não identificado — contate o suporte para concluir a ativação.</p>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
