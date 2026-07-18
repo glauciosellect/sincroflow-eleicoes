@@ -102,6 +102,11 @@ model Candidate {
   asaasCustomerId      String?
   asaasPaymentId       String?
   asaasPlano           String?
+  // true quando o pagamento da "Ativação da Campanha" é confirmado (via webhook Asaas).
+  // Separado de `status` porque status=ACTIVE já é setado na criação da conta (para o
+  // atendimento por IA funcionar desde o cadastro) — este campo é o gatilho real de
+  // desbloqueio dos módulos pagos (Módulo 8 da SPEC-Escala-Webhooks).
+  campaignActivated   Boolean          @default(false)
   // Endereço do candidato — obrigatório para prestação de contas TSE (SPCE)
   logradouro           String?
   numero               String?
@@ -297,6 +302,7 @@ model Channel {
   name          String
   isActive      Boolean        @default(true)
   config        Json
+  externalId    String?        // phoneNumberId (WhatsApp) | pageId (Facebook) | igAccountId (Instagram) | botId (Telegram)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
   candidate     Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
@@ -305,6 +311,7 @@ model Channel {
   broadcasts    Broadcast[]
 
   @@index([candidateId, type])
+  @@unique([type, externalId])
 }
 
 // ─── Contatos (eleitores) e memória de conversa ──────────────────────────────

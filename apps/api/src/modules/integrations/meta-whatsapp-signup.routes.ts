@@ -89,6 +89,7 @@ export async function metaWhatsAppSignupRoutes(app: FastifyInstance) {
 
     const channelData = {
       name: displayPhoneNumber || 'WhatsApp (Meta)',
+      externalId: phoneNumberId,
       config: { provider: 'meta-cloud', phoneNumberId, wabaId, accessToken, displayPhoneNumber },
     }
 

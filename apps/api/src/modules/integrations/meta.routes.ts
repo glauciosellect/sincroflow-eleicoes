@@ -223,8 +223,8 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
           }
           const existingIg = await prisma.channel.findFirst({ where: { candidateId, type: 'INSTAGRAM' } })
           const channel = existingIg
-            ? await prisma.channel.update({ where: { id: existingIg.id }, data: igChannelData })
-            : await prisma.channel.create({ data: { candidateId, type: 'INSTAGRAM', ...igChannelData } })
+            ? await prisma.channel.update({ where: { id: existingIg.id }, data: { ...igChannelData, externalId: ig.id } })
+            : await prisma.channel.create({ data: { candidateId, type: 'INSTAGRAM', ...igChannelData, externalId: ig.id } })
           await setupMetaWebhook(page.id, page.access_token, channel.id)
           created.push(ig.username || ig.name)
         }
@@ -242,8 +242,8 @@ export async function metaIntegrationRoutes(app: FastifyInstance) {
           }
           const existingFb = await prisma.channel.findFirst({ where: { candidateId, type: 'FACEBOOK' } })
           const channel = existingFb
-            ? await prisma.channel.update({ where: { id: existingFb.id }, data: fbChannelData })
-            : await prisma.channel.create({ data: { candidateId, type: 'FACEBOOK', ...fbChannelData } })
+            ? await prisma.channel.update({ where: { id: existingFb.id }, data: { ...fbChannelData, externalId: page.id } })
+            : await prisma.channel.create({ data: { candidateId, type: 'FACEBOOK', ...fbChannelData, externalId: page.id } })
           await setupMetaWebhook(page.id, page.access_token, channel.id)
           created.push(page.name)
         }

@@ -47,8 +47,8 @@ export async function channelRoutes(app: FastifyInstance) {
     const { name, pageAccessToken, pageId } = z.object({ name: z.string(), pageAccessToken: z.string(), pageId: z.string() }).parse(req.body)
     const existing = await prisma.channel.findFirst({ where: { candidateId, type: 'INSTAGRAM' } })
     const channel = existing
-      ? await prisma.channel.update({ where: { id: existing.id }, data: { name, config: { pageAccessToken, pageId } } })
-      : await prisma.channel.create({ data: { candidateId, type: 'INSTAGRAM', name, config: { pageAccessToken, pageId } } })
+      ? await prisma.channel.update({ where: { id: existing.id }, data: { name, externalId: pageId, config: { pageAccessToken, pageId } } })
+      : await prisma.channel.create({ data: { candidateId, type: 'INSTAGRAM', name, externalId: pageId, config: { pageAccessToken, pageId } } })
     return reply.status(201).send(channel)
   })
 

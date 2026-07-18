@@ -4,7 +4,7 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
-import { getPendingRegistration, activatePendingRegistration, updatePendingRegistrationPayment } from '../auth/auth.service'
+import { getPendingRegistration, createCandidateAccount, activateCampaignPayment, updatePendingRegistrationPayment } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 import { requireAdmin } from '../../lib/rbac'
 import { PLANOS_CAMPANHA, PlanoCampanhaKey, upsertClienteAsaas, criarCobrancaAsaas, getPixQrCode } from '../../lib/asaas'
@@ -132,7 +132,10 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ url: session.url })
   })
 
-  // Checkout via Asaas — fluxo principal de onboarding (Pix ou cartão parcelado)
+  // Checkout via Asaas — fluxo principal de onboarding (Pix ou cartão parcelado).
+  // Módulo 8: a conta (User + Candidate ACTIVE) é criada AQUI, antes do pagamento —
+  // o candidato já pode logar e usar o sistema; o pagamento só libera os módulos
+  // que dependem de "Ativação da Campanha" (ver lib/rbac.ts + lib/campaign-activation.ts).
   app.post('/auth/register/checkout-asaas', async (req, reply) => {
     const { pendingId, plano, formaPagamento, parcelas = 1 } = req.body as {
       pendingId: string
@@ -147,6 +150,9 @@ export async function stripeRoutes(app: FastifyInstance) {
     const planoDados = PLANOS_CAMPANHA[plano]
     if (!planoDados) return reply.status(400).send({ error: 'Plano inválido.' })
 
+    const account = await createCandidateAccount(pendingId, plano)
+    if (!account) return reply.status(400).send({ error: 'Não foi possível criar a conta. Tente novamente ou contate o suporte.' })
+
     const billingType = formaPagamento === 'pix' ? 'PIX' : 'CREDIT_CARD'
     const parcelasNum = formaPagamento === 'pix' ? 1 : Math.min(3, Math.max(1, parcelas)) as 1 | 2 | 3
 
@@ -157,16 +163,31 @@ export async function stripeRoutes(app: FastifyInstance) {
       email: pending.email,
       whatsapp: pending.whatsapp,
     })
+    await prisma.candidate.update({ where: { id: account.candidateId }, data: { asaasCustomerId } as any })
 
-    // Cria cobrança — externalReference = pendingId para o webhook saber quem ativar
+    // Cria cobrança — externalReference = candidateId (conta já existe; webhook só ativa a campanha)
     const cobranca = await criarCobrancaAsaas({
       customerId: asaasCustomerId,
       valor: planoDados.valor,
       parcelas: parcelasNum,
       billingType,
       descricao: planoDados.nome,
-      externalReference: `pending:${pendingId}`,
+      externalReference: account.candidateId,
     })
+    await prisma.candidate.update({ where: { id: account.candidateId }, data: { asaasPaymentId: cobranca.id, asaasPlano: plano } as any })
+
+    const tokens = {
+      accessToken: app.jwt.sign({ sub: account.userId, wid: account.candidateId, role: 'ADMINISTRADOR' }, { expiresIn: '15m' }),
+      refreshToken: app.jwt.sign({ sub: account.userId, type: 'refresh' }, { expiresIn: '7d' }),
+    }
+    const { saveRefreshToken } = await import('../auth/auth.service')
+    await saveRefreshToken(account.userId, tokens.refreshToken)
+
+    const [user, candidate] = await Promise.all([
+      prisma.user.findUnique({ where: { id: account.userId } }),
+      prisma.candidate.findUnique({ where: { id: account.candidateId } }),
+    ])
+    const { passwordHash, twoFactorSecret, ...safeUser } = user!
 
     if (billingType === 'PIX') {
       const qr = await getPixQrCode(cobranca.id)
@@ -176,13 +197,21 @@ export async function stripeRoutes(app: FastifyInstance) {
         qrCodeImage: qr?.encodedImage ?? null,
         qrCodePayload: qr?.payload ?? null,
         invoiceUrl: cobranca.invoiceUrl ?? null,
+        user: safeUser,
+        candidate,
+        role: 'ADMINISTRADOR',
+        ...tokens,
       })
     }
 
     return reply.send({
       type: 'card',
+      user: safeUser,
+      candidate,
+      role: 'ADMINISTRADOR',
       paymentId: cobranca.id,
       invoiceUrl: cobranca.invoiceUrl,
+      ...tokens,
     })
   })
 
@@ -307,14 +336,18 @@ export async function stripeRoutes(app: FastifyInstance) {
         const session = event.data.object as any
         const meta = session.metadata || {}
 
-        // Pagamento do registro aprovado → cria a conta de fato
+        // Pagamento do registro aprovado → cria a conta de fato (fluxo Stripe legado,
+        // não usado pelo frontend atual — mantido só para não quebrar compilação/histórico)
         if (meta.type === 'registration' && meta.pendingId) {
-          const result = await activatePendingRegistration(
-            meta.pendingId,
-            session.customer as string,
-            session.subscription as string,
-          )
-          if (!result) logger.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
+          const result = await createCandidateAccount(meta.pendingId)
+          if (result) {
+            await prisma.candidate.update({
+              where: { id: result.candidateId },
+              data: { stripeCustomerId: session.customer as string, stripeSubscriptionId: session.subscription as string },
+            })
+          } else {
+            logger.error('[STRIPE] Falha ao criar conta do registro pendente:', meta.pendingId)
+          }
           break
         }
 
@@ -329,16 +362,17 @@ export async function stripeRoutes(app: FastifyInstance) {
           })
         }
 
-        // Pagamento do registro aprovado (Pix ou cartão) → cria a conta
+        // Pagamento do registro aprovado (Pix ou cartão) → cria a conta (fluxo Stripe
+        // legado, não usado pelo frontend atual — mantido só para não quebrar compilação/histórico)
         if (meta.type === 'registration_onetime' && meta.pendingId) {
           const paidUntil = new Date(Date.now() + CAMPAIGN_PAYMENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
-          const result = await activatePendingRegistration(
-            meta.pendingId,
-            session.customer as string,
-            null,
-            { method: (meta.paymentMethod || 'card') as any, paidUntil, cargo: meta.cargo },
-          )
-          if (!result) logger.error('[STRIPE] Falha ao ativar registro pendente:', meta.pendingId)
+          const result = await createCandidateAccount(meta.pendingId, meta.cargo)
+          if (result) {
+            await prisma.candidate.update({ where: { id: result.candidateId }, data: { stripeCustomerId: session.customer as string } })
+            await activateCampaignPayment(result.candidateId, { method: meta.paymentMethod || 'card', paidUntil })
+          } else {
+            logger.error('[STRIPE] Falha ao criar conta do registro pendente:', meta.pendingId)
+          }
           break
         }
 

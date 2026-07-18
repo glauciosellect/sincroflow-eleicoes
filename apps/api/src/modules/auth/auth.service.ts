@@ -54,21 +54,21 @@ export async function getPendingRegistration(pendingId: string) {
   return prisma.pendingRegistration.findUnique({ where: { id: pendingId, status: 'PENDING' } })
 }
 
-// Passo 2: chamado pelo webhook do Stripe (cartão/Pix/boleto via Checkout) quando o
-// pagamento é aprovado, OU manualmente pelo painel /admin (Pix/boleto sem checkout,
-// aprovação humana). Cria a conta de fato — User, Candidate (status ACTIVE),
-// TeamMember (Administrador) e AgentConfig.
-export async function activatePendingRegistration(
+// Cria a conta de fato (User + Candidate status ACTIVE + TeamMember Administrador +
+// AgentConfig) — chamada ao final do Passo 2 do registro (escolha de plano/cargo),
+// ANTES do pagamento (Módulo 8 da SPEC-Escala-Webhooks: acesso parcial imediato).
+// status permanece ACTIVE desde já para o atendimento por IA funcionar no ato do
+// cadastro; campaignActivated (default false) é o que de fato libera os módulos
+// pagos, setado só quando o pagamento da campanha é confirmado (ver activateCampaignPayment).
+export async function createCandidateAccount(
   pendingId: string,
-  stripeCustomerId: string | null,
-  stripeSubscriptionId: string | null,
-  campaignPayment?: { method: string; paidUntil: Date; cargo?: string },
+  cargo?: string,
 ): Promise<{ userId: string; candidateId: string } | null> {
   const pending = await getPendingRegistration(pendingId)
   if (!pending) return null
 
   const existing = await prisma.user.findUnique({ where: { email: pending.email } })
-  if (existing) return null // já ativado (webhook duplicado)
+  if (existing) return null // já criada (chamada duplicada)
 
   const candidate = await prisma.candidate.create({
     data: {
@@ -77,15 +77,9 @@ export async function activatePendingRegistration(
       candidateNumber: pending.candidateNumber,
       email: pending.email,
       whatsapp: pending.whatsapp,
-      stripeCustomerId,
-      stripeSubscriptionId,
       status: 'ACTIVE',
       plan: 'CAMPAIGN',
-      ...(campaignPayment ? {
-        campaignPaymentMethod: campaignPayment.method,
-        campaignPaidUntil: campaignPayment.paidUntil,
-        ...(campaignPayment.cargo ? { position: campaignPayment.cargo } : {}),
-      } : {}),
+      ...(cargo ? { position: cargo } : {}),
       agentConfig: {
         create: {
           disclaimer: DEFAULT_DISCLAIMER(pending.name),
@@ -117,6 +111,23 @@ export async function activatePendingRegistration(
   await prisma.pendingRegistration.update({ where: { id: pendingId }, data: { status: 'APPROVED', resolvedAt: new Date() } })
 
   return { userId: user.id, candidateId: candidate.id }
+}
+
+// Chamado quando o pagamento da "Ativação da Campanha" é confirmado (webhook Asaas ou
+// painel /admin) — a conta já existe (criada por createCandidateAccount no cadastro).
+// Só marca campaignActivated e os dados de pagamento; não cria nada.
+export async function activateCampaignPayment(
+  candidateId: string,
+  campaignPayment: { method: string; paidUntil: Date },
+): Promise<void> {
+  await prisma.candidate.update({
+    where: { id: candidateId },
+    data: {
+      campaignActivated: true,
+      campaignPaymentMethod: campaignPayment.method,
+      campaignPaidUntil: campaignPayment.paidUntil,
+    },
+  })
 }
 
 export async function loginUser(input: LoginInput, signTokens: (userId: string, candidateId?: string, role?: string) => { accessToken: string; refreshToken: string }) {

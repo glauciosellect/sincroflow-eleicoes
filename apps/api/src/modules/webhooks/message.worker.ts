@@ -1,4 +1,4 @@
-import { createWorker } from '../../lib/queue'
+import { createWorker, messageQueue } from '../../lib/queue'
 import { prisma } from '../../lib/prisma'
 import { processAgentResponse, processIncomingMedia, detectRequestIntent, classifyMessageForAlerts } from '../ai/ai.service'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
@@ -44,7 +44,30 @@ function isFarewellMessage(text: string): boolean {
 
 const DISCLAIMER_FALLBACK = 'Olá! Sou o assistente virtual desta campanha. Estou aqui para responder suas dúvidas sobre as propostas, informar sobre eventos e registrar suas sugestões. Como posso ajudar você hoje?'
 
+// Profundidade de fila e tempo médio de espera — publicados periodicamente para
+// acompanhar saturação do worker antes que os candidatos percebam lentidão
+// (Módulo 3 da SPEC-SyncroFlowEleicoes-Escala-Webhooks).
+const QUEUE_DEPTH_ALERT_THRESHOLD = 100
+let queueMonitorInterval: ReturnType<typeof setInterval> | undefined
+
+function startQueueDepthMonitor() {
+  if (queueMonitorInterval) return
+  queueMonitorInterval = setInterval(async () => {
+    try {
+      const counts = await messageQueue.getJobCounts('waiting', 'active', 'delayed', 'failed')
+      if (counts.waiting > QUEUE_DEPTH_ALERT_THRESHOLD) {
+        logger.warn('[MESSAGE-QUEUE] profundidade de fila acima do limiar', counts)
+      } else {
+        logger.info('[MESSAGE-QUEUE] profundidade de fila', counts)
+      }
+    } catch (err: any) {
+      logger.error('[MESSAGE-QUEUE] erro ao consultar profundidade de fila', { error: err?.message })
+    }
+  }, 60_000)
+}
+
 export function startMessageWorker() {
+  startQueueDepthMonitor()
   return createWorker<{ channelId: string; channelType: string; payload: any }>(
     'messages',
     async (job) => {
@@ -459,6 +482,12 @@ export function startMessageWorker() {
         throw err // re-throw para BullMQ registrar como falha e fazer retry
       }
     },
-    5
+    // Concorrência elevada de 5 para 20 (padrão do createWorker) — com 5, o sistema
+    // processa no máximo 5 mensagens simultâneas em TODO o sistema, para todos os
+    // candidatos somados; insuficiente para 1000+ candidatos ativos. 20 é um valor
+    // inicial conservador, não validado por teste de carga real — reavaliar com
+    // dados de produção e, se o gargalo real for rate limit da Meta/IA (não CPU/DB),
+    // considerar múltiplas instâncias do worker em vez de só subir este número.
+    20
   )
 }

@@ -16,10 +16,6 @@ import { useToast } from '@/components/ui/use-toast'
 const ACTIVE_MSG_RECHARGE = { amount: 1000, priceLabel: 'A definir' }
 const WHATSAPP_LINE_PRICE = 497
 const WHATSAPP_LINE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
-// Fallback para Pix manual (linha de WhatsApp) — só usado por quem não tem cartão,
-// confirmação e liberação são feitas manualmente no painel /admin.
-const PIX_KEY = process.env.NEXT_PUBLIC_SUPPORT_PIX_KEY || 'A definir'
-const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || 'A definir'
 
 const PLAN_LABELS: Record<string, string> = { CAMPAIGN: 'Plano Campanha', MANDATE: 'Plano Mandato' }
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Ativa', SUSPENDED: 'Suspensa', CANCELLED: 'Cancelada' }
@@ -62,13 +58,12 @@ export default function BillingPage() {
     onError: (err: any) => toast({ title: 'Erro ao processar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
-  // Recarga de linhas extras de WhatsApp (assinatura recorrente, R$ 497/mês cada)
+  // Créditos de IA com linha virtual para WhatsApp — cobrança avulsa via Asaas (Pix/cartão)
   const whatsappLinesMutation = useMutation({
-    mutationFn: () => api.post('/billing/whatsapp-lines', { quantity: whatsappLinesQty }).then(r => r.data),
+    mutationFn: () => api.post('/billing/asaas/whatsapp-line-checkout', { quantidade: whatsappLinesQty, formaPagamento: 'pix' }).then(r => r.data),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['billing'] })
-      qc.invalidateQueries({ queryKey: ['channels'] })
-      toast({ title: 'Linha(s) de WhatsApp adicionada(s)!', description: data.message })
+      if (data.invoiceUrl) window.location.href = data.invoiceUrl
+      else toast({ title: 'Cobrança gerada!', description: 'Finalize o pagamento para liberar os créditos de linha.' })
     },
     onError: (err: any) => toast({ title: 'Erro ao adicionar linhas', description: err.response?.data?.error, variant: 'destructive' }),
   })
@@ -237,30 +232,30 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Recarga de linhas de WhatsApp */}
+      {/* Créditos de IA com linha Virtual para WhatsApp */}
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Smartphone className="w-5 h-5 text-[#009C3B]" />
-          <h2 className="text-lg font-semibold text-gray-900">Adicionar números de WhatsApp</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Comprar Créditos de IA com linha Virtual para Whatsapp</h2>
         </div>
         <p className="text-sm text-gray-500 mb-4">
-          Seu plano já inclui 1 número de WhatsApp. Para campanhas maiores, adicione linhas extras — cada uma atendida pelo mesmo assistente, com sua própria conexão e histórico de conversas. R$ {WHATSAPP_LINE_PRICE},00/mês por linha, cobrado junto com sua assinatura.
+          Cada pacote de créditos de IA com linha virtual para Whatsapp custa: R$ {WHATSAPP_LINE_PRICE},00 até o dia 30/09/26. Escolha a quantidade de pacote que desejar.
         </p>
         <div className="rounded-xl border-2 border-gray-200 p-4 max-w-xs space-y-3">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Quantidade de linhas a adicionar</label>
+            <label className="text-xs text-gray-500 mb-1 block">Quantidade de pacotes</label>
             <select
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={whatsappLinesQty}
               onChange={(e) => setWhatsappLinesQty(Number(e.target.value))}
             >
               {WHATSAPP_LINE_OPTIONS.map((n) => (
-                <option key={n} value={n}>+{n} WhatsApp</option>
+                <option key={n} value={n}>+{n} pacote{n > 1 ? 's' : ''}</option>
               ))}
             </select>
           </div>
           <div className="text-xl font-bold text-gray-900">
-            R$ {(whatsappLinesQty * WHATSAPP_LINE_PRICE).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+            R$ {(whatsappLinesQty * WHATSAPP_LINE_PRICE).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </div>
           <Button
             size="sm"
@@ -268,16 +263,8 @@ export default function BillingPage() {
             disabled={whatsappLinesMutation.isPending}
             onClick={() => whatsappLinesMutation.mutate()}
           >
-            {whatsappLinesMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assine agora'}
+            {whatsappLinesMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Comprar agora'}
           </Button>
-        </div>
-
-        <p className="text-sm text-gray-500 mt-4 mb-2">
-          Não tem cartão? Pague via Pix direto na nossa chave e mande o comprovante para liberarmos manualmente.
-        </p>
-        <div className="rounded-xl border-2 border-dashed border-gray-200 p-4 max-w-xs text-sm space-y-1">
-          <div><span className="text-gray-500">Chave Pix (CNPJ):</span> <span className="font-medium text-gray-900">{PIX_KEY}</span></div>
-          <div><span className="text-gray-500">Comprovante via WhatsApp:</span> <span className="font-medium text-gray-900">{SUPPORT_WHATSAPP}</span></div>
         </div>
       </div>
 

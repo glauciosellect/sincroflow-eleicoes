@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Check, X, Search, Smartphone, MessageSquare } from 'lucide-react'
+import { Loader2, Check, X, Search, Smartphone, MessageSquare, AlertTriangle, Signal } from 'lucide-react'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -39,6 +39,13 @@ export default function AdminPage() {
     queryKey: ['admin-candidates-search', search],
     queryFn: () => api.get('/system/candidates/search', { params: { q: search } }).then(r => r.data),
     enabled: unlocked && search.trim().length >= 2,
+  })
+
+  const { data: wabaCapacity } = useQuery({
+    queryKey: ['admin-waba-capacity'],
+    queryFn: () => api.get('/system/waba-capacity').then(r => r.data),
+    enabled: unlocked,
+    refetchInterval: 60_000,
   })
 
   const approveMutation = useMutation({
@@ -98,6 +105,42 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto space-y-8">
         <h1 className="text-2xl font-bold text-gray-900">Painel administrativo</h1>
+
+        {/* Capacidade da WABA — Módulo 4 (SPEC-Escala-Webhooks) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Signal className="w-5 h-5 text-gray-400" /> Capacidade da WABA
+          </h2>
+          {!wabaCapacity ? (
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          ) : (
+            <>
+              <div className={`flex items-center justify-between rounded-lg p-3 mb-3 text-sm ${wabaCapacity.nearWabaLimit ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
+                <span className="text-gray-700">
+                  {wabaCapacity.totalActive} de {wabaCapacity.wabaPhoneLimit} números ativos (limite conhecido)
+                </span>
+                {wabaCapacity.nearWabaLimit && (
+                  <span className="flex items-center gap-1 text-amber-700 font-medium text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Perto do limite — considere pedir aumento à Meta
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {wabaCapacity.numbers.map((n: any) => (
+                  <div key={n.channelId} className="flex items-center justify-between text-xs border border-gray-100 rounded-lg px-3 py-2">
+                    <span className="text-gray-700 truncate">{n.name} <span className="text-gray-400">({n.provider})</span></span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`px-1.5 py-0.5 rounded ${n.qualityRating === 'GREEN' ? 'bg-green-100 text-green-700' : n.qualityRating === 'YELLOW' ? 'bg-yellow-100 text-yellow-700' : n.qualityRating === 'RED' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {n.qualityRating}
+                      </span>
+                      <span className="text-gray-500">{n.messagingLimit ? `até ${n.messagingLimit}/24h` : n.messagingLimitTier === 'TIER_UNLIMITED' ? 'ilimitado' : '—'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Cadastros pendentes via Pix/boleto manual */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">

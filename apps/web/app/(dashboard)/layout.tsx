@@ -1,12 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { Sidebar } from '@/components/shared/sidebar'
 import { Topbar } from '@/components/shared/topbar'
 import { MascoteHelper } from '@/components/shared/mascote-helper'
 import { useSocketConnect } from '@/hooks/use-socket'
-import { AlertTriangle } from 'lucide-react'
+import api from '@/lib/api'
+import { AlertTriangle, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -36,12 +38,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [hydrated, role, isAgenteRoute, router])
 
+  const { data: billing } = useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get('/billing').then(r => r.data),
+    enabled: hydrated && !!user,
+    staleTime: 5 * 60 * 1000,
+  })
+
   if (!hydrated || !user) return null
 
   const isSuspended = candidate?.status === 'SUSPENDED'
 
   // Permite acessar apenas /billing quando a conta está suspensa
   const isBillingPage = pathname.startsWith('/billing')
+  const isSettingsPage = pathname.startsWith('/settings')
+
+  // Módulo 8: aviso regressivo até a data-limite de ativação da campanha — some quando
+  // já ativou, quando já passou do prazo (nesse caso o bloqueio de RBAC já cuida), ou
+  // quando o usuário já está em Configurações/Financeiro resolvendo isso.
+  const showActivationBanner = !!billing && !billing.campaignActivated && !billing.isPastActivationDeadline && !isSettingsPage
+  const daysLeft = billing?.daysUntilActivationDeadline ?? null
 
   return (
     <div className="flex h-screen h-dvh bg-[hsl(var(--background))]">
@@ -61,6 +77,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="shrink-0 bg-white text-red-600 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
             >
               Ver pagamento
+            </Link>
+          </div>
+        )}
+
+        {/* Faixa suave de lembrete regressivo — Ativação da Campanha (Módulo 8) */}
+        {!isSuspended && showActivationBanner && (
+          <div className="bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2 flex items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 shrink-0" />
+              <span>
+                Ative o SyncroFlowEleições para não sofrer bloqueio
+                {daysLeft !== null && <>, restam <strong>{daysLeft} dia{daysLeft === 1 ? '' : 's'}</strong></>}.
+              </span>
+            </div>
+            <Link
+              href="/settings?tab=billing"
+              className="shrink-0 bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              Ativar agora
             </Link>
           </div>
         )}

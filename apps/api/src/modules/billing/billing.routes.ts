@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { getWorkspaceId } from '../../lib/workspace'
 import { requireAdmin } from '../../lib/rbac'
+import { CAMPAIGN_ACTIVATION_DEADLINE, daysUntilActivationDeadline, isPastActivationDeadline } from '../../lib/campaign-activation'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-09-30.clover' as any })
 
@@ -30,6 +31,11 @@ export async function billingRoutes(app: FastifyInstance) {
       campaignPaymentMethod: candidate.campaignPaymentMethod,
       campaignPaidUntil: candidate.campaignPaidUntil,
       hasCardSubscription: !!candidate.stripeSubscriptionId,
+      campaignActivated: candidate.campaignActivated,
+      position: candidate.position,
+      activationDeadline: CAMPAIGN_ACTIVATION_DEADLINE.toISOString(),
+      daysUntilActivationDeadline: daysUntilActivationDeadline(),
+      isPastActivationDeadline: isPastActivationDeadline(),
     })
   })
 

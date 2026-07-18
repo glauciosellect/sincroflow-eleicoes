@@ -159,6 +159,7 @@ export async function salvyRoutes(app: FastifyInstance) {
       where: { id: channelId },
       data: {
         isActive: true,
+        externalId: wabaData.phoneNumberId,
         config: {
           ...config,
           provider: 'meta-cloud',

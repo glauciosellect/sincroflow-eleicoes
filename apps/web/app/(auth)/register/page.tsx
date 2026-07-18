@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/auth.store'
 import { Loader2, ArrowRight, Check, CreditCard, QrCode } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -65,6 +66,7 @@ function formatBRL(value: number) {
 
 function RegisterForm() {
   const { toast } = useToast()
+  const setAuth = useAuthStore((s) => s.setAuth)
   const searchParams = useSearchParams()
   const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
@@ -122,6 +124,12 @@ function RegisterForm() {
         formaPagamento: paymentMethod === 'card' ? 'cartao' : 'pix',
         parcelas: 1,
       })
+      // A conta já foi criada nesse momento (Módulo 8) — loga o candidato imediatamente,
+      // mesmo antes do pagamento confirmar, para ele já poder usar o sistema.
+      const { user, candidate, role, accessToken, refreshToken } = res.data
+      if (user && accessToken && refreshToken) {
+        setAuth(user, candidate ?? null, accessToken, refreshToken, role)
+      }
       if (res.data.invoiceUrl) {
         window.location.href = res.data.invoiceUrl
       } else if (res.data.type === 'pix') {
@@ -161,7 +169,7 @@ function RegisterForm() {
         <div>
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Cadastre sua campanha</h1>
-            <p className="text-gray-400 mt-1 text-sm">Sua conta é criada após a confirmação do pagamento.</p>
+            <p className="text-gray-400 mt-1 text-sm">Comece a usar o sistema imediatamente — o pagamento só é necessário para liberar todos os módulos.</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmitStep1)} className="space-y-4" autoComplete="off">
@@ -263,7 +271,7 @@ function RegisterForm() {
         <div>
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Escolha seu cargo</h1>
-            <p className="text-gray-400 mt-1 text-sm">Pagamento único para todo o período eleitoral. Sua conta é criada após a confirmação.</p>
+            <p className="text-gray-400 mt-1 text-sm">Pagamento único para todo o período eleitoral. Você já pode acessar o sistema agora, antes mesmo de pagar.</p>
           </div>
 
           {/* Seleção de cargo */}

@@ -1,11 +1,16 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart, ExternalLink } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart, ExternalLink, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
+
+// Único módulo que continua acessível para quem não ativou a campanha após o
+// prazo (Módulo 8 — SPEC-Escala-Webhooks): Configurações, onde fica a Ativação.
+const MODULES_EXEMPT_FROM_ACTIVATION_DEADLINE = ['settings']
 
 type TeamRole = 'ADMINISTRADOR' | 'ATENDIMENTO' | 'CONTEUDO' | 'RELATORIOS' | 'AGENTE_CAMPO' | 'COORDENADOR'
 
@@ -76,6 +81,13 @@ export function Sidebar() {
   const { candidate, role } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [portalUrl, setPortalUrl] = useState<string | null>(null)
+
+  const { data: billing } = useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get('/billing').then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
+  const campaignBlocked = !!billing && !billing.campaignActivated && billing.isPastActivationDeadline
 
   useEffect(() => {
     if (role === 'AGENTE_CAMPO') {
@@ -190,6 +202,23 @@ export function Sidebar() {
                   const [itemPath, itemQuery] = item.href.split('?')
                   const itemTab = itemQuery ? new URLSearchParams(itemQuery).get('tab') : null
                   const active = pathname === itemPath && (itemTab ? tabParam === itemTab : !tabParam)
+
+                  const isBlocked = campaignBlocked && !!item.module && !MODULES_EXEMPT_FROM_ACTIVATION_DEADLINE.includes(item.module)
+                  if (isBlocked) {
+                    return (
+                      <Link
+                        key={item.href}
+                        href="/settings?tab=billing"
+                        title="Ative a campanha em Configurações → Financeiro para desbloquear"
+                        className="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium text-[hsl(var(--sidebar-fg))] opacity-40 hover:opacity-70 transition-opacity duration-150 cursor-not-allowed"
+                      >
+                        <item.icon className="w-4 h-4 shrink-0" />
+                        {item.label}
+                        <Lock className="ml-auto w-3 h-3 shrink-0" />
+                      </Link>
+                    )
+                  }
+
                   return (
                     <Link
                       key={item.href}

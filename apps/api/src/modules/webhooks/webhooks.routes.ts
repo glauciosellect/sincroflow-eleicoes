@@ -51,12 +51,21 @@ export async function webhookRoutes(app: FastifyInstance) {
   app.post('/webhooks/whatsapp/:channelId', { config: { rawBody: true } }, async (req, reply) => {
     if (!isValidMetaSignature(req)) return reply.status(403).send()
 
-    const { channelId } = req.params as { channelId: string }
+    const { channelId: urlChannelId } = req.params as { channelId: string }
+    const body = req.body as any
 
-    const channel = await prisma.channel.findUnique({ where: { id: channelId } })
+    // Com múltiplos números WhatsApp na mesma WABA (whatsappLineLimit > 1), a Meta
+    // chama sempre a mesma URL de webhook cadastrada — o channelId da URL não indica
+    // de qual número a mensagem veio. O phone_number_id do payload é a fonte confiável.
+    const phoneNumberId: string | undefined = body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id
+
+    const channel = phoneNumberId
+      ? await prisma.channel.findUnique({ where: { type_externalId: { type: 'WHATSAPP', externalId: phoneNumberId } } })
+      : await prisma.channel.findUnique({ where: { id: urlChannelId } })
+
     if (!channel) return reply.status(404).send()
 
-    await messageQueue.add('process', { channelId, channelType: 'WHATSAPP', payload: req.body }, {
+    await messageQueue.add('process', { channelId: channel.id, channelType: 'WHATSAPP', payload: body }, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },
     })
@@ -101,15 +110,11 @@ export async function webhookRoutes(app: FastifyInstance) {
       return reply.send({ ok: true })
     }
 
-    // Busca o canal pelo pageId ou igAccountId (tenta todos os IDs do payload)
-    const channels = await prisma.channel.findMany({
-      where: { type: { in: ['INSTAGRAM', 'FACEBOOK'] } },
-    })
-
+    // Busca o canal pelo pageId ou igAccountId (externalId indexado) — evita varrer
+    // todos os canais INSTAGRAM/FACEBOOK e filtrar em JS a cada mensagem recebida.
     const idsToMatch = [...new Set([recipientId, entryId].filter(Boolean))]
-    const channel = channels.find((c) => {
-      const cfg = c.config as any
-      return idsToMatch.some(id => cfg?.pageId === id || cfg?.igAccountId === id)
+    const channel = await prisma.channel.findFirst({
+      where: { type: { in: ['INSTAGRAM', 'FACEBOOK'] }, externalId: { in: idsToMatch } },
     })
 
     if (!channel) {

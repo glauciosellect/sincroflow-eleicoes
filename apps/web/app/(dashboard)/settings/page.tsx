@@ -971,10 +971,28 @@ function BillingTab() {
   })
 
   const buyLinesMutation = useMutation({
-    mutationFn: (quantity: number) => api.post('/billing/whatsapp-lines', { quantity }),
-    onSuccess: () => toast({ title: 'Linhas adicionadas!', description: 'O número de linhas disponíveis será atualizado após a confirmação do pagamento.' }),
+    mutationFn: (quantity: number) => api.post('/billing/asaas/whatsapp-line-checkout', { quantidade: quantity, formaPagamento: 'pix' }).then(r => r.data),
+    onSuccess: (data) => {
+      if (data.invoiceUrl) window.location.href = data.invoiceUrl
+      else toast({ title: 'Cobrança gerada!', description: 'Finalize o pagamento para liberar os créditos de linha.' })
+    },
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
+
+  const activationCheckoutMutation = useMutation({
+    mutationFn: (plano: string) => api.post('/billing/asaas/checkout', { plano, formaPagamento: 'pix' }).then(r => r.data),
+    onSuccess: (data) => {
+      if (data.invoiceUrl) window.location.href = data.invoiceUrl
+      else toast({ title: 'Cobrança gerada!', description: 'Escaneie o QR Code Pix para concluir.' })
+    },
+    onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
+  })
+
+  const CARGO_TO_PLANO: Record<string, { plano: string; label: string; valor: number }> = {
+    DEP_ESTADUAL: { plano: 'deputado_estadual', label: 'Deputado(a) Estadual', valor: 5990 },
+    DEP_FEDERAL: { plano: 'deputado_federal', label: 'Deputado(a) Federal', valor: 7490 },
+    SENADOR_GOV: { plano: 'senador_governador', label: 'Senador(a) / Governador(a)', valor: 10990 },
+  }
 
   const rechargeMutation = useMutation({
     mutationFn: (quantity: number) => api.post('/billing/checkout-active-msgs', { quantity }).then(r => r.data),
@@ -996,9 +1014,44 @@ function BillingTab() {
   const msgsExtra = billing?.activeMsgsExtra ?? 0
   const msgsPercent = msgsIncluded > 0 ? Math.min(100, Math.round((msgsUsed / msgsIncluded) * 100)) : 0
   const isCancelled = billing?.status === 'CANCELLED'
+  const campaignActivated = !!billing?.campaignActivated
+  const daysLeft = billing?.daysUntilActivationDeadline ?? null
+  const cargoInfo = billing?.position ? CARGO_TO_PLANO[billing.position] : undefined
 
   return (
     <div className="space-y-5 max-w-2xl">
+      {!campaignActivated && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardHeader><CardTitle className="text-base text-amber-900">Ativação da Campanha</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-amber-800">
+              Sua conta está com acesso liberado, mas a campanha ainda não foi ativada.
+              {daysLeft !== null && daysLeft > 0 && (
+                <> Restam <strong>{daysLeft} dia{daysLeft === 1 ? '' : 's'}</strong> para ativar antes do bloqueio dos módulos.</>
+              )}
+              {daysLeft === 0 && <> O prazo de ativação gratuita terminou — ative agora para recuperar o acesso completo.</>}
+            </p>
+            {cargoInfo ? (
+              <div className="flex items-center justify-between gap-3 p-3 bg-white rounded-lg border border-amber-200">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">{cargoInfo.label}</div>
+                  <div className="text-xs text-gray-500">Pagamento único — todo o período eleitoral</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900">R$ {cargoInfo.valor.toLocaleString('pt-BR')}</div>
+                  <Button size="sm" className="mt-1" onClick={() => activationCheckoutMutation.mutate(cargoInfo.plano)} disabled={activationCheckoutMutation.isPending}>
+                    {activationCheckoutMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Ativar agora
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700">Cargo não identificado — contate o suporte para concluir a ativação.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle className="text-base">Resumo do plano</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -1024,9 +1077,9 @@ function BillingTab() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Comprar linhas de WhatsApp</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Comprar Créditos de IA com linha Virtual para Whatsapp</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gray-500">Cada linha extra custa <strong>R$ 497,00/mês</strong> e é cobrada junto da sua assinatura. Escolha quantas linhas quer adicionar.</p>
+          <p className="text-sm text-gray-500">Cada pacote de créditos de IA com linha virtual para Whatsapp custa: <strong>R$ 497,00 até o dia 30/09/26</strong>. Escolha a quantidade de pacote que desejar.</p>
           <div className="flex items-center gap-3">
             <Label className="text-sm text-gray-600 shrink-0">Quantidade</Label>
             <Input type="number" min={1} max={30} value={lineQty}
@@ -1034,7 +1087,7 @@ function BillingTab() {
               className="w-24" />
             <Button onClick={() => buyLinesMutation.mutate(lineQty)} disabled={buyLinesMutation.isPending}>
               {buyLinesMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              Adicionar {lineQty} linha{lineQty > 1 ? 's' : ''} — R$ {(lineQty * 497).toLocaleString('pt-BR')}/mês
+              Adicionar {lineQty} pacote{lineQty > 1 ? 's' : ''} — R$ {(lineQty * 497).toLocaleString('pt-BR')}
             </Button>
           </div>
         </CardContent>

@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { requireSystemAdminKey } from '../../lib/system-admin'
-import { activatePendingRegistration } from '../auth/auth.service'
+import { createCandidateAccount, activateCampaignPayment } from '../auth/auth.service'
+import { getWabaCapacitySnapshot } from '../channels/whatsapp/quality-rating.service'
 
 // Painel /admin (fora do dashboard de candidato) — usado pelo dono do sistema para
 // resolver manualmente pagamentos via Pix direto (sem Stripe Checkout), quando o
@@ -26,10 +27,26 @@ export async function systemAdminRoutes(app: FastifyInstance) {
     const { paymentMethod } = z.object({ paymentMethod: z.enum(['pix', 'boleto']) }).parse(req.body)
 
     const paidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    const result = await activatePendingRegistration(id, null, null, { method: paymentMethod, paidUntil })
-    if (!result) return reply.status(400).send({ error: 'Cadastro não encontrado ou já processado' })
+    // Módulo 8: a conta normalmente já existe (criada no cadastro, passo 2) — este
+    // painel só precisa marcar a campanha como ativada. createCandidateAccount aqui é
+    // só um fallback idempotente para PendingRegistrations antigas nunca finalizadas.
+    const pending = await prisma.pendingRegistration.findUnique({ where: { id } })
+    if (!pending) return reply.status(400).send({ error: 'Cadastro não encontrado' })
 
-    return reply.send({ ok: true, ...result })
+    const existingUser = await prisma.user.findUnique({ where: { email: pending.email } })
+    let candidateId: string
+    if (existingUser) {
+      const member = await prisma.teamMember.findFirst({ where: { userId: existingUser.id, role: 'ADMINISTRADOR' } })
+      if (!member) return reply.status(400).send({ error: 'Conta encontrada, mas sem vínculo de Administrador' })
+      candidateId = member.candidateId
+    } else {
+      const created = await createCandidateAccount(id)
+      if (!created) return reply.status(400).send({ error: 'Cadastro não encontrado ou já processado' })
+      candidateId = created.candidateId
+    }
+
+    await activateCampaignPayment(candidateId, { method: paymentMethod, paidUntil })
+    return reply.send({ ok: true, candidateId })
   })
 
   app.post('/system/pending-registrations/:id/reject', async (req, reply) => {
@@ -60,6 +77,15 @@ export async function systemAdminRoutes(app: FastifyInstance) {
       take: 20,
     })
     return reply.send(candidates)
+  })
+
+  // Módulo 4 (SPEC-Escala-Webhooks): visibilidade de quantos números WhatsApp estão
+  // ativos e qual o tier de mensagens/quality rating de cada um, para agir (pedir
+  // aumento de limite à Meta, redistribuir entre WABAs) antes de travar novos cadastros.
+  app.get('/system/waba-capacity', async (req, reply) => {
+    if (!requireSystemAdminKey(req, reply)) return
+    const snapshot = await getWabaCapacitySnapshot()
+    return reply.send(snapshot)
   })
 
   app.post('/system/candidates/:id/add-whatsapp-line', async (req, reply) => {
