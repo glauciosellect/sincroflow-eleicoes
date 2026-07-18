@@ -161,6 +161,7 @@ export async function webhookRoutes(app: FastifyInstance) {
 
   app.post('/webhooks/telegram/:channelId', async (req, reply) => {
     const { channelId } = req.params as { channelId: string }
+    logger.info('[TELEGRAM-WEBHOOK] recebido', { channelId, preview: JSON.stringify(req.body).slice(0, 400) })
     await messageQueue.add('process', { channelId, channelType: 'TELEGRAM', payload: req.body }, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },
