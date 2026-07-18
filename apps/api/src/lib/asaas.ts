@@ -1,16 +1,38 @@
 import axios from 'axios'
+import { logger } from './logger'
 
 const ASAAS_API_URL = process.env.ASAAS_ENV === 'sandbox'
   ? 'https://sandbox.asaas.com/api/v3'
   : 'https://api.asaas.com/api/v3'
 
+if (!process.env.ASAAS_API_KEY) {
+  logger.error('[ASAAS] ASAAS_API_KEY não está definida no ambiente — todas as chamadas à Asaas vão falhar')
+}
+
 export const asaas = axios.create({
   baseURL: ASAAS_API_URL,
   headers: {
-    'access_token': process.env.ASAAS_API_KEY!,
+    'access_token': process.env.ASAAS_API_KEY || '',
     'Content-Type': 'application/json',
   },
 })
+
+// Loga o corpo completo de erro da Asaas — sem isso, só se vê "Request failed with
+// status code 404/401" no log, sem a mensagem de erro real que a Asaas retorna.
+asaas.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    logger.error('[ASAAS] Erro na chamada à API', {
+      url: err?.config?.url,
+      method: err?.config?.method,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      baseURL: ASAAS_API_URL,
+      hasApiKey: !!process.env.ASAAS_API_KEY,
+    })
+    return Promise.reject(err)
+  }
+)
 
 export const PLANOS_CAMPANHA = {
   deputado_estadual: {
