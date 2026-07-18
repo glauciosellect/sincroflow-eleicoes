@@ -1021,8 +1021,19 @@ function BillingTab() {
   const daysLeft = billing?.daysUntilActivationDeadline ?? null
   const selectedCargoInfo = CARGO_TO_PLANO[selectedCargo]
 
+  const activatedCargoInfo = billing?.position ? CARGO_TO_PLANO[billing.position] : undefined
+
   return (
     <div className="space-y-5 max-w-2xl">
+      {campaignActivated && (
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800">
+          <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+          <span>
+            Plano ativado{activatedCargoInfo ? <> para <strong>{activatedCargoInfo.label}</strong></> : null}.
+          </span>
+        </div>
+      )}
+
       {!campaignActivated && (
         <Card className="border-amber-300 bg-amber-50">
           <CardHeader><CardTitle className="text-base text-amber-900">Ativação da Campanha</CardTitle></CardHeader>
