@@ -674,8 +674,10 @@ model PortalEleitor {
   descricao      String?  @db.Text
   fotoUrl        String?
   fotoSobre      String?
+  fotoFundo      String?  // imagem de fundo do hero — substitui o gradiente de corPrimaria quando preenchida
   corPrimaria    String   @default("#002776")
   corDestaque    String   @default("#C9A227")
+  corTexto       String   @default("#FFFFFF") // cor do texto/títulos do hero — separada de corPrimaria (fundo)
   numero         String?
   instagram      String?
   facebook       String?

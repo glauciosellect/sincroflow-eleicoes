@@ -31,7 +31,8 @@ interface DepoimentoItem { texto: string; autor: string }
 
 interface Portal {
   slug: string; titulo: string; subtitulo?: string; descricao?: string
-  fotoUrl?: string; fotoSobre?: string; corPrimaria: string; corDestaque: string; totalCadastros: number
+  fotoUrl?: string; fotoSobre?: string; fotoFundo?: string
+  corPrimaria: string; corDestaque: string; corTexto?: string; totalCadastros: number
   numero?: string; instagram?: string; facebook?: string; tiktok?: string; whatsapp?: string
   trajetoria: TrajetoriaItem[]; depoimentos: DepoimentoItem[]
   candidate: {
@@ -56,6 +57,14 @@ function darken(hex: string, amount = 30): string {
   const g = Math.max(0, ((num >> 8) & 0xff) - amount)
   const b = Math.max(0, (num & 0xff) - amount)
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = (num >> 16) & 0xff
+  const g = (num >> 8) & 0xff
+  const b = num & 0xff
+  return `rgba(${r},${g},${b},${alpha})`
 }
 
 export default function PortalPublicoPage() {
@@ -116,6 +125,12 @@ export default function PortalPublicoPage() {
   const corEscura = darken(cor, 40)
   const dest = portal.corDestaque
   const destEscuro = darken(dest, 30)
+  const corTexto = portal.corTexto || '#FFFFFF'
+  // Overlay escurecido sobre a foto de fundo (quando houver) para manter o texto legível
+  // independente da cor de texto escolhida — sem isso, fotos claras deixariam o texto ilegível.
+  const heroBackground = portal.fotoFundo
+    ? `linear-gradient(135deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.35) 100%), url(${portal.fotoFundo})`
+    : `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`
   const primeiroNome = portal.candidate.name.split(' ')[0]
   const temHistoria = !!portal.candidate.story?.trim()
   const temPropostas = portal.candidate.propostas.length > 0
@@ -202,34 +217,34 @@ export default function PortalPublicoPage() {
       </header>
 
       {/* ─── HERO ─── */}
-      <section style={{ background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`, color: '#fff', padding: '90px 24px', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ background: heroBackground, backgroundSize: 'cover', backgroundPosition: 'center', color: corTexto, padding: '90px 24px', position: 'relative', overflow: 'hidden' }}>
         {/* Círculos decorativos */}
         <div style={{ position: 'absolute', top: -80, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'rgba(255,255,255,.06)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -60, left: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,.04)', pointerEvents: 'none' }} />
 
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 48, alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.25)', borderRadius: 50, padding: '6px 16px', fontSize: 12, fontWeight: 700, marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: withAlpha(corTexto, .15), border: `1px solid ${withAlpha(corTexto, .25)}`, borderRadius: 50, padding: '6px 16px', fontSize: 12, fontWeight: 700, marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {portal.candidate.position && <span>{portal.candidate.position}</span>}
               {portal.candidate.party && <><span style={{ opacity: .5 }}>·</span><span>{portal.candidate.party}</span></>}
               {portal.candidate.city && <><span style={{ opacity: .5 }}>·</span><span>{portal.candidate.city}{portal.candidate.state ? `/${portal.candidate.state}` : ''}</span></>}
             </div>
             <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 18 }}>{portal.titulo}</h1>
             {portal.subtitulo && (
-              <p style={{ fontSize: 18, color: 'rgba(255,255,255,.85)', lineHeight: 1.65, marginBottom: 28, maxWidth: 500 }}>{portal.subtitulo}</p>
+              <p style={{ fontSize: 18, color: withAlpha(corTexto, .85), lineHeight: 1.65, marginBottom: 28, maxWidth: 500 }}>{portal.subtitulo}</p>
             )}
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 40 }}>
               <a href="#apoiar" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: dest, color: '#fff', fontWeight: 700, fontSize: 16, padding: '14px 32px', borderRadius: 50, textDecoration: 'none', boxShadow: `0 6px 20px ${dest}66` }}>
                 Quero ser voluntário
               </a>
               {temPropostas && (
-                <a href="#propostas" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.12)', color: '#fff', fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 50, border: '1.5px solid rgba(255,255,255,.3)', textDecoration: 'none' }}>
+                <a href="#propostas" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: withAlpha(corTexto, .12), color: corTexto, fontWeight: 600, fontSize: 16, padding: '14px 28px', borderRadius: 50, border: `1.5px solid ${withAlpha(corTexto, .3)}`, textDecoration: 'none' }}>
                   Ver propostas
                 </a>
               )}
             </div>
             {portal.totalCadastros > 0 && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,.1)', borderRadius: 50, padding: '8px 18px', fontSize: 13, fontWeight: 500 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: withAlpha(corTexto, .1), borderRadius: 50, padding: '8px 18px', fontSize: 13, fontWeight: 500 }}>
                 <Users size={14} />
                 {portal.totalCadastros.toLocaleString('pt-BR')} apoiadores cadastrados
               </div>
@@ -238,11 +253,11 @@ export default function PortalPublicoPage() {
 
           {/* Foto */}
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 380, aspectRatio: '4/5', borderRadius: 16, overflow: 'hidden', border: '6px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.1)' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 380, aspectRatio: '4/5', borderRadius: 16, overflow: 'hidden', border: `6px solid ${withAlpha(corTexto, .15)}`, background: withAlpha(corTexto, .1) }}>
               {portal.fotoUrl ? (
                 <img src={portal.fotoUrl} alt={portal.candidate.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80, fontWeight: 900, color: 'rgba(255,255,255,.6)' }}>
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80, fontWeight: 900, color: withAlpha(corTexto, .6) }}>
                   {portal.candidate.name[0]}
                 </div>
               )}

@@ -43,8 +43,8 @@ export async function uploadCandidatePhoto(candidateId: string, fileBuffer: Buff
   return `${data.publicUrl}?t=${Date.now()}`
 }
 
-/** Sobe foto do portal (hero ou sobre) e retorna a URL pública permanente. */
-export async function uploadPortalPhoto(candidateId: string, tipo: 'hero' | 'sobre', fileBuffer: Buffer, mimeType: string): Promise<string> {
+/** Sobe foto do portal (hero, sobre ou fundo) e retorna a URL pública permanente. */
+export async function uploadPortalPhoto(candidateId: string, tipo: 'hero' | 'sobre' | 'fundo', fileBuffer: Buffer, mimeType: string): Promise<string> {
   const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
   const filePath = `${candidateId}/portal-${tipo}.${ext}`
   const { error } = await supabase.storage.from(BUCKET_CANDIDATES).upload(filePath, fileBuffer, { contentType: mimeType, upsert: true })

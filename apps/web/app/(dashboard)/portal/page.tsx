@@ -26,8 +26,10 @@ const configSchema = z.object({
   subtitulo: z.string().max(200).optional(),
   descricao: z.string().max(2000).optional(),
   fotoUrl: z.string().url('URL inválida').optional().or(z.literal('')),
+  fotoFundo: z.string().url('URL inválida').optional().or(z.literal('')),
   corPrimaria: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#002776'),
   corDestaque: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#C9A227'),
+  corTexto: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#FFFFFF'),
   numero: z.string().max(20).optional(),
   instagram: z.string().max(100).optional(),
   facebook: z.string().max(100).optional(),
@@ -41,7 +43,7 @@ type ConfigForm = z.infer<typeof configSchema>
 
 interface Portal {
   id: string; slug: string; titulo: string; subtitulo?: string; descricao?: string
-  fotoUrl?: string; corPrimaria: string; corDestaque: string; numero?: string
+  fotoUrl?: string; fotoFundo?: string; corPrimaria: string; corDestaque: string; corTexto?: string; numero?: string
   instagram?: string; facebook?: string; tiktok?: string; whatsapp?: string
   trajetoria?: { ano: string; descricao: string }[]
   depoimentos?: { texto: string; autor: string }[]
@@ -69,11 +71,14 @@ export default function PortalPage() {
   const [page, setPage] = useState(1)
   const [uploadingHero, setUploadingHero] = useState(false)
   const [uploadingSobre, setUploadingSobre] = useState(false)
+  const [uploadingFundo, setUploadingFundo] = useState(false)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
   const [sobrePreview, setSobrePreview] = useState<string | null>(null)
+  const [fundoPreview, setFundoPreview] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const heroInputRef = useRef<HTMLInputElement>(null)
   const sobreInputRef = useRef<HTMLInputElement>(null)
+  const fundoInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const qc = useQueryClient()
 
@@ -88,11 +93,11 @@ export default function PortalPage() {
     enabled: tab === 'cadastros',
   })
 
-  const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<ConfigForm>({
+  const { register, handleSubmit, control, reset, setValue, formState: { errors, isSubmitting } } = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
     defaultValues: {
-      slug: '', titulo: '', subtitulo: '', descricao: '', fotoUrl: '',
-      corPrimaria: '#002776', corDestaque: '#C9A227', numero: '', instagram: '',
+      slug: '', titulo: '', subtitulo: '', descricao: '', fotoUrl: '', fotoFundo: '',
+      corPrimaria: '#002776', corDestaque: '#C9A227', corTexto: '#FFFFFF', numero: '', instagram: '',
       facebook: '', tiktok: '', whatsapp: '',
       trajetoria: [{ ano: '', descricao: '' }],
       depoimentos: [{ texto: '', autor: '' }],
@@ -118,11 +123,12 @@ export default function PortalPage() {
       })
       if (portal.fotoUrl) setHeroPreview(portal.fotoUrl)
       if ((portal as any).fotoSobre) setSobrePreview((portal as any).fotoSobre)
+      if (portal.fotoFundo) setFundoPreview(portal.fotoFundo)
     }
   }, [portal, reset])
 
-  const uploadPhoto = async (tipo: 'hero' | 'sobre', file: File) => {
-    const setLoading = tipo === 'hero' ? setUploadingHero : setUploadingSobre
+  const uploadPhoto = async (tipo: 'hero' | 'sobre' | 'fundo', file: File) => {
+    const setLoading = tipo === 'hero' ? setUploadingHero : tipo === 'sobre' ? setUploadingSobre : setUploadingFundo
     setLoading(true)
     try {
       const formData = new FormData()
@@ -131,9 +137,10 @@ export default function PortalPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       if (tipo === 'hero') setHeroPreview(data.url)
-      else setSobrePreview(data.url)
+      else if (tipo === 'sobre') setSobrePreview(data.url)
+      else setFundoPreview(data.url)
       qc.invalidateQueries({ queryKey: ['portal'] })
-      toast({ title: tipo === 'hero' ? 'Foto de capa enviada!' : 'Foto da história enviada!' })
+      toast({ title: tipo === 'hero' ? 'Foto de capa enviada!' : tipo === 'sobre' ? 'Foto da história enviada!' : 'Foto de fundo enviada!' })
     } catch (e: any) {
       toast({ title: 'Erro ao enviar foto', description: e.response?.data?.error, variant: 'destructive' })
     } finally {
@@ -148,6 +155,7 @@ export default function PortalPage() {
       setConfirmDelete(false)
       setHeroPreview(null)
       setSobrePreview(null)
+      setFundoPreview(null)
       toast({ title: 'Portal excluído com sucesso.' })
     } catch (e: any) {
       toast({ title: 'Erro ao excluir portal', description: e.response?.data?.error, variant: 'destructive' })
@@ -158,6 +166,7 @@ export default function PortalPage() {
     mutationFn: (data: ConfigForm) => api.post('/portal', {
       ...data,
       fotoUrl: data.fotoUrl || null,
+      fotoFundo: data.fotoFundo || null,
       numero: data.numero || null,
       instagram: data.instagram || null,
       facebook: data.facebook || null,
@@ -419,10 +428,58 @@ export default function PortalPage() {
                     {sobrePreview ? 'Trocar foto da história' : 'Enviar foto da história'}
                   </Button>
                 </div>
+
+                {/* Foto de fundo (substitui a cor sólida do hero) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Foto de Fundo</label>
+                  <p className="text-xs text-gray-400 -mt-1">Substitui a cor de fundo do cabeçalho por esta imagem. Deixe em branco para usar a Cor principal.</p>
+                  <div
+                    className="relative border-2 border-dashed border-gray-200 rounded-xl overflow-hidden cursor-pointer hover:border-[#002776] transition-colors"
+                    style={{ aspectRatio: '4/3' }}
+                    onClick={() => fundoInputRef.current?.click()}
+                  >
+                    {fundoPreview ? (
+                      <img src={fundoPreview} alt="Fundo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-400">
+                        <ImageIcon className="w-8 h-8" />
+                        <span className="text-xs">Clique para enviar foto</span>
+                      </div>
+                    )}
+                    {uploadingFundo && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fundoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto('fundo', f) }}
+                  />
+                  <Button
+                    type="button" variant="outline" size="sm" className="w-full gap-2"
+                    onClick={() => fundoInputRef.current?.click()}
+                    disabled={uploadingFundo}
+                  >
+                    {uploadingFundo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {fundoPreview ? 'Trocar foto de fundo' : 'Enviar foto de fundo'}
+                  </Button>
+                  {fundoPreview && (
+                    <Button
+                      type="button" variant="ghost" size="sm" className="w-full gap-2 text-red-600 hover:text-red-700"
+                      onClick={() => { setFundoPreview(null); setValue('fotoFundo', '') }}
+                    >
+                      Remover foto de fundo
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Paleta de cores */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Cor principal</label>
                   <p className="text-xs text-gray-400 -mt-0.5">Fundo do cabeçalho (hero)</p>
@@ -468,6 +525,31 @@ export default function PortalPage() {
                           onBlur={field.onBlur}
                           className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]"
                           placeholder="#C9A227"
+                        />
+                      </div>
+                    )}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Cor da Letra Principal</label>
+                  <p className="text-xs text-gray-400 -mt-0.5">Títulos e textos do cabeçalho (hero)</p>
+                  <Controller
+                    name="corTexto"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={field.value || '#FFFFFF'}
+                          onChange={e => field.onChange(e.target.value)}
+                          className="h-10 w-14 rounded-md border cursor-pointer"
+                        />
+                        <input
+                          value={field.value || '#FFFFFF'}
+                          onChange={e => field.onChange(e.target.value)}
+                          onBlur={field.onBlur}
+                          className="flex-1 border rounded-md px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-[#002776]"
+                          placeholder="#FFFFFF"
                         />
                       </div>
                     )}

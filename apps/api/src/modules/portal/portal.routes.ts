@@ -57,8 +57,10 @@ const portalConfigSchema = z.object({
   subtitulo: z.string().max(200).optional(),
   descricao: z.string().max(2000).optional(),
   fotoUrl: z.string().url().optional().nullable(),
+  fotoFundo: z.string().url().optional().nullable(),
   corPrimaria: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#002776'),
   corDestaque: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#C9A227'),
+  corTexto: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#FFFFFF'),
   numero: z.string().max(20).optional().nullable(),
   instagram: z.string().max(100).optional().nullable(),
   facebook: z.string().max(100).optional().nullable(),
@@ -96,8 +98,10 @@ export async function portalPublicRoutes(app: FastifyInstance) {
         descricao: true,
         fotoUrl: true,
         fotoSobre: true,
+        fotoFundo: true,
         corPrimaria: true,
         corDestaque: true,
+        corTexto: true,
         numero: true,
         instagram: true,
         facebook: true,
@@ -439,14 +443,14 @@ export async function portalRoutes(app: FastifyInstance) {
     return reply.send({ synced, total: pendentes.length })
   })
 
-  // POST /portal/upload/:tipo — upload de foto para Supabase Storage (hero | sobre)
+  // POST /portal/upload/:tipo — upload de foto para Supabase Storage (hero | sobre | fundo)
   app.post('/portal/upload/:tipo', { onRequest: [requireModule('portal')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const { tipo } = req.params as { tipo: string }
 
-    if (!['hero', 'sobre'].includes(tipo)) {
-      return reply.status(400).send({ error: 'Tipo deve ser "hero" ou "sobre"' })
+    if (!['hero', 'sobre', 'fundo'].includes(tipo)) {
+      return reply.status(400).send({ error: 'Tipo deve ser "hero", "sobre" ou "fundo"' })
     }
 
     const data = await req.file()
@@ -458,11 +462,11 @@ export async function portalRoutes(app: FastifyInstance) {
     }
 
     const buffer = await data.toBuffer()
-    const url = await uploadPortalPhoto(candidateId, tipo as 'hero' | 'sobre', buffer, data.mimetype)
+    const url = await uploadPortalPhoto(candidateId, tipo as 'hero' | 'sobre' | 'fundo', buffer, data.mimetype)
 
     const existing = await prisma.portalEleitor.findUnique({ where: { candidateId } })
     if (existing) {
-      const updateData = tipo === 'hero' ? { fotoUrl: url } : { fotoSobre: url }
+      const updateData = tipo === 'hero' ? { fotoUrl: url } : tipo === 'sobre' ? { fotoSobre: url } : { fotoFundo: url }
       await prisma.portalEleitor.update({ where: { candidateId }, data: updateData as any })
     }
 
