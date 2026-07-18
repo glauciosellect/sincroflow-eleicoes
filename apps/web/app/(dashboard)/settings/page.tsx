@@ -982,19 +982,17 @@ function BillingTab() {
   })
 
   const buyLinesMutation = useMutation({
-    mutationFn: (quantity: number) => api.post('/billing/asaas/whatsapp-line-checkout', { quantidade: quantity, formaPagamento: 'pix' }).then(r => r.data),
+    mutationFn: (quantity: number) => api.post('/billing/whatsapp-lines', { quantity }).then(r => r.data),
     onSuccess: (data) => {
-      if (data.invoiceUrl) window.location.href = data.invoiceUrl
-      else toast({ title: 'Cobrança gerada!', description: 'Finalize o pagamento para liberar os créditos de linha.' })
+      if (data.url) window.location.href = data.url
     },
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
 
   const activationCheckoutMutation = useMutation({
-    mutationFn: (plano: string) => api.post('/billing/asaas/checkout', { plano, formaPagamento: 'pix' }).then(r => r.data),
+    mutationFn: (cargo: string) => api.post('/billing/activate-campaign', { cargo, paymentMethod: 'card' }).then(r => r.data),
     onSuccess: (data) => {
-      if (data.invoiceUrl) window.location.href = data.invoiceUrl
-      else toast({ title: 'Cobrança gerada!', description: 'Escaneie o QR Code Pix para concluir.' })
+      if (data.url) window.location.href = data.url
     },
     onError: (err: any) => toast({ title: 'Erro', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' }),
   })
@@ -1056,7 +1054,7 @@ function BillingTab() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-gray-900">R$ {selectedCargoInfo.valor.toLocaleString('pt-BR')}</div>
-                  <Button size="sm" className="mt-1" onClick={() => activationCheckoutMutation.mutate(selectedCargoInfo.plano)} disabled={activationCheckoutMutation.isPending}>
+                  <Button size="sm" className="mt-1" onClick={() => activationCheckoutMutation.mutate(selectedCargo)} disabled={activationCheckoutMutation.isPending}>
                     {activationCheckoutMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Ativar agora
                   </Button>

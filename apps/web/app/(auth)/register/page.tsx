@@ -39,21 +39,18 @@ const CARGOS = [
     value: 'DEP_ESTADUAL',
     label: 'Deputado(a) Estadual',
     total: 5990,
-    asaasKey: 'deputado_estadual',
     desc: 'Eleições 2026 — pagamento único',
   },
   {
     value: 'DEP_FEDERAL',
     label: 'Deputado(a) Federal',
     total: 7490,
-    asaasKey: 'deputado_federal',
     desc: 'Eleições 2026 — pagamento único',
   },
   {
     value: 'SENADOR_GOV',
     label: 'Senador(a) / Governador(a)',
     total: 10990,
-    asaasKey: 'senador_governador',
     desc: 'Eleições 2026 — pagamento único',
   },
 ] as const
@@ -117,12 +114,11 @@ function RegisterForm() {
     }
     setLoading(true)
     try {
-      const cargoSelecionado = CARGOS.find(c => c.value === cargo)!
-      const res = await api.post('/auth/register/checkout-asaas', {
+      const res = await api.post('/auth/register/checkout', {
         pendingId,
-        plano: cargoSelecionado.asaasKey,
-        formaPagamento: paymentMethod === 'card' ? 'cartao' : 'pix',
-        parcelas: 1,
+        cargo,
+        paymentMethod,
+        installments: 1,
       })
       // A conta já foi criada nesse momento (Módulo 8) — loga o candidato imediatamente,
       // mesmo antes do pagamento confirmar, para ele já poder usar o sistema.
@@ -130,11 +126,8 @@ function RegisterForm() {
       if (user && accessToken && refreshToken) {
         setAuth(user, candidate ?? null, accessToken, refreshToken, role)
       }
-      if (res.data.invoiceUrl) {
-        window.location.href = res.data.invoiceUrl
-      } else if (res.data.type === 'pix') {
-        // Pix: redireciona para página de aguardo com QR
-        window.location.href = `/aguardando-pagamento?id=${res.data.paymentId}`
+      if (res.data.url) {
+        window.location.href = res.data.url
       }
     } catch (err: any) {
       toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })

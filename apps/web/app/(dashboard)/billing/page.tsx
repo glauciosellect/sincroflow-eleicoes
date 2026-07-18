@@ -58,12 +58,11 @@ export default function BillingPage() {
     onError: (err: any) => toast({ title: 'Erro ao processar pagamento', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
-  // Créditos de IA com linha virtual para WhatsApp — cobrança avulsa via Asaas (Pix/cartão)
+  // Créditos de IA com linha virtual para WhatsApp — checkout avulso via Stripe
   const whatsappLinesMutation = useMutation({
-    mutationFn: () => api.post('/billing/asaas/whatsapp-line-checkout', { quantidade: whatsappLinesQty, formaPagamento: 'pix' }).then(r => r.data),
+    mutationFn: () => api.post('/billing/whatsapp-lines', { quantity: whatsappLinesQty }).then(r => r.data),
     onSuccess: (data) => {
-      if (data.invoiceUrl) window.location.href = data.invoiceUrl
-      else toast({ title: 'Cobrança gerada!', description: 'Finalize o pagamento para liberar os créditos de linha.' })
+      if (data.url) window.location.href = data.url
     },
     onError: (err: any) => toast({ title: 'Erro ao adicionar linhas', description: err.response?.data?.error, variant: 'destructive' }),
   })

@@ -7,7 +7,6 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { getPendingRegistration, createCandidateAccount, activateCampaignPayment, updatePendingRegistrationPayment } from '../auth/auth.service'
 import { TERMS_VERSION, TERMS_TEXT } from './terms-content'
 import { requireAdmin } from '../../lib/rbac'
-import { PLANOS_CAMPANHA, PlanoCampanhaKey, upsertClienteAsaas, criarCobrancaAsaas, getPixQrCode } from '../../lib/asaas'
 
 // apiVersion forçada explicitamente: o SDK não atualiza isso automaticamente,
 // e branding_settings (nome customizado por sessão de checkout) só funciona em
@@ -25,9 +24,9 @@ const CHECKOUT_BRANDING = {
 
 // Price IDs por cargo — pagamento único para todo o período eleitoral (eleições 2026).
 // Criar no Stripe Dashboard: 3 produtos (um por cargo), cada um com 1 price avulso (mode: payment).
-// STRIPE_PRICE_DEP_ESTADUAL → R$ 4.790 (479000 centavos)
-// STRIPE_PRICE_DEP_FEDERAL  → R$ 7.200 (720000 centavos)
-// STRIPE_PRICE_SENADOR_GOV  → R$ 10.800 (1080000 centavos)
+// STRIPE_PRICE_DEP_ESTADUAL → R$ 5.990 (599000 centavos)
+// STRIPE_PRICE_DEP_FEDERAL  → R$ 7.490 (749000 centavos)
+// STRIPE_PRICE_SENADOR_GOV  → R$ 10.990 (1099000 centavos)
 // STRIPE_PRICE_MANDATE      → plano mandato (oculto até após eleições)
 const CARGO_PRICE_IDS: Record<string, string | undefined> = {
   DEP_ESTADUAL: process.env.STRIPE_PRICE_DEP_ESTADUAL,
@@ -36,11 +35,12 @@ const CARGO_PRICE_IDS: Record<string, string | undefined> = {
   MANDATE:      process.env.STRIPE_PRICE_MANDATE,
 }
 
-// Valores totais por cargo em centavos — usados para exibição e info no metadata do Stripe.
+// Valores totais por cargo em centavos — mesmos valores exibidos no site/Asaas (fonte
+// única de preço, ver Módulo 8 da SPEC-Escala-Webhooks) — usados para exibição e metadata do Stripe.
 export const CARGO_PRICES: Record<string, { label: string; total: number }> = {
-  DEP_ESTADUAL: { label: 'Deputado(a) Estadual',       total: 479000  },
-  DEP_FEDERAL:  { label: 'Deputado(a) Federal',         total: 720000  },
-  SENADOR_GOV:  { label: 'Senador(a) / Governador(a)', total: 1080000 },
+  DEP_ESTADUAL: { label: 'Deputado(a) Estadual',       total: 599000  },
+  DEP_FEDERAL:  { label: 'Deputado(a) Federal',         total: 749000  },
+  SENADOR_GOV:  { label: 'Senador(a) / Governador(a)', total: 1099000 },
 }
 
 // Recarga avulsa de mensagens ativas — comprada quando o limite do plano se esgota
@@ -77,10 +77,12 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ version: TERMS_VERSION, text: TERMS_TEXT })
   })
 
-  // ── Passo 2 do registro: checkout por cargo ──────────────────────────────
-  // O candidato já preencheu o Passo 1 (/auth/register) e recebeu um pendingId.
-  // Este endpoint cria a sessão de pagamento único (mode: payment) — a conta só é
-  // criada de fato quando o webhook confirmar o pagamento (checkout.session.completed).
+  // ── Passo 2 do registro: cria a conta e inicia checkout por cargo ─────────
+  // Módulo 8 (SPEC-Escala-Webhooks): a conta (User + Candidate ACTIVE) é criada AQUI,
+  // antes do pagamento — o candidato já pode logar e usar o sistema imediatamente.
+  // O pagamento (Stripe) só libera os módulos que dependem de "Ativação da Campanha"
+  // (ver lib/rbac.ts + lib/campaign-activation.ts). O webhook, ao confirmar o
+  // pagamento, chama activateCampaignPayment — não cria mais a conta.
   //
   // cargo: DEP_ESTADUAL | DEP_FEDERAL | SENADOR_GOV (eleições 2026)
   // paymentMethod: pix (à vista) | card (1x, 2x ou 3x sem juros)
@@ -105,6 +107,9 @@ export async function stripeRoutes(app: FastifyInstance) {
 
     await updatePendingRegistrationPayment(pendingId, paymentMethod as any, 'CAMPAIGN')
 
+    const account = await createCandidateAccount(pendingId, cargo)
+    if (!account) return reply.status(400).send({ error: 'Não foi possível criar a conta. Tente novamente ou contate o suporte.' })
+
     const validInstallments = paymentMethod === 'card' ? Math.min(3, Math.max(1, installments)) : 1
 
     const sessionParams: any = {
@@ -112,9 +117,9 @@ export async function stripeRoutes(app: FastifyInstance) {
       mode: 'payment',
       customer_email: pending.email,
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { type: 'registration_onetime', pendingId, cargo, paymentMethod, installments: String(validInstallments) },
+      metadata: { type: 'campaign_activation', candidateId: account.candidateId, cargo, paymentMethod },
       success_url: `${process.env.FRONTEND_URL}/login?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/register?cargo=${cargo}&payment=cancelled`,
+      cancel_url: `${process.env.FRONTEND_URL}/login?payment=cancelled`,
       branding_settings: CHECKOUT_BRANDING as any,
     }
 
@@ -129,52 +134,6 @@ export async function stripeRoutes(app: FastifyInstance) {
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams)
-    return reply.send({ url: session.url })
-  })
-
-  // Checkout via Asaas — fluxo principal de onboarding (Pix ou cartão parcelado).
-  // Módulo 8: a conta (User + Candidate ACTIVE) é criada AQUI, antes do pagamento —
-  // o candidato já pode logar e usar o sistema; o pagamento só libera os módulos
-  // que dependem de "Ativação da Campanha" (ver lib/rbac.ts + lib/campaign-activation.ts).
-  app.post('/auth/register/checkout-asaas', async (req, reply) => {
-    const { pendingId, plano, formaPagamento, parcelas = 1 } = req.body as {
-      pendingId: string
-      plano: PlanoCampanhaKey
-      formaPagamento: 'pix' | 'cartao'
-      parcelas?: 1 | 2 | 3
-    }
-
-    const pending = await getPendingRegistration(pendingId)
-    if (!pending) return reply.status(400).send({ error: 'Cadastro expirado ou inválido. Recomece o registro.' })
-
-    const planoDados = PLANOS_CAMPANHA[plano]
-    if (!planoDados) return reply.status(400).send({ error: 'Plano inválido.' })
-
-    const account = await createCandidateAccount(pendingId, plano)
-    if (!account) return reply.status(400).send({ error: 'Não foi possível criar a conta. Tente novamente ou contate o suporte.' })
-
-    const billingType = formaPagamento === 'pix' ? 'PIX' : 'CREDIT_CARD'
-    const parcelasNum = formaPagamento === 'pix' ? 1 : Math.min(3, Math.max(1, parcelas)) as 1 | 2 | 3
-
-    // Cria cliente no Asaas com os dados do pending
-    const asaasCustomerId = await upsertClienteAsaas({
-      name: pending.name,
-      cpf: pending.cpf,
-      email: pending.email,
-      whatsapp: pending.whatsapp,
-    })
-    await prisma.candidate.update({ where: { id: account.candidateId }, data: { asaasCustomerId } as any })
-
-    // Cria cobrança — externalReference = candidateId (conta já existe; webhook só ativa a campanha)
-    const cobranca = await criarCobrancaAsaas({
-      customerId: asaasCustomerId,
-      valor: planoDados.valor,
-      parcelas: parcelasNum,
-      billingType,
-      descricao: planoDados.nome,
-      externalReference: account.candidateId,
-    })
-    await prisma.candidate.update({ where: { id: account.candidateId }, data: { asaasPaymentId: cobranca.id, asaasPlano: plano } as any })
 
     const tokens = {
       accessToken: app.jwt.sign({ sub: account.userId, wid: account.candidateId, role: 'ADMINISTRADOR' }, { expiresIn: '15m' }),
@@ -189,30 +148,7 @@ export async function stripeRoutes(app: FastifyInstance) {
     ])
     const { passwordHash, twoFactorSecret, ...safeUser } = user!
 
-    if (billingType === 'PIX') {
-      const qr = await getPixQrCode(cobranca.id)
-      return reply.send({
-        type: 'pix',
-        paymentId: cobranca.id,
-        qrCodeImage: qr?.encodedImage ?? null,
-        qrCodePayload: qr?.payload ?? null,
-        invoiceUrl: cobranca.invoiceUrl ?? null,
-        user: safeUser,
-        candidate,
-        role: 'ADMINISTRADOR',
-        ...tokens,
-      })
-    }
-
-    return reply.send({
-      type: 'card',
-      user: safeUser,
-      candidate,
-      role: 'ADMINISTRADOR',
-      paymentId: cobranca.id,
-      invoiceUrl: cobranca.invoiceUrl,
-      ...tokens,
-    })
+    return reply.send({ url: session.url, user: safeUser, candidate, role: 'ADMINISTRADOR', ...tokens })
   })
 
   // Recarga avulsa de mensagens ativas (candidato já com conta ativa) — quantity é o
@@ -240,38 +176,68 @@ export async function stripeRoutes(app: FastifyInstance) {
     return reply.send({ url: session.url })
   })
 
-  // Endpoint legado de renovação manual (não usado no novo fluxo de pagamento único)
-  // Mantido para compatibilidade com candidatos ativados antes da migração de preços.
-
-  // Adiciona N linhas extras de WhatsApp à assinatura já ativa do candidato (recorrente,
-  // R$ 497/mês cada). O limite (whatsappLineLimit) só sobe quando o webhook confirmar.
+  // "Comprar Créditos de IA com linha Virtual para Whatsapp" (Módulo 8, item 7) — checkout
+  // avulso (mode: payment), consistente com o pagamento único da campanha. O limite
+  // (whatsappLineLimit/whatsappLinesManual) só sobe quando o webhook confirmar o pagamento.
   app.post('/billing/whatsapp-lines', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
-    if (!WHATSAPP_LINE_PRICE_ID) return reply.status(500).send({ error: 'Recarga de WhatsApp não configurada. Contate o suporte.' })
+    if (!WHATSAPP_LINE_PRICE_ID) return reply.status(500).send({ error: 'Créditos de linha WhatsApp não configurados. Contate o suporte.' })
 
     const { quantity } = z.object({ quantity: z.number().int().min(1).max(30) }).parse(req.body)
 
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [{ price: WHATSAPP_LINE_PRICE_ID, quantity }],
+      metadata: { type: 'whatsapp_line_credit', candidateId, quantity: String(quantity) },
+      success_url: `${process.env.FRONTEND_URL}/settings?tab=billing&payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL}/settings?tab=billing&payment=cancelled`,
+      branding_settings: CHECKOUT_BRANDING as any,
+    })
+
+    return reply.send({ url: session.url })
+  })
+
+  // "Ativação da Campanha" para conta já existente (candidato logado sem campanha paga
+  // ainda) — checkout avulso vinculado ao candidateId (não a um pendingId de registro).
+  // Módulo 8: complementa o fluxo de registro, que já cria a conta e ativa via
+  // 'registration_onetime' no mesmo webhook.
+  app.post('/billing/activate-campaign', { onRequest: [app.authenticate, requireAdmin()] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { cargo, paymentMethod = 'card', installments = 1 } = z.object({
+      cargo: z.enum(['DEP_ESTADUAL', 'DEP_FEDERAL', 'SENADOR_GOV']),
+      paymentMethod: z.enum(['card', 'pix']).default('card'),
+      installments: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(1),
+    }).parse(req.body)
+
+    const priceId = CARGO_PRICE_IDS[cargo]
+    if (!priceId) return reply.status(500).send({ error: `Preço para ${cargo} não configurado. Contate o suporte.` })
+
     const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } })
-    if (!candidate?.stripeSubscriptionId) {
-      return reply.status(400).send({ error: 'Assine o plano antes de adicionar linhas de WhatsApp.' })
+    if (!candidate) return reply.status(404).send({ error: 'Candidato não encontrado' })
+
+    const validInstallments = paymentMethod === 'card' ? Math.min(3, Math.max(1, installments)) : 1
+
+    const sessionParams: any = {
+      payment_method_types: [paymentMethod],
+      mode: 'payment',
+      customer_email: candidate.email,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { type: 'campaign_activation', candidateId, cargo, paymentMethod },
+      success_url: `${process.env.FRONTEND_URL}/settings?tab=billing&payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL}/settings?tab=billing&payment=cancelled`,
+      branding_settings: CHECKOUT_BRANDING as any,
     }
 
-    const subscription = await stripe.subscriptions.retrieve(candidate.stripeSubscriptionId, { expand: ['items'] })
-    const existingItem = subscription.items.data.find((item) => item.price.id === WHATSAPP_LINE_PRICE_ID)
-
-    if (existingItem) {
-      await stripe.subscriptionItems.update(existingItem.id, { quantity: (existingItem.quantity || 0) + quantity })
-    } else {
-      await stripe.subscriptionItems.create({
-        subscription: candidate.stripeSubscriptionId,
-        price: WHATSAPP_LINE_PRICE_ID,
-        quantity,
-      })
+    if (paymentMethod === 'card' && validInstallments > 1) {
+      sessionParams.payment_method_options = { card: { installments: { enabled: true } } }
     }
 
-    return reply.send({ ok: true, message: 'Linhas adicionadas — disponíveis após confirmação do pagamento.' })
+    const session = await stripe.checkout.sessions.create(sessionParams)
+    return reply.send({ url: session.url })
   })
 
   // Registra o aceite do Termo pelo usuário autenticado, para efeitos legais
@@ -362,17 +328,27 @@ export async function stripeRoutes(app: FastifyInstance) {
           })
         }
 
-        // Pagamento do registro aprovado (Pix ou cartão) → cria a conta (fluxo Stripe
-        // legado, não usado pelo frontend atual — mantido só para não quebrar compilação/histórico)
-        if (meta.type === 'registration_onetime' && meta.pendingId) {
+        // Módulo 8, item 7: créditos de linha WhatsApp confirmados — soma ao limite manual.
+        if (meta.type === 'whatsapp_line_credit' && meta.candidateId && meta.quantity) {
+          const quantity = parseInt(meta.quantity, 10) || 1
+          await prisma.candidate.update({
+            where: { id: meta.candidateId },
+            data: { whatsappLinesManual: { increment: quantity }, whatsappLineLimit: { increment: quantity } },
+          })
+          await prisma.invoice.create({
+            data: { candidateId: meta.candidateId, amount: session.amount_total || 0, status: 'paid', externalId: session.id },
+          })
+          break
+        }
+
+        // Ativação da Campanha de conta já existente (candidato logado, sem pagamento ainda).
+        if (meta.type === 'campaign_activation' && meta.candidateId) {
           const paidUntil = new Date(Date.now() + CAMPAIGN_PAYMENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
-          const result = await createCandidateAccount(meta.pendingId, meta.cargo)
-          if (result) {
-            await prisma.candidate.update({ where: { id: result.candidateId }, data: { stripeCustomerId: session.customer as string } })
-            await activateCampaignPayment(result.candidateId, { method: meta.paymentMethod || 'card', paidUntil })
-          } else {
-            logger.error('[STRIPE] Falha ao criar conta do registro pendente:', meta.pendingId)
-          }
+          await prisma.candidate.update({ where: { id: meta.candidateId }, data: { stripeCustomerId: session.customer as string, ...(meta.cargo ? { position: meta.cargo } : {}) } })
+          await activateCampaignPayment(meta.candidateId, { method: meta.paymentMethod || 'card', paidUntil })
+          await prisma.invoice.create({
+            data: { candidateId: meta.candidateId, amount: session.amount_total || 0, status: 'paid', externalId: session.id },
+          })
           break
         }
 
