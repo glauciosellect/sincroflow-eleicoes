@@ -204,6 +204,10 @@ model AgentConfig {
   story                 String?    @db.Text
   disclaimer            String     @db.Text
   candidateSite         String?
+  // Texto extraído do site do candidato (scraping), usado como fonte de conhecimento
+  // adicional no prompt da IA — evita raspar o site a cada mensagem recebida.
+  siteContent           String?    @db.Text
+  siteContentUpdatedAt  DateTime?
   voiceEnabled          Boolean    @default(false)
   ttsVoice              String?    @default("onyx")
   responseDelay         Int        @default(0)

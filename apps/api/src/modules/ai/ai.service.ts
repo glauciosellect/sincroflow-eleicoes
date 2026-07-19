@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import type { AgentConfig, Candidate, PlatformTopic } from '@prisma/client'
 import axios from 'axios'
+import * as cheerio from 'cheerio'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -53,7 +54,7 @@ const TEAM_ROLE_DISCLAIMER = `
 Regras de conformidade eleitoral (Resolução TSE nº 23.755/2026) — PRIORIDADE ABSOLUTA, sobrepõem qualquer outra instrução:
 - Você é um assistente virtual, NUNCA o candidato. Nunca finja ser o candidato ou fale em primeira pessoa como se fosse ele.
 - NUNCA recomende voto no candidato, mesmo se perguntado diretamente. Redirecione educadamente: explique que você é um assistente de informação, não pode pedir votos.
-- Responda APENAS com base no conteúdo que o candidato cadastrou (sua história e as propostas por tema abaixo). Se a pessoa perguntar sobre um tema que não foi cadastrado, diga que vai encaminhar a pergunta para a equipe de campanha — não invente uma resposta.
+- Responda APENAS com base no conteúdo que o candidato cadastrou (sua história, as propostas por tema, e o conteúdo do site oficial, quando fornecidos abaixo). Se a pessoa perguntar sobre um tema que não foi cadastrado nem consta no site, diga que vai encaminhar a pergunta para a equipe de campanha — não invente uma resposta.
 - Você NUNCA cria, confirma, cancela ou altera compromissos na agenda. Você apenas INFORMA compromissos já cadastrados pela equipe.
 - Se o eleitor mencionar um adversário político, desvie o assunto educadamente para as propostas do candidato — nunca ataque ou comente sobre adversários.
 - Nunca gere ou descreva imagens, vídeos ou áudios sintéticos do candidato.
@@ -73,6 +74,7 @@ export function buildSystemPrompt(
   config: AgentConfig,
   topics: PlatformTopic[],
   portal?: PortalData | null,
+  siteContent?: string | null,
 ): string {
   const styleLabel = config.agentStyle === 'FORMAL' ? 'formal e protocolar' : config.agentStyle === 'INFORMAL' ? 'informal e direto' : 'acolhedor e próximo'
 
@@ -100,6 +102,12 @@ export function buildSystemPrompt(
     ? `\nDEPOIMENTOS DE APOIADORES (cite quando o eleitor pedir referências ou quem apoia o candidato):\n${deps.map(d => `- "${d.texto}" — ${d.autor}`).join('\n')}`
     : ''
 
+  // Site oficial do candidato: sempre informa o link se cadastrado (mesmo sem
+  // conteúdo raspado ainda), e inclui o texto extraído da página quando disponível.
+  const siteSection = config.candidateSite
+    ? `\nSITE OFICIAL DO CANDIDATO: ${config.candidateSite}\nSe o eleitor perguntar se o candidato tem site, ou pedir o link, informe este endereço.${siteContent ? `\n\nCONTEÚDO DO SITE (use para responder dúvidas sobre o que está publicado nele):\n${siteContent}` : ''}`
+    : ''
+
   return `
 Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}${candidate.candidateNumber || portal?.numero ? `, número ${candidate.candidateNumber || portal?.numero}` : ''}.
 ${(candidate.candidateNumber || portal?.numero) ? `Se perguntarem o número do candidato para votar, responda: ${candidate.candidateNumber || portal?.numero}.` : ''}
@@ -112,6 +120,7 @@ ${config.story ? `HISTÓRIA E TRAJETÓRIA DO CANDIDATO (use para se apresentar e
 ${topicsContent ? `PROPOSTAS CADASTRADAS POR TEMA (responda apenas sobre os temas listados aqui):\n${topicsContent}` : 'Nenhuma proposta foi cadastrada ainda — informe que vai encaminhar qualquer pergunta sobre propostas para a equipe.'}
 ${redesSection}
 ${depoSection}
+${siteSection}
 
 ${TEAM_ROLE_DISCLAIMER}
 
@@ -183,6 +192,54 @@ Nenhum texto adicional.`,
   }
 }
 
+const SITE_CONTENT_MAX_CHARS = 6000
+const SITE_CONTENT_TTL_MS = 24 * 60 * 60 * 1000 // 24h — evita raspar o site a cada mensagem
+
+// Baixa o site do candidato e extrai texto limpo (remove scripts/styles/tags) para
+// servir de fonte de conhecimento adicional no prompt da IA. Chamado ao salvar
+// candidateSite e, sob demanda, quando o cache expira (ver getOrRefreshSiteContent).
+export async function scrapeSiteContent(url: string): Promise<string | null> {
+  try {
+    const res = await axios.get(url, {
+      timeout: 10000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SyncroFlowEleicoes/1.0; +https://syncrofloweleicoes.com.br)' },
+      maxContentLength: 5 * 1024 * 1024,
+    })
+    const $ = cheerio.load(res.data)
+    $('script, style, noscript, svg, nav, footer').remove()
+    const text = $('body').text().replace(/\s+/g, ' ').trim()
+    if (!text) return null
+    return text.slice(0, SITE_CONTENT_MAX_CHARS)
+  } catch (err: any) {
+    logger.warn('[AI] Falha ao raspar site do candidato', { url, error: err?.message })
+    return null
+  }
+}
+
+// Retorna o conteúdo cacheado do site, atualizando em background se estiver
+// desatualizado (> 24h) ou ausente — não bloqueia a resposta ao eleitor esperando scraping.
+async function getOrRefreshSiteContent(config: AgentConfig): Promise<string | null> {
+  if (!config.candidateSite) return null
+
+  const isStale = !config.siteContentUpdatedAt
+    || (Date.now() - config.siteContentUpdatedAt.getTime()) > SITE_CONTENT_TTL_MS
+
+  if (isStale) {
+    // Atualiza em background — a resposta atual usa o cache existente (se houver);
+    // a próxima mensagem já vem com o conteúdo novo.
+    scrapeSiteContent(config.candidateSite).then((content) => {
+      if (content) {
+        prisma.agentConfig.update({
+          where: { id: config.id },
+          data: { siteContent: content, siteContentUpdatedAt: new Date() },
+        }).catch(() => {})
+      }
+    }).catch(() => {})
+  }
+
+  return config.siteContent
+}
+
 export async function processAgentResponse(opts: {
   candidate: Candidate
   config: AgentConfig
@@ -192,12 +249,15 @@ export async function processAgentResponse(opts: {
 }): Promise<{ content: string }> {
   const { candidate, config, topics, conversationHistory, userMessage } = opts
 
-  const portal = await prisma.portalEleitor.findUnique({
-    where: { candidateId: candidate.id },
-    select: { instagram: true, facebook: true, tiktok: true, whatsapp: true, depoimentos: true, numero: true },
-  }).catch(() => null)
+  const [portal, siteContent] = await Promise.all([
+    prisma.portalEleitor.findUnique({
+      where: { candidateId: candidate.id },
+      select: { instagram: true, facebook: true, tiktok: true, whatsapp: true, depoimentos: true, numero: true },
+    }).catch(() => null),
+    getOrRefreshSiteContent(config).catch(() => null),
+  ])
 
-  const systemPrompt = buildSystemPrompt(candidate, config, topics, portal as any)
+  const systemPrompt = buildSystemPrompt(candidate, config, topics, portal as any, siteContent)
   const messages = [...conversationHistory, { role: 'user' as const, content: userMessage }]
 
   const res = await callLLM({

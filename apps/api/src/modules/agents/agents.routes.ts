@@ -6,6 +6,8 @@ import { getComplianceStatus } from '../compliance/compliance.service'
 import { PLATFORM_TOPICS } from '../../lib/platform-topics'
 import { requireModule } from '../../lib/rbac'
 import { TSE_AI_DISCLAIMER } from '../../lib/tse-disclaimer'
+import { scrapeSiteContent } from '../ai/ai.service'
+import { logger } from '../../lib/logger'
 
 const configSchema = z.object({
   agentName: z.string().min(1).max(100).optional(),
@@ -40,11 +42,27 @@ export async function agentRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
     const data = configSchema.parse(req.body)
+
+    const before = await prisma.agentConfig.findUnique({ where: { candidateId }, select: { candidateSite: true } })
     const config = await prisma.agentConfig.upsert({
       where: { candidateId },
       update: data,
       create: { candidateId, disclaimer: data.disclaimer || '', ...data },
     })
+
+    // Raspa o site em background quando o candidato cadastra/muda a URL — evita esperar
+    // até 24h (TTL do cache) para a IA passar a conhecer o conteúdo da página nova.
+    if (config.candidateSite && config.candidateSite !== before?.candidateSite) {
+      scrapeSiteContent(config.candidateSite).then((content) => {
+        if (content) {
+          return prisma.agentConfig.update({
+            where: { candidateId },
+            data: { siteContent: content, siteContentUpdatedAt: new Date() },
+          })
+        }
+      }).catch((err) => logger.warn('[AGENTS] Falha ao raspar site do candidato', { candidateId, error: err?.message }))
+    }
+
     return reply.send(config)
   })
 
