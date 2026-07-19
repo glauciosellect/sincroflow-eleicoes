@@ -223,7 +223,14 @@ export default function PortalPublicoPage() {
         <div style={{ position: 'absolute', bottom: -60, left: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,.04)', pointerEvents: 'none' }} />
 
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 48, alignItems: 'center', position: 'relative', zIndex: 1 }}>
-          <div>
+          <div style={portal.fotoFundo ? {
+            background: 'rgba(255,255,255,.18)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            borderRadius: 20,
+            padding: '32px 28px',
+            boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+          } : undefined}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: withAlpha(corTexto, .15), border: `1px solid ${withAlpha(corTexto, .25)}`, borderRadius: 50, padding: '6px 16px', fontSize: 12, fontWeight: 700, marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {portal.candidate.position && <span>{portal.candidate.position}</span>}
               {portal.candidate.party && <><span style={{ opacity: .5 }}>·</span><span>{portal.candidate.party}</span></>}
@@ -262,10 +269,10 @@ export default function PortalPublicoPage() {
                 </div>
               )}
             </div>
-            {/* Número circular */}
+            {/* Número circular — fonte reduz conforme a quantidade de dígitos, para nunca estourar o círculo */}
             {portal.numero && (
-              <div style={{ position: 'absolute', bottom: -18, right: 10, width: 100, height: 100, borderRadius: '50%', background: dest, border: '4px solid #fff', boxShadow: '0 10px 28px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                <span style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>{portal.numero}</span>
+              <div style={{ position: 'absolute', bottom: -18, right: 10, width: 110, height: 110, borderRadius: '50%', background: dest, border: '4px solid #fff', boxShadow: '0 10px 28px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', padding: '0 6px', boxSizing: 'border-box' }}>
+                <span style={{ fontSize: portal.numero.length >= 6 ? 20 : portal.numero.length >= 5 ? 24 : 30, fontWeight: 900, lineHeight: 1, whiteSpace: 'nowrap' }}>{portal.numero}</span>
                 <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700 }}>VOTE</span>
               </div>
             )}
