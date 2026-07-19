@@ -21,6 +21,9 @@ import { channelLabel, cn } from '@/lib/utils'
 import { ChannelIcon } from '@/components/channel-icon'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+// Oculto por decisão de produto (2026-07) — reativar quando o fluxo de exclusão de
+// conta for necessário de novo. Rota de backend (DELETE /candidates/me) mantida intacta.
+const SHOW_DANGER_ZONE = false
 
 // ─── ABA: PERFIL DA CONTA (seção 4.11) ────────────────────────────────────────
 function ProfileTab() {
@@ -350,37 +353,39 @@ function ProfileTab() {
         </DialogContent>
       </Dialog>
 
-      <Card className="border-red-200">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2 text-red-600">
-            <ShieldAlert className="w-4 h-4" />
-            Zona de perigo
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-            <strong>Ação irreversível.</strong> Ao excluir sua conta, todos os dados serão permanentemente removidos: configuração do agente, conversas, contatos, canais e solicitações. Não há como desfazer.
-          </div>
-          {!showDeleteConfirm ? (
-            <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50" onClick={() => setShowDeleteConfirm(true)}>
-              <Trash2 className="w-4 h-4 mr-2" />
-              Excluir minha conta
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-700">Para confirmar, digite <strong>EXCLUIR CONTA</strong> abaixo:</p>
-              <Input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder="EXCLUIR CONTA" className="border-red-300 focus:ring-red-300" />
-              <div className="flex gap-2">
-                <Button className="bg-red-600 hover:bg-red-700 text-white" disabled={deleteConfirmText !== 'EXCLUIR CONTA' || deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
-                  {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Confirmar exclusão
-                </Button>
-                <Button variant="ghost" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}>Cancelar</Button>
-              </div>
+      {SHOW_DANGER_ZONE && (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-red-600">
+              <ShieldAlert className="w-4 h-4" />
+              Zona de perigo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              <strong>Ação irreversível.</strong> Ao excluir sua conta, todos os dados serão permanentemente removidos: configuração do agente, conversas, contatos, canais e solicitações. Não há como desfazer.
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {!showDeleteConfirm ? (
+              <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50" onClick={() => setShowDeleteConfirm(true)}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir minha conta
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-700">Para confirmar, digite <strong>EXCLUIR CONTA</strong> abaixo:</p>
+                <Input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder="EXCLUIR CONTA" className="border-red-300 focus:ring-red-300" />
+                <div className="flex gap-2">
+                  <Button className="bg-red-600 hover:bg-red-700 text-white" disabled={deleteConfirmText !== 'EXCLUIR CONTA' || deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+                    {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Confirmar exclusão
+                  </Button>
+                  <Button variant="ghost" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
