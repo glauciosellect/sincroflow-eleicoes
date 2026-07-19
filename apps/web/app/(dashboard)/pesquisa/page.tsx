@@ -69,6 +69,7 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
   const [cep, setCep] = useState('')
   const [neighborhood, setNeighborhood] = useState('')
   const [city, setCity] = useState('')
+  const [state, setState] = useState('')
   const [cepLoading, setCepLoading] = useState(false)
   const [intention, setIntention] = useState<VoteIntention | null>(null)
   const [notes, setNotes] = useState('')
@@ -82,14 +83,14 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
       const data = await res.json()
-      if (!data.erro) { setNeighborhood(data.bairro || ''); setCity(data.localidade || '') }
+      if (!data.erro) { setNeighborhood(data.bairro || ''); setCity(data.localidade || ''); setState(data.uf || '') }
     } catch { /* ignora */ } finally { setCepLoading(false) }
   }
 
   const mutation = useMutation({
     mutationFn: () => api.post('/surveys/vote', {
       voterName: voterName || undefined, voterPhone: voterPhone || undefined,
-      cep: cep.replace(/\D/g, '') || undefined, neighborhood: neighborhood || undefined, city: city || undefined,
+      cep: cep.replace(/\D/g, '') || undefined, neighborhood: neighborhood || undefined, city: city || undefined, state: state || undefined,
       intention, notes: notes || undefined,
       prefVereador: prefs.prefVereador || undefined, prefDepEstadual: prefs.prefDepEstadual || undefined,
       prefDepFederal: prefs.prefDepFederal || undefined, prefSenador: prefs.prefSenador || undefined,
@@ -98,7 +99,7 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
     onSuccess: () => {
       setSubmitted(true); onSuccess()
       setTimeout(() => {
-        setVoterName(''); setVoterPhone(''); setCep(''); setNeighborhood(''); setCity('')
+        setVoterName(''); setVoterPhone(''); setCep(''); setNeighborhood(''); setCity(''); setState('')
         setIntention(null); setNotes(''); setPrefs({}); setSubmitted(false)
       }, 2000)
     },
@@ -119,7 +120,7 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
         <div><Label>Nome do eleitor</Label><Input className="mt-1" placeholder="Opcional" value={voterName} onChange={e => setVoterName(e.target.value)} /></div>
         <div><Label>Telefone</Label><Input className="mt-1" placeholder="Opcional" value={voterPhone} onChange={e => setVoterPhone(e.target.value)} /></div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div>
           <Label>CEP</Label>
           <div className="relative mt-1">
@@ -130,6 +131,7 @@ function SurveyForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div><Label>Bairro</Label><Input className="mt-1" placeholder="Auto ou manual" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} /></div>
         <div><Label>Cidade</Label><Input className="mt-1" placeholder="Auto ou manual" value={city} onChange={e => setCity(e.target.value)} /></div>
+        <div><Label>UF</Label><Input className="mt-1" placeholder="Auto ou manual" maxLength={2} value={state} onChange={e => setState(e.target.value.toUpperCase())} /></div>
       </div>
       <div>
         <Label>Intenção de voto <span className="text-red-500">*</span></Label>

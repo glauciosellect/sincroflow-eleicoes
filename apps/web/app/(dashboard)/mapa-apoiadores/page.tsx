@@ -44,8 +44,16 @@ const PERIOD_OPTIONS = [
   { label: '90 dias', days: 90 },
 ]
 
+const GRANULARITY_OPTIONS = [
+  { key: 'byNeighborhood', pluralLabel: 'bairros' },
+  { key: 'byCity', pluralLabel: 'cidades' },
+  { key: 'byState', pluralLabel: 'estados' },
+] as const
+type GranularityKey = (typeof GRANULARITY_OPTIONS)[number]['key']
+
 export default function MapaApoiadoresPage() {
   const [days, setDays] = useState(30)
+  const [granularity, setGranularity] = useState<GranularityKey>('byCity')
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
   const { data, isLoading, error } = useQuery({
@@ -54,7 +62,9 @@ export default function MapaApoiadoresPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const points = data?.points ?? []
+  const active = data?.[granularity] as { label: string; points: any[] } | undefined
+  const regionLabel = active?.label ?? 'Cidade'
+  const points = active?.points ?? []
   // Usa os totais reais do backend (inclui registros sem localização)
   const totalApoiador = data?.totais?.apoiador ?? points.reduce((s: number, p: any) => s + p.apoiador, 0)
   const totalIndeciso = data?.totais?.indeciso ?? points.reduce((s: number, p: any) => s + p.indeciso, 0)
@@ -71,7 +81,7 @@ export default function MapaApoiadoresPage() {
             Mapa de Apoiadores
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {data?.regionLabel === 'Cidade' ? 'Distribuição por cidade' : 'Distribuição por bairro'} — baseado nos CEPs coletados em campo
+            Distribuição por {regionLabel.toLowerCase()} — baseado nos CEPs coletados em campo
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
@@ -85,6 +95,20 @@ export default function MapaApoiadoresPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Granularidade — bairro/cidade/estado, útil para candidatos de cargo
+          estadual/federal que precisam ver distribuição além de um único bairro/cidade */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {GRANULARITY_OPTIONS.map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => setGranularity(opt.key)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${granularity === opt.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            {data?.[opt.key]?.label ?? opt.pluralLabel}
+          </button>
+        ))}
       </div>
 
       {/* Totalizadores — mostra sempre que há dados, mesmo sem localização */}
@@ -131,8 +155,8 @@ export default function MapaApoiadoresPage() {
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Map className="w-4 h-4 text-[#002776]" />
-            {data?.regionLabel === 'Cidade' ? 'Por cidade' : 'Por bairro'}
-            {points.length > 0 && <span className="text-xs font-normal text-gray-400 ml-1">· {points.length} {data?.regionLabel === 'Cidade' ? 'cidades' : 'bairros'} com dados</span>}
+            Por {regionLabel.toLowerCase()}
+            {points.length > 0 && <span className="text-xs font-normal text-gray-400 ml-1">· {points.length} {GRANULARITY_OPTIONS.find(o => o.key === granularity)?.pluralLabel} com dados</span>}
           </CardTitle>
           {/* Legenda */}
           <div className="flex items-center gap-3 text-xs text-gray-500">
@@ -165,7 +189,7 @@ export default function MapaApoiadoresPage() {
           ) : (
             <div className="h-full rounded-lg overflow-hidden">
               <MapErrorBoundary>
-                <MapComponent points={points} regionLabel={data?.regionLabel ?? 'Bairro'} />
+                <MapComponent points={points} regionLabel={regionLabel} />
               </MapErrorBoundary>
             </div>
           )}
@@ -178,7 +202,7 @@ export default function MapaApoiadoresPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Users className="w-4 h-4 text-[#002776]" />
-              Ranking por {data?.regionLabel === 'Cidade' ? 'cidade' : 'bairro'}
+              Ranking por {regionLabel.toLowerCase()}
             </CardTitle>
           </CardHeader>
           <CardContent>

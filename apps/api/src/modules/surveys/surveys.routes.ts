@@ -5,6 +5,14 @@ import { getWorkspaceId } from '../../lib/workspace'
 import { requireModule, requireAdmin, auditLog } from '../../lib/rbac'
 import { syncContactFromField } from '../../lib/sync-contact'
 
+// Normaliza removendo acentos, minúsculas e espaços extras — usado como chave de
+// agrupamento para "Centro"/"centro"/"Centro " não virarem entradas separadas.
+function normalizeSurveyText(s: string): string {
+  return s.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
 export async function surveyRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate)
 
@@ -13,12 +21,13 @@ export async function surveyRoutes(app: FastifyInstance) {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
 
-    const { voterName, voterPhone, cep, neighborhood, city, intention, notes, prefVereador, prefDepEstadual, prefDepFederal, prefSenador, prefGovernador, prefPresidente } = z.object({
+    const { voterName, voterPhone, cep, neighborhood, city, state, intention, notes, prefVereador, prefDepEstadual, prefDepFederal, prefSenador, prefGovernador, prefPresidente } = z.object({
       voterName: z.string().optional(),
       voterPhone: z.string().optional(),
       cep: z.string().optional(),
       neighborhood: z.string().optional(),
       city: z.string().optional(),
+      state: z.string().max(2).optional(),
       intention: z.enum(['APOIADOR', 'INDECISO', 'CRITICO']),
       notes: z.string().optional(),
       prefVereador: z.string().optional(),
@@ -42,6 +51,7 @@ export async function surveyRoutes(app: FastifyInstance) {
         cep,
         neighborhood,
         city,
+        state,
         intention,
         notes,
         prefVereador,
@@ -179,11 +189,7 @@ export async function surveyRoutes(app: FastifyInstance) {
       prefPresidente: 'Presidente',
     }
 
-    // Normaliza removendo acentos, minúsculas e espaços extras
-    const normalize = (s: string) =>
-      s.trim().toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\s+/g, ' ')
+    const normalize = normalizeSurveyText
 
     // Agrupa variações do mesmo nome: "Flavio", "Flávio Bolsonaro", "Bolsonaro"
     // → usa o primeiro token como chave de agrupamento quando há sobreposição
@@ -253,7 +259,11 @@ export async function surveyRoutes(app: FastifyInstance) {
     })
   })
 
-  // Mapa de apoiadores — retorna regiões com contagens e coordenadas (geocoding via Nominatim)
+  // Mapa de apoiadores — retorna regiões (bairro, cidade e estado) com contagens e
+  // coordenadas (geocoding via Nominatim). As três granularidades são calculadas
+  // sempre juntas — o candidato escolhe qual ver no frontend (abas Bairro/Cidade/Estado),
+  // já que candidatos de cargo estadual/federal precisam ver distribuição entre
+  // cidades e regiões do estado, não só bairros de uma única cidade.
   app.get('/surveys/vote/map', { onRequest: [requireModule('platform')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
@@ -262,11 +272,8 @@ export async function surveyRoutes(app: FastifyInstance) {
 
     const candidate = await prisma.candidate.findUnique({
       where: { id: candidateId },
-      select: { position: true, city: true, state: true },
+      select: { city: true, state: true },
     })
-    const groupByCity = candidate?.position
-      ? !['Vereador', 'Prefeito'].includes(candidate.position)
-      : false
 
     // Totais reais (incluindo registros sem localização) — usados nos cards de resumo
     const totaisReais = await prisma.voteSurveyResponse.groupBy({
@@ -276,83 +283,76 @@ export async function surveyRoutes(app: FastifyInstance) {
     })
     const totaisMap = Object.fromEntries(totaisReais.map(t => [t.intention, t._count]))
 
-    // Busca todas as respostas com alguma localização (neighborhood ou city)
-    // Para vereador/prefeito: tenta bairro primeiro, cai para cidade se bairro vazio
-    const rowsRaw = groupByCity
-      ? await prisma.voteSurveyResponse.groupBy({
-          by: ['city', 'intention'],
-          where: { candidateId, city: { not: null }, createdAt: { gte: sinceDate } },
-          _count: true,
-        })
-      : await prisma.voteSurveyResponse.findMany({
-          where: {
-            candidateId,
-            createdAt: { gte: sinceDate },
-            OR: [{ neighborhood: { not: null } }, { city: { not: null } }],
-          },
-          select: { neighborhood: true, city: true, intention: true },
-        })
+    const rows = await prisma.voteSurveyResponse.findMany({
+      where: {
+        candidateId,
+        createdAt: { gte: sinceDate },
+        OR: [{ neighborhood: { not: null } }, { city: { not: null } }, { state: { not: null } }],
+      },
+      select: { neighborhood: true, city: true, state: true, intention: true },
+    })
 
-    // Agrupa por região (bairro se existir, senão cidade como fallback)
-    const regionMap: Record<string, { apoiador: number; indeciso: number; critico: number }> = {}
-    for (const row of rowsRaw as any[]) {
-      const key = groupByCity
-        ? row.city
-        : (row.neighborhood?.trim() || row.city?.trim() || null)
-      if (!key) continue
-      if (!regionMap[key]) regionMap[key] = { apoiador: 0, indeciso: 0, critico: 0 }
-      if (groupByCity) {
-        if (row.intention === 'APOIADOR') regionMap[key].apoiador += row._count
-        if (row.intention === 'INDECISO') regionMap[key].indeciso += row._count
-        if (row.intention === 'CRITICO')  regionMap[key].critico  += row._count
-      } else {
-        if (row.intention === 'APOIADOR') regionMap[key].apoiador += 1
-        if (row.intention === 'INDECISO') regionMap[key].indeciso += 1
-        if (row.intention === 'CRITICO')  regionMap[key].critico  += 1
+    // Normaliza para chave de agrupamento (evita "Centro"/"centro" virarem entradas
+    // separadas), mas guarda a primeira grafia vista como label de exibição.
+    type Counts = { apoiador: number; indeciso: number; critico: number }
+    function buildRegionMap(getRawLabel: (row: typeof rows[number]) => string | null | undefined) {
+      const map: Record<string, { label: string; counts: Counts }> = {}
+      for (const row of rows) {
+        const raw = getRawLabel(row)?.trim()
+        if (!raw) continue
+        const key = normalizeSurveyText(raw)
+        if (!map[key]) map[key] = { label: raw, counts: { apoiador: 0, indeciso: 0, critico: 0 } }
+        if (row.intention === 'APOIADOR') map[key].counts.apoiador += 1
+        if (row.intention === 'INDECISO') map[key].counts.indeciso += 1
+        if (row.intention === 'CRITICO')  map[key].counts.critico  += 1
       }
+      return map
     }
 
-    // Geocodifica cada região via Nominatim (OpenStreetMap) — sem chave, gratuito
+    const neighborhoodMap = buildRegionMap(r => r.neighborhood)
+    const cityMap = buildRegionMap(r => r.city)
+    const stateMap = buildRegionMap(r => r.state)
+
     const baseCity = candidate?.city ?? ''
-    const baseState = candidate?.state ?? 'Brasil'
+    const baseState = candidate?.state ?? ''
 
-    const geocoded = await Promise.all(
-      Object.entries(regionMap).map(async ([region, counts]) => {
-        const total = counts.apoiador + counts.indeciso + counts.critico
-        const dominant =
-          counts.apoiador >= counts.indeciso && counts.apoiador >= counts.critico ? 'APOIADOR'
-          : counts.indeciso >= counts.critico ? 'INDECISO'
-          : 'CRITICO'
+    // Geocodifica cada região via Nominatim (OpenStreetMap) — sem chave, gratuito
+    async function geocodeMap(
+      map: Record<string, { label: string; counts: Counts }>,
+      queryFor: (label: string) => string,
+    ) {
+      const results = await Promise.all(
+        Object.values(map).map(async ({ label, counts }) => {
+          const total = counts.apoiador + counts.indeciso + counts.critico
+          const dominant =
+            counts.apoiador >= counts.indeciso && counts.apoiador >= counts.critico ? 'APOIADOR'
+            : counts.indeciso >= counts.critico ? 'INDECISO'
+            : 'CRITICO'
 
-        // Tenta geocodificar: bairro + cidade + estado, ou só cidade + estado
-        const query = groupByCity
-          ? `${region}, ${baseState}, Brasil`
-          : `${region}, ${baseCity}, ${baseState}, Brasil`
-
-        try {
-          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
-          const res = await fetch(url, { headers: { 'User-Agent': 'SyncroFlowEleicoes/1.0' } })
-          const data = await res.json() as any[]
-          if (data.length > 0) {
-            return {
-              region,
-              lat: parseFloat(data[0].lat),
-              lng: parseFloat(data[0].lon),
-              dominant,
-              total,
-              ...counts,
+          try {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryFor(label))}&format=json&limit=1`
+            const res = await fetch(url, { headers: { 'User-Agent': 'SyncroFlowEleicoes/1.0' } })
+            const data = await res.json() as any[]
+            if (data.length > 0) {
+              return { region: label, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), dominant, total, ...counts }
             }
-          }
-        } catch { /* ignora falha de geocoding */ }
+          } catch { /* ignora falha de geocoding */ }
+          return null
+        })
+      )
+      return results.filter(Boolean)
+    }
 
-        return null
-      })
-    )
+    const [byNeighborhood, byCity, byState] = await Promise.all([
+      geocodeMap(neighborhoodMap, (label) => `${label}, ${baseCity}, ${baseState}, Brasil`),
+      geocodeMap(cityMap, (label) => `${label}, ${baseState}, Brasil`),
+      geocodeMap(stateMap, (label) => `${label}, Brasil`),
+    ])
 
     return reply.send({
-      groupByCity,
-      regionLabel: groupByCity ? 'Cidade' : 'Bairro',
-      points: geocoded.filter(Boolean),
+      byNeighborhood: { label: 'Bairro', points: byNeighborhood },
+      byCity: { label: 'Cidade', points: byCity },
+      byState: { label: 'Estado', points: byState },
       totais: {
         apoiador: totaisMap['APOIADOR'] ?? 0,
         indeciso: totaisMap['INDECISO'] ?? 0,
