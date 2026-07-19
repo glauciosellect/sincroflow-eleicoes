@@ -410,7 +410,8 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
     onError: (err: any) => toast({ title: 'Erro ao disparar', description: err.response?.data?.error, variant: 'destructive' }),
   })
 
-  const exceeds24h = preview && preview.totalTargets > preview.remaining24hCapacity
+  // remaining24hCapacity === null significa canal sem limite de 24h (ex: Telegram) — nunca excede.
+  const exceeds24h = preview && preview.remaining24hCapacity !== null && preview.totalTargets > preview.remaining24hCapacity
   const exceedsMax = preview && preview.totalTargets > preview.maxTargets
   const exceedsQuota = preview && preview.totalTargets > preview.activeMsgsRemaining
   const canConfirm = preview && !exceeds24h && !exceedsMax && !exceedsQuota && preview.totalTargets > 0
