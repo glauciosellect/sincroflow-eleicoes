@@ -138,7 +138,7 @@ async function bootstrap() {
     if (error.name === 'ZodError') {
       return reply.status(400).send({ error: 'Dados inválidos', details: JSON.parse(error.message) })
     }
-    if (error.message === 'Email já cadastrado' || error.message.includes('inválid') || error.message.includes('não encontrado')) {
+    if (error.message.includes('já cadastrado') || error.message.includes('inválid') || error.message.includes('não encontrado')) {
       return reply.status(400).send({ error: error.message })
     }
     reply.status(500).send({ error: process.env.NODE_ENV === 'development' ? error.message : 'Erro interno do servidor' })

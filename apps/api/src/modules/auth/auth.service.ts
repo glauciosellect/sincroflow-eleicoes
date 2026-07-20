@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { prisma } from '../../lib/prisma'
 import { redis } from '../../lib/redis'
 import { sendEmail, passwordResetEmail } from '../../lib/mailer'
+import { sendInstitutionalWhatsAppText } from '../../lib/institutional-whatsapp'
 import type { RegisterInput, LoginInput } from './auth.schema'
 
 const DEFAULT_DISCLAIMER = (name: string, position?: string, party?: string) => `
@@ -12,6 +13,21 @@ Olá! Sou o assistente virtual da campanha de ${name}${position ? `, pré-candid
 Estou aqui para responder suas dúvidas sobre as propostas, informar sobre eventos e registrar suas sugestões.
 Como posso ajudar você hoje?
 `.trim()
+
+const WELCOME_WHATSAPP_MESSAGE = (name: string) => {
+  const firstName = name.trim().split(' ')[0]
+  return `Olá, ${firstName}! 🚀
+
+Seja muito bem-vindo(a) à *SyncroFlow*! Sua conta acabou de ser criada e sua campanha agora tem um aliado trabalhando 24 horas por dia ao seu lado.
+
+A partir de agora você tem em mãos uma plataforma completa para organizar sua candidatura: um assistente de IA para atender seus eleitores, ferramentas para sua equipe de campo, criativos, relatórios e muito mais — tudo pensado para que você foque no que importa: sua mensagem e seu eleitor.
+
+Estamos muito felizes em fazer parte dessa jornada com você. 💙
+
+Qualquer dúvida, pode chamar por aqui mesmo — esse número fica sempre aberto para te ajudar.
+
+Vamos juntos! 🇧🇷`
+}
 
 // Passo 1 do registro (seção 4.1 da spec): valida e guarda os dados temporariamente.
 // A conta (User + Candidate) só é criada de fato após o pagamento ser aprovado —
@@ -109,6 +125,10 @@ export async function createCandidateAccount(
   })
 
   await prisma.pendingRegistration.update({ where: { id: pendingId }, data: { status: 'APPROVED', resolvedAt: new Date() } })
+
+  if (pending.whatsapp) {
+    sendInstitutionalWhatsAppText(pending.whatsapp, WELCOME_WHATSAPP_MESSAGE(pending.name)).catch(() => {})
+  }
 
   return { userId: user.id, candidateId: candidate.id }
 }
