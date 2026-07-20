@@ -48,7 +48,13 @@ export async function webhookRoutes(app: FastifyInstance) {
     return reply.send()
   })
 
-  app.post('/webhooks/whatsapp/:channelId', { config: { rawBody: true } }, async (req, reply) => {
+  // rateLimit: false — webhooks recebem tráfego de TODOS os candidatos simultaneamente
+  // vindo de um conjunto pequeno de IPs da própria Meta/Telegram; o rate limit global
+  // por IP (200 req/min) satura rápido com poucas centenas de candidatos ativos e
+  // derruba mensagens de eleitores reais antes de chegarem à fila (ver teste de carga,
+  // Módulo 6 da SPEC-Escala-Webhooks). Autenticidade já é garantida por assinatura HMAC
+  // (Meta) ou channelId válido (Telegram), não pelo rate limit.
+  app.post('/webhooks/whatsapp/:channelId', { config: { rawBody: true, rateLimit: false } }, async (req, reply) => {
     if (!isValidMetaSignature(req)) return reply.status(403).send()
 
     const { channelId: urlChannelId } = req.params as { channelId: string }
@@ -88,7 +94,7 @@ export async function webhookRoutes(app: FastifyInstance) {
     return reply.send()
   })
 
-  app.post('/webhooks/meta', { config: { rawBody: true } }, async (req, reply) => {
+  app.post('/webhooks/meta', { config: { rawBody: true, rateLimit: false } }, async (req, reply) => {
     if (!isValidMetaSignature(req)) return reply.status(403).send()
 
     const body = req.body as any
@@ -143,7 +149,7 @@ export async function webhookRoutes(app: FastifyInstance) {
     return reply.send()
   })
 
-  app.post('/webhooks/meta/:channelId', { config: { rawBody: true } }, async (req, reply) => {
+  app.post('/webhooks/meta/:channelId', { config: { rawBody: true, rateLimit: false } }, async (req, reply) => {
     if (!isValidMetaSignature(req)) return reply.status(403).send()
 
     const { channelId } = req.params as { channelId: string }
@@ -159,7 +165,7 @@ export async function webhookRoutes(app: FastifyInstance) {
     return reply.send({ ok: true })
   })
 
-  app.post('/webhooks/telegram/:channelId', async (req, reply) => {
+  app.post('/webhooks/telegram/:channelId', { config: { rateLimit: false } }, async (req, reply) => {
     const { channelId } = req.params as { channelId: string }
     logger.info('[TELEGRAM-WEBHOOK] recebido', { channelId, preview: JSON.stringify(req.body).slice(0, 400) })
     await messageQueue.add('process', { channelId, channelType: 'TELEGRAM', payload: req.body }, {
