@@ -1,10 +1,9 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/auth.store'
-import { Loader2, ArrowRight, Check, CreditCard, QrCode } from 'lucide-react'
+import { Loader2, ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const accountSchema = z.object({
@@ -34,47 +33,10 @@ const accountSchema = z.object({
 
 type AccountData = z.infer<typeof accountSchema>
 
-const CARGOS = [
-  {
-    value: 'DEP_ESTADUAL',
-    label: 'Deputado(a) Estadual',
-    total: 5990,
-    desc: 'Eleições 2026 — pagamento único',
-  },
-  {
-    value: 'DEP_FEDERAL',
-    label: 'Deputado(a) Federal',
-    total: 7490,
-    desc: 'Eleições 2026 — pagamento único',
-  },
-  {
-    value: 'SENADOR_GOV',
-    label: 'Senador(a) / Governador(a)',
-    total: 10990,
-    desc: 'Eleições 2026 — pagamento único',
-  },
-] as const
-
-type CargoValue = (typeof CARGOS)[number]['value']
-
-function formatBRL(value: number) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
 function RegisterForm() {
   const { toast } = useToast()
   const setAuth = useAuthStore((s) => s.setAuth)
-  const searchParams = useSearchParams()
-  const [step, setStep] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
-  const [cargo, setCargo] = useState<CargoValue>('DEP_ESTADUAL')
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('pix')
-  const [pendingId, setPendingId] = useState<string | null>(null)
-
-  useEffect(() => {
-    const c = searchParams.get('cargo') as CargoValue | null
-    if (c && CARGOS.find(x => x.value === c)) setCargo(c)
-  }, [searchParams])
 
   const { register, handleSubmit, watch, control, formState: { errors, isValid } } = useForm<AccountData>({
     resolver: zodResolver(accountSchema),
@@ -83,9 +45,7 @@ function RegisterForm() {
   })
   const passwordValue = watch('password', '')
 
-  const selectedCargo = CARGOS.find(c => c.value === cargo)!
-
-  const onSubmitStep1 = async (data: AccountData) => {
+  const onSubmit = async (data: AccountData) => {
     setLoading(true)
     try {
       const res = await api.post('/auth/register', {
@@ -97,8 +57,9 @@ function RegisterForm() {
         password: data.password,
         acceptedTerms: true,
       })
-      setPendingId(res.data.pendingId)
-      setStep(2)
+      const { user, candidate, role, accessToken, refreshToken } = res.data
+      setAuth(user, candidate ?? null, accessToken, refreshToken, role)
+      window.location.href = '/dashboard'
     } catch (err: any) {
       toast({ title: 'Erro ao registrar', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
     } finally {
@@ -106,66 +67,14 @@ function RegisterForm() {
     }
   }
 
-  const handleCheckout = async () => {
-    if (!pendingId) {
-      toast({ title: 'Sessão de cadastro expirada', description: 'Volte ao passo 1 e tente novamente', variant: 'destructive' })
-      setStep(1)
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await api.post('/auth/register/checkout', {
-        pendingId,
-        cargo,
-        paymentMethod,
-        installments: 1,
-      })
-      // A conta já foi criada nesse momento (Módulo 8) — loga o candidato imediatamente,
-      // mesmo antes do pagamento confirmar, para ele já poder usar o sistema.
-      const { user, candidate, role, accessToken, refreshToken } = res.data
-      if (user && accessToken && refreshToken) {
-        setAuth(user, candidate ?? null, accessToken, refreshToken, role)
-      }
-      if (res.data.url) {
-        window.location.href = res.data.url
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro ao iniciar pagamento', description: err.response?.data?.error || 'Tente novamente', variant: 'destructive' })
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex items-center gap-2 flex-1">
-              <div className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-all',
-                s < step ? 'bg-[#009C3B] text-white' :
-                s === step ? 'bg-[#002776] text-white' :
-                'bg-gray-100 text-gray-400'
-              )}>
-                {s < step ? <Check className="w-4 h-4" /> : s}
-              </div>
-              {s < 2 && <div className={cn('flex-1 h-0.5 transition-all', s < step ? 'bg-[#009C3B]' : 'bg-gray-100')} />}
-            </div>
-          ))}
-        </div>
-        <div className="text-xs text-gray-400 text-right">
-          {step === 1 ? 'Dados do candidato' : 'Pagamento'}
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Cadastre sua campanha</h1>
+        <p className="text-gray-400 mt-1 text-sm">Comece a usar o sistema imediatamente. A ativação do plano é feita depois, em Configurações → Financeiro.</p>
       </div>
 
-      {step === 1 && (
-        <div>
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Cadastre sua campanha</h1>
-            <p className="text-gray-400 mt-1 text-sm">Comece a usar o sistema imediatamente — o pagamento só é necessário para liberar todos os módulos.</p>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmitStep1)} className="space-y-4" autoComplete="off">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
             <div>
               <Label htmlFor="name">Nome completo *</Label>
               <Input id="name" placeholder="Seu nome completo" className="mt-1" {...register('name')} />
@@ -249,116 +158,18 @@ function RegisterForm() {
               disabled={!isValid || loading}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Avançar para pagamento <ArrowRight className="w-4 h-4 ml-2" />
+              Criar minha conta <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          </form>
+      </form>
 
-          <p className="text-center text-sm text-gray-400 mt-5">
-            Já tem conta?{' '}
-            <Link href="/login" className="text-[#002776] hover:underline font-medium">Entrar</Link>
-          </p>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div>
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Escolha seu cargo</h1>
-            <p className="text-gray-400 mt-1 text-sm">Pagamento único para todo o período eleitoral. Você já pode acessar o sistema agora, antes mesmo de pagar.</p>
-          </div>
-
-          {/* Seleção de cargo */}
-          <div className="space-y-2 mb-6">
-            {CARGOS.map((c) => (
-              <button
-                key={c.value}
-                onClick={() => setCargo(c.value)}
-                className={cn(
-                  'w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
-                  cargo === c.value ? 'border-[#002776] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={cn('text-sm font-semibold', cargo === c.value ? 'text-[#002776]' : 'text-gray-800')}>{c.label}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{c.desc}</div>
-                  </div>
-                  <div className={cn('text-lg font-bold', cargo === c.value ? 'text-[#002776]' : 'text-gray-700')}>
-                    {formatBRL(c.total)}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Forma de pagamento */}
-          <Label className="text-sm font-medium text-gray-700">Forma de pagamento</Label>
-          <div className="grid grid-cols-2 gap-2 mt-2 mb-4">
-            <button
-              onClick={() => setPaymentMethod('card')}
-              className={cn(
-                'flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 transition-all',
-                paymentMethod === 'card' ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
-              )}
-            >
-              <CreditCard className={cn('w-5 h-5', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-400')} />
-              <span className={cn('text-sm font-semibold', paymentMethod === 'card' ? 'text-[#009C3B]' : 'text-gray-700')}>Cartão de Débito</span>
-              <span className="text-xs text-gray-400">à vista</span>
-            </button>
-            <button
-              onClick={() => setPaymentMethod('pix')}
-              className={cn(
-                'flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 transition-all',
-                paymentMethod === 'pix' ? 'border-[#009C3B] bg-green-50' : 'border-gray-200 hover:border-gray-300'
-              )}
-            >
-              <QrCode className={cn('w-5 h-5', paymentMethod === 'pix' ? 'text-[#009C3B]' : 'text-gray-400')} />
-              <span className={cn('text-sm font-semibold', paymentMethod === 'pix' ? 'text-[#009C3B]' : 'text-gray-700')}>Pix</span>
-              <span className="text-xs text-gray-400">à vista</span>
-            </button>
-          </div>
-
-          {paymentMethod === 'card' && (
-            <div className="mb-6 px-4 py-3 rounded-xl bg-green-50 border border-green-200">
-              <p className="text-sm text-green-800 font-medium">
-                {formatBRL(selectedCargo.total)} à vista no débito
-              </p>
-              <p className="text-xs text-green-600 mt-0.5">Aprovação imediata após o pagamento</p>
-            </div>
-          )}
-
-          {paymentMethod === 'pix' && (
-            <div className="mb-6 px-4 py-3 rounded-xl bg-green-50 border border-green-200">
-              <p className="text-sm text-green-800 font-medium">
-                {formatBRL(selectedCargo.total)} à vista via Pix
-              </p>
-              <p className="text-xs text-green-600 mt-0.5">Aprovação imediata após o pagamento</p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleCheckout}
-            disabled={loading}
-            className="w-full text-white"
-            style={{ background: 'linear-gradient(135deg, #009C3B, #002776)' }}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Ir para pagamento
-          </Button>
-
-          <p className="text-center text-xs text-gray-400 mt-3">
-            Pagamento processado com segurança via Asaas
-          </p>
-        </div>
-      )}
+      <p className="text-center text-sm text-gray-400 mt-5">
+        Já tem conta?{' '}
+        <Link href="/login" className="text-[#002776] hover:underline font-medium">Entrar</Link>
+      </p>
     </div>
   )
 }
 
 export default function RegisterPage() {
-  return (
-    <Suspense fallback={<div className="w-full max-w-md animate-pulse" />}>
-      <RegisterForm />
-    </Suspense>
-  )
+  return <RegisterForm />
 }

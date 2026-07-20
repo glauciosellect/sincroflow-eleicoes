@@ -10,6 +10,8 @@ import {
 } from './auth.schema'
 import {
   createPendingRegistration,
+  createCandidateAccount,
+  saveRefreshToken,
   loginUser,
   refreshTokens,
   logoutUser,
@@ -19,6 +21,7 @@ import {
   verify2FA,
   disable2FA,
 } from './auth.service'
+import { prisma } from '../../lib/prisma'
 
 export async function authRoutes(app: FastifyInstance) {
   const signTokens = (userId: string, candidateId?: string, role?: string) => ({
@@ -29,12 +32,27 @@ export async function authRoutes(app: FastifyInstance) {
   // Rate limit estrito: 10 tentativas por 15 minutos por IP
   const authRateLimit = { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }
 
-  // Passo 1 do registro (dados do candidato) — não cria a conta ainda.
-  // A conta só é criada após o pagamento ser aprovado (ver billing/stripe.routes.ts).
+  // Cadastro em passo único: cria a conta (User + Candidate ACTIVE) e já loga o
+  // candidato, sem pedir cargo/pagamento aqui — isso é feito depois, dentro do
+  // sistema, em Configurações → Financeiro (ver billing/stripe.routes.ts,
+  // rota /billing/activate-campaign).
   app.post('/auth/register', authRateLimit, async (req, reply) => {
     const input = registerSchema.parse(req.body)
     const pendingId = await createPendingRegistration(input)
-    return reply.status(201).send({ pendingId })
+
+    const account = await createCandidateAccount(pendingId)
+    if (!account) return reply.status(400).send({ error: 'Não foi possível criar a conta. Tente novamente ou contate o suporte.' })
+
+    const tokens = signTokens(account.userId, account.candidateId, 'ADMINISTRADOR')
+    await saveRefreshToken(account.userId, tokens.refreshToken)
+
+    const [user, candidate] = await Promise.all([
+      prisma.user.findUnique({ where: { id: account.userId } }),
+      prisma.candidate.findUnique({ where: { id: account.candidateId } }),
+    ])
+    const { passwordHash, twoFactorSecret, ...safeUser } = user!
+
+    return reply.status(201).send({ user: safeUser, candidate, role: 'ADMINISTRADOR', ...tokens })
   })
 
   app.post('/auth/login', authRateLimit, async (req, reply) => {
