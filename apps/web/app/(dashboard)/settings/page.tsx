@@ -462,22 +462,6 @@ function ChannelsTab() {
     window.location.href = `${API_URL}/integrations/meta/connect?token=${encodeURIComponent(token)}&type=${type}`
   }
 
-  const embeddedSignupDataRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({})
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.facebook.com') return
-      try {
-        const data = JSON.parse(event.data)
-        if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
-          embeddedSignupDataRef.current = { wabaId: data.data?.waba_id, phoneNumberId: data.data?.phone_number_id }
-        }
-      } catch {}
-    }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
-  }, [])
-
   const whatsappEmbeddedSignupMutation = useMutation({
     mutationFn: (params: { code: string; wabaId?: string; phoneNumberId?: string }) =>
       api.post('/channels/whatsapp-meta/signup', params),
@@ -491,25 +475,37 @@ function ChannelsTab() {
     },
   })
 
+  // Domínio "emprestado" para o Embedded Signup: app.syncrofloweleicoes.com.br ainda
+  // não pode ser cadastrado no App da Meta (compartilhado com o SyncroFlow comercial,
+  // hoje em análise para Instagram/Facebook — evitamos qualquer mudança de config nele).
+  // eleicoes-connect.syncroflow.io é um subdomínio de syncroflow.io (já autorizado),
+  // apontado via DNS/Vercel para este mesmo painel — roda o FB.login numa página sem
+  // autenticação própria e devolve o resultado por postMessage. Remover assim que o
+  // Eleições tiver App Meta próprio. Ver app/embedded-signup-bridge/page.tsx.
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const data = event.data
+      if (!data || data.source !== 'syncroflow-embedded-signup-bridge') return
+      if (!data.code) { toast({ title: 'Conexão cancelada', variant: 'destructive' }); return }
+      whatsappEmbeddedSignupMutation.mutate({ code: data.code, wabaId: data.wabaId, phoneNumberId: data.phoneNumberId })
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
   const connectWhatsAppMeta = () => {
     if (whatsappAtLimit) {
       toast({ title: 'Limite do plano atingido', description: `Seu plano permite ${whatsappLimit} número(s) de WhatsApp. Faça upgrade para conectar mais.`, variant: 'destructive' })
       return
     }
-    if (!(window as any).FB) {
-      toast({ title: 'SDK da Meta ainda não carregou — tente novamente em alguns segundos', variant: 'destructive' })
-      return
+    const popup = window.open(
+      'https://eleicoes-connect.syncroflow.io/embedded-signup-bridge',
+      'meta-embedded-signup',
+      'width=600,height=720',
+    )
+    if (!popup) {
+      toast({ title: 'Pop-up bloqueado', description: 'Permita pop-ups para este site e tente novamente.', variant: 'destructive' })
     }
-    ;(window as any).FB.login((response: any) => {
-      const code = response.authResponse?.code
-      if (!code) { toast({ title: 'Conexão cancelada', variant: 'destructive' }); return }
-      whatsappEmbeddedSignupMutation.mutate({ code, ...embeddedSignupDataRef.current })
-    }, {
-      config_id: process.env.NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID,
-      response_type: 'code',
-      override_default_response_type: true,
-      extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
-    })
   }
 
   // Número virtual (Salvy) — alternativa a trazer um número próprio: a plataforma
