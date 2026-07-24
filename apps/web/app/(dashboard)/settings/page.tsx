@@ -546,6 +546,16 @@ function ChannelsTab() {
     }
   }, [verificationStatus?.verificationCode])
 
+  // O backend ativa o canal sozinho assim que o SMS chega no webhook (sem esperar
+  // clique) — ao detectar isso via polling, fecha o diálogo e avisa o candidato.
+  useEffect(() => {
+    if (verificationStatus?.isActive) {
+      qc.invalidateQueries({ queryKey: ['channels'] })
+      toast({ title: 'WhatsApp ativado com sucesso!' })
+      closeVirtualNumberDialog()
+    }
+  }, [verificationStatus?.isActive])
+
   const activateVirtualNumberMutation = useMutation({
     mutationFn: () => api.post(`/integrations/salvy/virtual-numbers/${pendingVirtualChannelId}/activate`, { verificationCode: virtualVerificationCode }),
     onSuccess: () => {
@@ -787,32 +797,37 @@ function ChannelsTab() {
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-gray-500">
-                Número adquirido! Assim que o SMS com o código de verificação chegar, ele aparece automaticamente abaixo — ou cole manualmente se preferir.
+                Número adquirido! A ativação é automática: assim que o SMS com o código de verificação chegar, o WhatsApp é conectado sozinho — não é preciso fazer nada.
               </p>
-              <div>
-                <Label>Código de verificação</Label>
-                <Input
-                  className="mt-1 font-mono"
-                  placeholder="123456"
-                  value={virtualVerificationCode}
-                  onChange={(e) => setVirtualVerificationCode(e.target.value)}
-                />
-                {verificationStatus?.verificationCode ? (
-                  <p className="text-xs text-green-600 mt-1">Código recebido via SMS</p>
-                ) : (
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Aguardando SMS...</p>
-                )}
+              <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                {verificationStatus?.verificationCode ? 'Código recebido — ativando automaticamente...' : 'Aguardando SMS...'}
               </div>
-              <DialogFooter>
-                <Button
-                  className="w-full"
-                  disabled={!virtualVerificationCode.trim() || activateVirtualNumberMutation.isPending}
-                  onClick={() => activateVirtualNumberMutation.mutate()}
-                >
-                  {activateVirtualNumberMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Confirmar e ativar
-                </Button>
-              </DialogFooter>
+
+              <details className="text-xs text-gray-400">
+                <summary className="cursor-pointer select-none">Está demorando? Confirme manualmente</summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <Label className="text-xs">Código de verificação</Label>
+                    <Input
+                      className="mt-1 font-mono"
+                      placeholder="123456"
+                      value={virtualVerificationCode}
+                      onChange={(e) => setVirtualVerificationCode(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    size="sm"
+                    disabled={!virtualVerificationCode.trim() || activateVirtualNumberMutation.isPending}
+                    onClick={() => activateVirtualNumberMutation.mutate()}
+                  >
+                    {activateVirtualNumberMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Confirmar e ativar
+                  </Button>
+                </div>
+              </details>
             </div>
           )}
         </DialogContent>

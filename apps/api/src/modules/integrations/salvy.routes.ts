@@ -67,6 +67,52 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
   }
 }
 
+// Registra o número na WABA e ativa o canal — chamado automaticamente pelo webhook
+// assim que o SMS chega (ver POST /webhooks/salvy), sem esperar o candidato clicar em
+// nada. Recomendação da própria Salvy: "finalizar a verificação automaticamente na API
+// do provedor" no backend, ao receber o OTP via webhook.
+async function activateChannelWithCode(channelId: string, verificationCode: string): Promise<void> {
+  const channel = await prisma.channel.findUnique({ where: { id: channelId } })
+  if (!channel) return
+
+  const config = channel.config as any
+  if (channel.isActive || config?.phoneNumberId) return // já ativo — evita corrida/reprocessamento
+
+  const phoneNumber = config?.displayPhoneNumber
+  if (!phoneNumber) {
+    logger.error('[SALVY] Auto-ativação abortada: canal sem displayPhoneNumber', { channelId })
+    return
+  }
+
+  let wabaData: { phoneNumberId: string; accessToken: string; wabaId: string }
+  try {
+    wabaData = await registerNumberOnWaba(phoneNumber, verificationCode)
+  } catch (err: any) {
+    logger.error('[SALVY] Auto-ativação: erro ao registrar número na WABA', { channelId, error: err?.response?.data || err?.message })
+    return
+  }
+
+  await prisma.channel.update({
+    where: { id: channelId },
+    data: {
+      isActive: true,
+      externalId: wabaData.phoneNumberId,
+      config: {
+        ...config,
+        provider: 'meta-cloud',
+        phoneNumberId: wabaData.phoneNumberId,
+        accessToken: wabaData.accessToken,
+        wabaId: wabaData.wabaId,
+        salvyStatus: 'active',
+        verificationCode: null,
+      },
+    },
+  })
+
+  await subscribeAppToWaba(wabaData.wabaId, wabaData.accessToken)
+  logger.info('[SALVY] Canal ativado automaticamente via webhook', { channelId, phoneNumber })
+}
+
 export async function salvyRoutes(app: FastifyInstance) {
   // Lista DDDs disponíveis para o candidato escolher ao adquirir número
   app.get('/integrations/salvy/area-codes', { onRequest: [app.authenticate] }, async (_req, reply) => {
@@ -210,8 +256,10 @@ export async function salvyRoutes(app: FastifyInstance) {
     return reply.send({ status: confirmed.status })
   })
 
-  // Webhook da Salvy (assinado via Svix) — recebe sms.received com o código de verificação do WhatsApp.
-  // Ao receber o código, salva no channel.config para o candidato confirmar no painel.
+  // Webhook da Salvy (assinado via Svix) — recebe sms.received com o código de verificação
+  // do WhatsApp. Ao receber o código, ativa o canal automaticamente (registra o número
+  // na WABA da Meta) — sem esperar o candidato clicar em nada, conforme orientação da
+  // própria Salvy ("finalize a verificação automaticamente na API do provedor").
   app.post('/webhooks/salvy', { config: { rawBody: true } }, async (req, reply) => {
     const wh = new Webhook(SALVY_WEBHOOK_SECRET)
     let payload: any
@@ -251,6 +299,8 @@ export async function salvyRoutes(app: FastifyInstance) {
             },
           })
           logger.info(`[SALVY-WEBHOOK] Código ${verificationCode} salvo no canal ${channel.id}`)
+
+          await activateChannelWithCode(channel.id, verificationCode)
         } else {
           logger.warn(`[SALVY-WEBHOOK] Canal não encontrado para salvyVirtualPhoneAccountId: ${virtualPhoneAccountId}`)
         }
