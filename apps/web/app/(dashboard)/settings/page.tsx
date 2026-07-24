@@ -805,16 +805,22 @@ function ChannelsTab() {
               <p className="text-sm text-gray-500">
                 Número adquirido! A ativação é automática: assim que o SMS com o código de verificação chegar, o WhatsApp é conectado sozinho — não é preciso fazer nada.
               </p>
-              <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
-                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                {verificationStatus?.verificationCode ? 'Código recebido — ativando automaticamente...' : 'Aguardando SMS...'}
-              </div>
+              {verificationStatus?.registrationError ? (
+                <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2.5">
+                  Não conseguimos preparar este número na Meta agora. Cancele e tente adquirir um número novo, ou contate o suporte se persistir.
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  {verificationStatus?.verificationCode ? 'Código recebido — ativando automaticamente...' : 'Aguardando SMS...'}
+                </div>
+              )}
 
               <Button
                 className="w-full"
                 variant="outline"
                 size="sm"
-                disabled={resendVirtualCodeMutation.isPending}
+                disabled={resendVirtualCodeMutation.isPending || !verificationStatus?.phoneNumberId}
                 onClick={() => resendVirtualCodeMutation.mutate()}
               >
                 {resendVirtualCodeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

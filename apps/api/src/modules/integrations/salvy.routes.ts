@@ -234,23 +234,29 @@ export async function salvyRoutes(app: FastifyInstance) {
 
     // Passos 1 e 2 do fluxo oficial (adicionar número + pedir SMS) em background —
     // não bloqueia a resposta ao candidato. A linha recém-comprada na Salvy pode levar
-    // alguns segundos para ficar apta na rede; se falhar aqui, o webhook da Salvy ainda
-    // assim chega, mas activateChannelWithCode vai falhar por não ter phoneNumberId —
-    // por isso guardamos o erro no config para o candidato saber que precisa tentar de novo.
-    acquireAndRequestCode(account.phoneNumber)
-      .then(({ phoneNumberId }) =>
-        prisma.channel.update({
-          where: { id: channel.id },
-          data: { config: { ...(channel.config as any), phoneNumberId } },
-        }),
-      )
-      .catch((err: any) => {
-        logger.error('[SALVY] Erro ao adicionar número/solicitar código na WABA', { channelId: channel.id, error: err?.response?.data || err?.message })
-        prisma.channel.update({
-          where: { id: channel.id },
-          data: { config: { ...(channel.config as any), registrationError: true } },
-        }).catch(() => {})
-      })
+    // alguns segundos para ficar apta na rede; tenta algumas vezes com backoff antes de
+    // desistir e marcar registrationError, que a UI exibe como erro visível ao candidato.
+    ;(async () => {
+      const delaysMs = [0, 5000, 15000]
+      for (let i = 0; i < delaysMs.length; i++) {
+        if (delaysMs[i] > 0) await sleep(delaysMs[i])
+        try {
+          const { phoneNumberId } = await acquireAndRequestCode(account.phoneNumber)
+          await prisma.channel.update({
+            where: { id: channel.id },
+            data: { config: { ...(channel.config as any), phoneNumberId } },
+          })
+          return
+        } catch (err: any) {
+          logger.warn('[SALVY] Tentativa de adicionar número/solicitar código falhou', { channelId: channel.id, attempt: i, error: err?.response?.data || err?.message })
+        }
+      }
+      logger.error('[SALVY] Todas as tentativas de adicionar número/solicitar código falharam', { channelId: channel.id })
+      await prisma.channel.update({
+        where: { id: channel.id },
+        data: { config: { ...(channel.config as any), registrationError: true } },
+      }).catch(() => {})
+    })()
 
     return reply.status(201).send({ channel, salvyAccount: account })
   })
@@ -434,6 +440,8 @@ export async function salvyRoutes(app: FastifyInstance) {
       verificationCodeReceivedAt: config?.verificationCodeReceivedAt ?? null,
       salvyStatus: config?.salvyStatus ?? null,
       isActive: channel.isActive,
+      phoneNumberId: config?.phoneNumberId ?? null,
+      registrationError: !!config?.registrationError,
     })
   })
 }
