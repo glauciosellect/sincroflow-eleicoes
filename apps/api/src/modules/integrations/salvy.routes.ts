@@ -20,38 +20,85 @@ const META_APP_SECRET = process.env.META_APP_SECRET!
 const META_WHATSAPP_API_VERSION = process.env.META_WHATSAPP_API_VERSION || 'v21.0'
 const GRAPH_URL = `https://graph.facebook.com/${META_WHATSAPP_API_VERSION}`
 
-// Registra o número virtual na WABA da SyncroFlow após confirmação do código SMS.
+// Adiciona o número à WABA (passo 1 do fluxo oficial da Meta) — sem código de
+// verificação ainda, é só o cadastro do número. Retorna o phoneNumberId, necessário
+// para os passos seguintes (request_code, verify_code, register).
+async function addPhoneNumberToWaba(systemToken: string, wabaId: string, phoneNumber: string): Promise<string> {
+  const res = await axios.post(
+    `${GRAPH_URL}/${wabaId}/phone_numbers`,
+    { phone_number: phoneNumber, cc: '55', verified_name: 'SyncroFlowEleições' },
+    { headers: { Authorization: `Bearer ${systemToken}` } },
+  )
+  return res.data.id
+}
+
+// Passo 2: solicita o envio do código de verificação (SMS ou ligação) para o número
+// recém-adicionado — é essa chamada que efetivamente dispara o SMS que a Salvy repassa
+// pelo webhook. Reutilizada também para reenviar o código, se o candidato pedir de novo.
+async function requestVerificationCode(accessToken: string, phoneNumberId: string, method: 'SMS' | 'VOICE' = 'SMS'): Promise<void> {
+  await axios.post(
+    `${GRAPH_URL}/${phoneNumberId}/request_code`,
+    { code_method: method, language: 'pt_BR' },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+}
+
+// Passo 3: confirma o código de verificação recebido por SMS.
+async function verifyPhoneCode(accessToken: string, phoneNumberId: string, code: string): Promise<void> {
+  await axios.post(
+    `${GRAPH_URL}/${phoneNumberId}/verify_code`,
+    { code },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+}
+
+// Passo 4: registra o número para uso efetivo na Cloud API (envio/recebimento de
+// mensagens) — sem essa chamada o número fica preso em "verificado mas não registrado".
+// O PIN é interno (nunca digitado por ninguém), usado só internamente pela Meta para
+// a verificação em duas etapas da linha.
+async function registerPhoneForMessaging(accessToken: string, phoneNumberId: string): Promise<void> {
+  const pin = String(Math.floor(100000 + Math.random() * 900000))
+  await axios.post(
+    `${GRAPH_URL}/${phoneNumberId}/register`,
+    { messaging_product: 'whatsapp', pin },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+}
+
+// Executa o fluxo oficial completo de registro na WABA da SyncroFlow, a partir do
+// código de verificação já recebido via webhook da Salvy (passos 3 e 4 — os passos 1 e
+// 2, adicionar número e pedir o código, já rodaram antes, ver acquireAndRequestCode).
 // Retorna phoneNumberId e accessToken que ficam em Channel.config.
-async function registerNumberOnWaba(phoneNumber: string, verificationCode: string): Promise<{
+async function completeWabaRegistration(phoneNumberId: string, verificationCode: string): Promise<{
   phoneNumberId: string
   accessToken: string
   wabaId: string
 }> {
-  // Obtém token de sistema de longa duração via App ID + Secret
   const tokenRes = await axios.get(`${GRAPH_URL}/oauth/access_token`, {
-    params: {
-      client_id: META_APP_ID,
-      client_secret: META_APP_SECRET,
-      grant_type: 'client_credentials',
-    },
+    params: { client_id: META_APP_ID, client_secret: META_APP_SECRET, grant_type: 'client_credentials' },
   })
   const systemToken: string = tokenRes.data.access_token
-
-  // Registra o número na WABA (a WABA_ID fica em META_WABA_ID env ou é buscada via API)
   const wabaId = process.env.META_WABA_ID!
-  const registerRes = await axios.post(
-    `${GRAPH_URL}/${wabaId}/phone_numbers`,
-    {
-      phone_number: phoneNumber,
-      verification_code: verificationCode,
-      cc: '55',
-    },
-    { headers: { Authorization: `Bearer ${systemToken}` } },
-  )
 
-  const phoneNumberId: string = registerRes.data.id
+  await verifyPhoneCode(systemToken, phoneNumberId, verificationCode)
+  await registerPhoneForMessaging(systemToken, phoneNumberId)
 
   return { phoneNumberId, accessToken: systemToken, wabaId }
+}
+
+// Passos 1 e 2 do fluxo oficial — chamado assim que o candidato adquire o número na
+// Salvy (antes de qualquer código existir), para já disparar o SMS de verificação.
+async function acquireAndRequestCode(phoneNumber: string): Promise<{ phoneNumberId: string }> {
+  const tokenRes = await axios.get(`${GRAPH_URL}/oauth/access_token`, {
+    params: { client_id: META_APP_ID, client_secret: META_APP_SECRET, grant_type: 'client_credentials' },
+  })
+  const systemToken: string = tokenRes.data.access_token
+  const wabaId = process.env.META_WABA_ID!
+
+  const phoneNumberId = await addPhoneNumberToWaba(systemToken, wabaId, phoneNumber)
+  await requestVerificationCode(systemToken, phoneNumberId, 'SMS')
+
+  return { phoneNumberId }
 }
 
 // Assina o app no WABA para receber mensagens via webhook
@@ -67,28 +114,39 @@ async function subscribeAppToWaba(wabaId: string, accessToken: string) {
   }
 }
 
-// Registra o número na WABA e ativa o canal — chamado automaticamente pelo webhook
-// assim que o SMS chega (ver POST /webhooks/salvy), sem esperar o candidato clicar em
-// nada. Recomendação da própria Salvy: "finalizar a verificação automaticamente na API
-// do provedor" no backend, ao receber o OTP via webhook.
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Confirma o código (verify_code) e finaliza o registro (register) — ativa o canal
+// automaticamente assim que o SMS chega via webhook (ver POST /webhooks/salvy), sem
+// esperar o candidato clicar em nada. Recomendação da própria Salvy: "finalize a
+// verificação automaticamente na API do provedor" no backend, ao receber o OTP.
+// O phoneNumberId é preenchido em background por acquireAndRequestCode logo após a
+// compra do número (passos 1 e 2) — se o webhook do SMS chegar antes disso terminar,
+// espera um pouco e tenta de novo (poucas vezes, com backoff curto).
 async function activateChannelWithCode(channelId: string, verificationCode: string): Promise<void> {
-  const channel = await prisma.channel.findUnique({ where: { id: channelId } })
+  let channel = await prisma.channel.findUnique({ where: { id: channelId } })
   if (!channel) return
+  if (channel.isActive) return
 
-  const config = channel.config as any
-  if (channel.isActive || config?.phoneNumberId) return // já ativo — evita corrida/reprocessamento
+  let config = channel.config as any
+  for (let attempt = 0; !config?.phoneNumberId && attempt < 5; attempt++) {
+    await sleep(2000)
+    channel = await prisma.channel.findUnique({ where: { id: channelId } })
+    if (!channel || channel.isActive) return
+    config = channel.config as any
+  }
 
-  const phoneNumber = config?.displayPhoneNumber
-  if (!phoneNumber) {
-    logger.error('[SALVY] Auto-ativação abortada: canal sem displayPhoneNumber', { channelId })
+  const phoneNumberId = config?.phoneNumberId
+  if (!phoneNumberId) {
+    logger.error('[SALVY] Auto-ativação abortada: phoneNumberId não disponível a tempo', { channelId })
     return
   }
 
   let wabaData: { phoneNumberId: string; accessToken: string; wabaId: string }
   try {
-    wabaData = await registerNumberOnWaba(phoneNumber, verificationCode)
+    wabaData = await completeWabaRegistration(phoneNumberId, verificationCode)
   } catch (err: any) {
-    logger.error('[SALVY] Auto-ativação: erro ao registrar número na WABA', { channelId, error: err?.response?.data || err?.message })
+    logger.error('[SALVY] Auto-ativação: erro ao confirmar/registrar número na WABA', { channelId, error: err?.response?.data || err?.message })
     return
   }
 
@@ -110,7 +168,7 @@ async function activateChannelWithCode(channelId: string, verificationCode: stri
   })
 
   await subscribeAppToWaba(wabaData.wabaId, wabaData.accessToken)
-  logger.info('[SALVY] Canal ativado automaticamente via webhook', { channelId, phoneNumber })
+  logger.info('[SALVY] Canal ativado automaticamente via webhook', { channelId })
 }
 
 export async function salvyRoutes(app: FastifyInstance) {
@@ -164,7 +222,8 @@ export async function salvyRoutes(app: FastifyInstance) {
           salvyVirtualPhoneAccountId: account.id,
           salvyStatus: account.status,
           displayPhoneNumber: account.phoneNumber,
-          // phoneNumberId e accessToken serão preenchidos após ativação pós-SMS
+          // phoneNumberId é preenchido assim que o número é aceito na WABA (ver
+          // background abaixo); accessToken só após verify_code confirmar o SMS.
           phoneNumberId: null,
           accessToken: null,
           wabaId: null,
@@ -173,11 +232,32 @@ export async function salvyRoutes(app: FastifyInstance) {
       },
     })
 
+    // Passos 1 e 2 do fluxo oficial (adicionar número + pedir SMS) em background —
+    // não bloqueia a resposta ao candidato. A linha recém-comprada na Salvy pode levar
+    // alguns segundos para ficar apta na rede; se falhar aqui, o webhook da Salvy ainda
+    // assim chega, mas activateChannelWithCode vai falhar por não ter phoneNumberId —
+    // por isso guardamos o erro no config para o candidato saber que precisa tentar de novo.
+    acquireAndRequestCode(account.phoneNumber)
+      .then(({ phoneNumberId }) =>
+        prisma.channel.update({
+          where: { id: channel.id },
+          data: { config: { ...(channel.config as any), phoneNumberId } },
+        }),
+      )
+      .catch((err: any) => {
+        logger.error('[SALVY] Erro ao adicionar número/solicitar código na WABA', { channelId: channel.id, error: err?.response?.data || err?.message })
+        prisma.channel.update({
+          where: { id: channel.id },
+          data: { config: { ...(channel.config as any), registrationError: true } },
+        }).catch(() => {})
+      })
+
     return reply.status(201).send({ channel, salvyAccount: account })
   })
 
   // Após receber o código SMS (via webhook abaixo), o candidato confirma no painel
-  // para finalizar o registro do número na WABA e ativar o canal
+  // para finalizar o registro do número na WABA e ativar o canal — fallback manual,
+  // já que activateChannelWithCode normalmente já faz isso sozinho via webhook.
   app.post('/integrations/salvy/virtual-numbers/:channelId/activate', { onRequest: [app.authenticate] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
@@ -188,14 +268,14 @@ export async function salvyRoutes(app: FastifyInstance) {
     if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
 
     const config = channel.config as any
-    if (config?.isActive) return reply.status(400).send({ error: 'Canal já está ativo' })
+    if (channel.isActive) return reply.status(400).send({ error: 'Canal já está ativo' })
 
-    const phoneNumber = config?.displayPhoneNumber
-    if (!phoneNumber) return reply.status(400).send({ error: 'Número de telefone não encontrado na configuração do canal' })
+    const phoneNumberId = config?.phoneNumberId
+    if (!phoneNumberId) return reply.status(400).send({ error: 'Número ainda não foi preparado na Meta. Aguarde alguns segundos e tente novamente.' })
 
     let wabaData: { phoneNumberId: string; accessToken: string; wabaId: string }
     try {
-      wabaData = await registerNumberOnWaba(phoneNumber, verificationCode)
+      wabaData = await completeWabaRegistration(phoneNumberId, verificationCode)
     } catch (err: any) {
       logger.error('[SALVY] Erro ao registrar número na WABA:', err?.response?.data || err?.message)
       return reply.status(400).send({ error: 'Código de verificação inválido ou expirado. Tente solicitar um novo SMS.' })
@@ -221,6 +301,35 @@ export async function salvyRoutes(app: FastifyInstance) {
     await subscribeAppToWaba(wabaData.wabaId, wabaData.accessToken)
 
     return reply.send(updated)
+  })
+
+  // Candidato pede um novo SMS (ex: o primeiro não chegou ou expirou) — reutiliza o
+  // mesmo request_code da Meta, sem depender do dono da conta Salvy para nada.
+  app.post('/integrations/salvy/virtual-numbers/:channelId/resend-code', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const { channelId } = z.object({ channelId: z.string() }).parse(req.params)
+    const { method } = z.object({ method: z.enum(['SMS', 'VOICE']).default('SMS') }).parse(req.body ?? {})
+
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, candidateId } })
+    if (!channel) return reply.status(404).send({ error: 'Canal não encontrado' })
+    if (channel.isActive) return reply.status(400).send({ error: 'Canal já está ativo' })
+
+    const config = channel.config as any
+    const phoneNumberId = config?.phoneNumberId
+    if (!phoneNumberId) return reply.status(400).send({ error: 'Número ainda não foi preparado na Meta. Aguarde alguns segundos e tente novamente.' })
+
+    try {
+      const tokenRes = await axios.get(`${GRAPH_URL}/oauth/access_token`, {
+        params: { client_id: META_APP_ID, client_secret: META_APP_SECRET, grant_type: 'client_credentials' },
+      })
+      await requestVerificationCode(tokenRes.data.access_token, phoneNumberId, method)
+    } catch (err: any) {
+      logger.error('[SALVY] Erro ao reenviar código de verificação:', err?.response?.data || err?.message)
+      return reply.status(400).send({ error: 'Não foi possível reenviar o código agora. Tente novamente em instantes.' })
+    }
+
+    return reply.send({ ok: true })
   })
 
   // Cancela número virtual Salvy e desativa o canal correspondente

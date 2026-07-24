@@ -566,6 +566,12 @@ function ChannelsTab() {
     onError: (err: any) => toast({ title: 'Erro ao ativar', description: err.response?.data?.error || 'Código inválido ou expirado', variant: 'destructive' }),
   })
 
+  const resendVirtualCodeMutation = useMutation({
+    mutationFn: () => api.post(`/integrations/salvy/virtual-numbers/${pendingVirtualChannelId}/resend-code`, { method: 'SMS' }),
+    onSuccess: () => toast({ title: 'Novo código enviado! Aguarde alguns instantes.' }),
+    onError: (err: any) => toast({ title: 'Não foi possível reenviar', description: err.response?.data?.error || 'Tente novamente em instantes', variant: 'destructive' }),
+  })
+
   const cancelVirtualNumberMutation = useMutation({
     mutationFn: (channelId: string) => api.delete(`/integrations/salvy/virtual-numbers/${channelId}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['channels'] }); toast({ title: 'Número cancelado' }) },
@@ -804,8 +810,19 @@ function ChannelsTab() {
                 {verificationStatus?.verificationCode ? 'Código recebido — ativando automaticamente...' : 'Aguardando SMS...'}
               </div>
 
+              <Button
+                className="w-full"
+                variant="outline"
+                size="sm"
+                disabled={resendVirtualCodeMutation.isPending}
+                onClick={() => resendVirtualCodeMutation.mutate()}
+              >
+                {resendVirtualCodeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Não chegou? Reenviar código por SMS
+              </Button>
+
               <details className="text-xs text-gray-400">
-                <summary className="cursor-pointer select-none">Está demorando? Confirme manualmente</summary>
+                <summary className="cursor-pointer select-none">Digitar código manualmente</summary>
                 <div className="mt-3 space-y-3">
                   <div>
                     <Label className="text-xs">Código de verificação</Label>
