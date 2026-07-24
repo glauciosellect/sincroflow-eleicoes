@@ -426,7 +426,13 @@ function ChannelsTab() {
     queryFn: () => api.get('/billing').then(r => r.data),
   })
 
-  const whatsappChannels = (channels || []).filter((c: any) => c.type === 'WHATSAPP')
+  // Números Salvy cancelados ficam com isActive: false e salvyStatus: 'canceled' —
+  // não somem do banco (histórico), mas não devem contar para o limite nem aparecer
+  // na lista. Outros estados "inativo" (ex: aguardando confirmação do SMS) continuam
+  // visíveis normalmente.
+  const isCanceledSalvyChannel = (c: any) => c.config?.salvyVirtualPhoneAccountId && c.config?.salvyStatus === 'canceled'
+  const visibleChannels = (channels || []).filter((c: any) => !isCanceledSalvyChannel(c))
+  const whatsappChannels = visibleChannels.filter((c: any) => c.type === 'WHATSAPP')
   const whatsappLimit = billing?.whatsappLineLimit ?? 1
   const whatsappUnlimited = whatsappLimit === -1
   const whatsappAtLimit = !whatsappUnlimited && whatsappChannels.length >= whatsappLimit
@@ -626,7 +632,7 @@ function ChannelsTab() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#002776]" /></div>
-      ) : !channels?.length ? (
+      ) : !visibleChannels.length ? (
         <div className="text-center py-16">
           <Radio className="w-16 h-16 text-gray-200 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum canal conectado</h3>
@@ -634,7 +640,7 @@ function ChannelsTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(channels || []).map((channel: any) => (
+          {visibleChannels.map((channel: any) => (
             <Card key={channel.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
