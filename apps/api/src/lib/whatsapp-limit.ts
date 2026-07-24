@@ -11,7 +11,10 @@ export class WhatsAppLimitExceededError extends Error {
 
 /**
  * Lança WhatsAppLimitExceededError se o candidato já estiver no limite do plano.
- * Deve ser chamado ANTES de criar um novo Channel do tipo WHATSAPP.
+ * O limite é único e compartilhado entre número próprio e Salvy — o candidato escolhe
+ * livremente a distribuição entre os dois tipos dentro do total contratado (planos
+ * mais caros / linhas extras compradas aumentam esse total). Deve ser chamado ANTES
+ * de criar um novo Channel do tipo WHATSAPP.
  */
 export async function assertWhatsAppLimit(candidateId: string): Promise<void> {
   const candidate = await prisma.candidate.findUnique({
