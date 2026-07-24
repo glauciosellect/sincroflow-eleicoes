@@ -9,6 +9,19 @@ export class WhatsAppLimitExceededError extends Error {
   }
 }
 
+// Números Salvy cancelados ficam no banco como histórico (isActive:false,
+// config.salvyStatus:'canceled') mas não devem ocupar vaga do limite do plano — mesma
+// regra já aplicada na UI (ver settings/page.tsx, isCanceledSalvyChannel).
+function countActiveWhatsAppChannels(candidateId: string) {
+  return prisma.channel.count({
+    where: {
+      candidateId,
+      type: 'WHATSAPP',
+      NOT: { config: { path: ['salvyStatus'], equals: 'canceled' } },
+    },
+  })
+}
+
 /**
  * Lança WhatsAppLimitExceededError se o candidato já estiver no limite do plano.
  * O limite é único e compartilhado entre número próprio e Salvy — o candidato escolhe
@@ -24,7 +37,7 @@ export async function assertWhatsAppLimit(candidateId: string): Promise<void> {
   if (!candidate) throw new Error('Candidato não encontrado')
   if (candidate.whatsappLineLimit === UNLIMITED) return
 
-  const current = await prisma.channel.count({ where: { candidateId, type: 'WHATSAPP' } })
+  const current = await countActiveWhatsAppChannels(candidateId)
   if (current >= candidate.whatsappLineLimit) {
     throw new WhatsAppLimitExceededError(candidate.whatsappLineLimit, current)
   }
@@ -37,6 +50,6 @@ export async function getWhatsAppUsage(candidateId: string) {
     select: { whatsappLineLimit: true },
   })
   if (!candidate) throw new Error('Candidato não encontrado')
-  const current = await prisma.channel.count({ where: { candidateId, type: 'WHATSAPP' } })
+  const current = await countActiveWhatsAppChannels(candidateId)
   return { current, limit: candidate.whatsappLineLimit, unlimited: candidate.whatsappLineLimit === UNLIMITED }
 }
