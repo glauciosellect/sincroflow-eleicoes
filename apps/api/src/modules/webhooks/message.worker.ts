@@ -1,6 +1,6 @@
 import { createWorker, messageQueue } from '../../lib/queue'
 import { prisma } from '../../lib/prisma'
-import { processAgentResponse, processIncomingMedia, detectRequestIntent, classifyMessageForAlerts } from '../ai/ai.service'
+import { processAgentResponse, processIncomingMedia, classifyMessage } from '../ai/ai.service'
 import { getWhatsAppProvider } from '../channels/whatsapp/provider.factory'
 import { emitNewMessage, emitConversationUpdated } from '../../lib/socket'
 import { redis } from '../../lib/redis'
@@ -250,7 +250,7 @@ export function startMessageWorker() {
         ? await prisma.teamMember.findMany({ where: { candidateId: candidate.id, role: 'AGENTE_CAMPO', status: 'ACTIVE' }, select: { id: true, name: true } })
         : []
 
-      const classification = await classifyMessageForAlerts(text, topicsWithContent, fieldAgents.map(a => a.name))
+      const classification = await classifyMessage(text, topicsWithContent, fieldAgents.map(a => a.name))
       await prisma.message.update({
         where: { id: userMsg.id },
         data: { topicKey: classification.topicKey, isContentGap: classification.isContentGap, sentiment: classification.sentiment },
@@ -343,20 +343,21 @@ export function startMessageWorker() {
       }
 
       // ── Registro de solicitação (pedido/reclamação → protocolo, seção 4.12) ──
+      // Reaproveita a classificação já feita acima (classifyMessage) em vez de uma
+      // segunda chamada de IA separada para a mesma mensagem.
       let requestContext = ''
-      const requestIntent = await detectRequestIntent(text)
-      if (requestIntent.isRequest) {
+      if (classification.isRequest) {
         const request = await createRequest({
           candidateId: candidate.id,
           contactId: contact.id,
           conversationId: conversation.id,
-          subject: requestIntent.subject || text.slice(0, 100),
+          subject: classification.requestSubject || text.slice(0, 100),
           description: text,
         })
-        if (requestIntent.neighborhood && !contact.neighborhood) {
-          await prisma.contact.update({ where: { id: contact.id }, data: { neighborhood: requestIntent.neighborhood } })
+        if (classification.neighborhood && !contact.neighborhood) {
+          await prisma.contact.update({ where: { id: contact.id }, data: { neighborhood: classification.neighborhood } })
         }
-        requestContext = `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO ESTE TEXTO, MAS INFORME O PROTOCOLO NATURALMENTE NA SUA RESPOSTA: Esta mensagem foi identificada como uma solicitação e foi registrada com o protocolo ${request.protocolNumber}. Confirme o registro e informe este número de protocolo ao eleitor, e diga que a equipe entrará em contato em breve.${!requestIntent.neighborhood && !contact.neighborhood ? ' Se ainda não souber, pergunte educadamente em qual bairro o eleitor mora, para ajudar a equipe a entender melhor a demanda da região.' : ''}]`
+        requestContext = `\n\n[CONTEXTO INTERNO — NÃO MENCIONE AO USUÁRIO ESTE TEXTO, MAS INFORME O PROTOCOLO NATURALMENTE NA SUA RESPOSTA: Esta mensagem foi identificada como uma solicitação e foi registrada com o protocolo ${request.protocolNumber}. Confirme o registro e informe este número de protocolo ao eleitor, e diga que a equipe entrará em contato em breve.${!classification.neighborhood && !contact.neighborhood ? ' Se ainda não souber, pergunte educadamente em qual bairro o eleitor mora, para ajudar a equipe a entender melhor a demanda da região.' : ''}]`
       }
 
       // ── Resposta via IA, restrita ao conteúdo cadastrado (Minha História + Plataforma Eleitoral) ──

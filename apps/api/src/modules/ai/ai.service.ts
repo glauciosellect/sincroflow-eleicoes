@@ -16,19 +16,33 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const DEFAULT_MODEL = 'claude-haiku-4-5'
 
+// system aceita string (sem cache) ou array de blocos — o bloco com cache:true
+// recebe cache_control:{type:"ephemeral"}, permitindo a Anthropic reaproveitar
+// esse prefixo (disclaimer + história + propostas + site) entre chamadas
+// idênticas, em vez de cobrar o preço cheio de input a cada mensagem de eleitor.
+type SystemBlock = { text: string; cache?: boolean }
+
 export async function callLLM(opts: {
   model: string
-  system: string
+  system: string | SystemBlock[]
   messages: { role: 'user' | 'assistant'; content: string }[]
   maxTokens?: number
 }): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   const { model, system, messages, maxTokens = 1024 } = opts
 
   if (model.startsWith('claude')) {
+    const systemParam = typeof system === 'string'
+      ? system
+      : system.map(block => ({
+          type: 'text' as const,
+          text: block.text,
+          ...(block.cache ? { cache_control: { type: 'ephemeral' as const } } : {}),
+        }))
+
     const res = await anthropic.messages.create({
       model,
       max_tokens: maxTokens,
-      system,
+      system: systemParam,
       messages,
     })
     const content = res.content[0].type === 'text' ? res.content[0].text : ''
@@ -36,10 +50,11 @@ export async function callLLM(opts: {
   }
 
   if (model.startsWith('gpt')) {
+    const systemText = typeof system === 'string' ? system : system.map(b => b.text).join('\n\n')
     const res = await openai.chat.completions.create({
       model,
       max_tokens: maxTokens,
-      messages: [{ role: 'system', content: system }, ...messages],
+      messages: [{ role: 'system', content: systemText }, ...messages],
     })
     const content = res.choices[0].message.content || ''
     const inputTokens = res.usage?.prompt_tokens || 0
@@ -69,13 +84,17 @@ interface PortalData {
   numero?: string | null
 }
 
-export function buildSystemPrompt(
+// Retorna o prompt em dois blocos: "stable" (identidade, história, propostas, site,
+// disclaimer — muda só quando a campanha edita o AgentConfig, ótimo para cache_control)
+// e "dynamic" (data/hora atual — muda a cada chamada, fica FORA do bloco cacheado para
+// não invalidar o cache a cada minuto). Concatenados, formam o mesmo prompt de antes.
+export function buildSystemPromptBlocks(
   candidate: Candidate,
   config: AgentConfig,
   topics: PlatformTopic[],
   portal?: PortalData | null,
   siteContent?: string | null,
-): string {
+): { stable: string; dynamic: string } {
   const styleLabel = config.agentStyle === 'FORMAL' ? 'formal e protocolar' : config.agentStyle === 'INFORMAL' ? 'informal e direto' : 'acolhedor e próximo'
 
   const topicsContent = topics
@@ -108,7 +127,7 @@ export function buildSystemPrompt(
     ? `\nSITE OFICIAL DO CANDIDATO: ${config.candidateSite}\nSe o eleitor perguntar se o candidato tem site, ou pedir o link, informe este endereço.${siteContent ? `\n\nCONTEÚDO DO SITE (use para responder dúvidas sobre o que está publicado nele):\n${siteContent}` : ''}`
     : ''
 
-  return `
+  const stable = `
 Você é ${config.agentName}, assistente virtual da campanha de ${candidate.name}${candidate.position ? `, pré-candidato(a) a ${candidate.position}` : ''}${candidate.party ? ` pelo ${candidate.party}` : ''}${candidate.candidateNumber || portal?.numero ? `, número ${candidate.candidateNumber || portal?.numero}` : ''}.
 ${(candidate.candidateNumber || portal?.numero) ? `Se perguntarem o número do candidato para votar, responda: ${candidate.candidateNumber || portal?.numero}.` : ''}
 
@@ -125,45 +144,53 @@ ${siteSection}
 ${TEAM_ROLE_DISCLAIMER}
 
 Regras gerais de conversa:
-- HORÁRIO: Data e hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: config.timezone || 'America/Sao_Paulo' })}. Use a saudação correta conforme este horário: das 5h às 12h = "bom dia", das 12h às 18h = "boa tarde", das 18h às 5h = "boa noite".
 - FORMATO: você escreve sua resposta normalmente em texto. O sistema converte para áudio automaticamente quando o eleitor prefere áudio. Nunca diga que não pode enviar áudio.
 - APRESENTAÇÃO: apresente-se pelo seu nome SOMENTE na primeira mensagem (histórico vazio). Se já houver mensagem anterior, não se reapresente.
 - NOME DO ELEITOR: se o histórico já tiver o nome do eleitor, não pergunte de novo.
 - Nunca repita a mesma pergunta ou frase duas vezes seguidas.
 - Se o eleitor pedir para falar com a equipe/humano, informe que vai transferir o atendimento.
 `.trim()
+
+  // Fora do bloco cacheado de propósito — muda a cada minuto, invalidaria o cache
+  // se estivesse junto do texto estável acima.
+  const dynamic = `HORÁRIO: Data e hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: config.timezone || 'America/Sao_Paulo' })}. Use a saudação correta conforme este horário: das 5h às 12h = "bom dia", das 12h às 18h = "boa tarde", das 18h às 5h = "boa noite".`
+
+  return { stable, dynamic }
 }
 
-// Detecta se a mensagem é um pedido/reclamação que deve gerar protocolo de solicitação
-// (seção 4.12 da spec) — ex: "queria pedir para arrumar a iluminação da minha rua".
-// Não classifica perguntas simples sobre propostas como solicitação.
-export async function detectRequestIntent(message: string): Promise<{ isRequest: boolean; subject?: string; neighborhood?: string }> {
-  try {
-    const res = await callLLM({
-      model: DEFAULT_MODEL,
-      system: `Você classifica mensagens de eleitores para um serviço de atendimento ao eleitor. Determine se a mensagem é um PEDIDO ou RECLAMAÇÃO que deve ser registrado como solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre um serviço público, denúncia, pedido de ajuda).
-NÃO classifique como solicitação: perguntas sobre propostas do candidato, perguntas sobre agenda/eventos, cumprimentos, conversas gerais.
-Se a mensagem mencionar um bairro, região ou localidade específica, extraia esse nome em "neighborhood" (ex: "Centro", "Jardim das Flores") — senão omita o campo.
-Responda APENAS em JSON: {"isRequest": true/false, "subject": "resumo curto do pedido em até 8 palavras", "neighborhood": "<bairro mencionado ou omitir>"} (subject pode ser omitido se isRequest for false). Nenhum texto adicional.`,
-      messages: [{ role: 'user', content: message }],
-      maxTokens: 100,
-    })
-    const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
-    return { isRequest: !!parsed.isRequest, subject: parsed.subject, neighborhood: parsed.neighborhood || undefined }
-  } catch (err: any) {
-    logger.warn('[AI] classifyRequest falhou', { error: err?.message })
-    return { isRequest: false }
-  }
+// Mantido para compatibilidade com quem só precisa do texto completo (ex: testAgent,
+// onde cache não é relevante por ser uma chamada avulsa de teste no painel).
+export function buildSystemPrompt(
+  candidate: Candidate,
+  config: AgentConfig,
+  topics: PlatformTopic[],
+  portal?: PortalData | null,
+  siteContent?: string | null,
+): string {
+  const { stable, dynamic } = buildSystemPromptBlocks(candidate, config, topics, portal, siteContent)
+  return `${stable}\n\n${dynamic}`
 }
 
-// Classifica a mensagem do eleitor para os alertas automáticos (seção 4.13 da spec):
-// tema da Plataforma Eleitoral envolvido (para pico por tema), se é uma pergunta sobre
-// tema sem conteúdo cadastrado (gap), e se o tom é agressivo/sensível (urgência).
-export async function classifyMessageForAlerts(
+// Classifica a mensagem do eleitor numa única chamada de IA, cobrindo o que antes eram
+// duas chamadas separadas (detectRequestIntent + classifyMessageForAlerts) — mesmo texto
+// de entrada, mesma tarefa de classificação leve, sem motivo para pagar duas requisições.
+// Cobre: tema da Plataforma Eleitoral (seção 4.13), pedido/reclamação → protocolo (4.12),
+// urgência/sentimento, e menção a Agente de Campo.
+export async function classifyMessage(
   message: string,
   topicsWithContent: Set<string>,
   fieldAgentNames: string[] = [],
-): Promise<{ topicKey: string | null; isContentGap: boolean; isUrgent: boolean; sentiment: string; mentionedAgentName: string | null }> {
+): Promise<{
+  topicKey: string | null
+  isContentGap: boolean
+  isUrgent: boolean
+  sentiment: string
+  mentionedAgentName: string | null
+  isRequest: boolean
+  requestSubject?: string
+  neighborhood?: string
+}> {
+  const fallback = { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL', mentionedAgentName: null, isRequest: false }
   try {
     const topicList = PLATFORM_TOPICS.map(t => `${t.key}: ${t.name}`).join('\n')
     const agentInstructions = fieldAgentNames.length > 0
@@ -172,23 +199,34 @@ export async function classifyMessageForAlerts(
       : '\n\n"mentionedAgentName": sempre null (não há agentes de campo cadastrados).'
     const res = await callLLM({
       model: DEFAULT_MODEL,
-      system: `Classifique a mensagem de um eleitor para um serviço de atendimento ao eleitor. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", "mentionedAgentName": "<nome ou null>"}.
+      system: `Classifique a mensagem de um eleitor para um serviço de atendimento ao eleitor. Temas possíveis:\n${topicList}\n\nResponda APENAS em JSON: {"topicKey": "<chave do tema ou null>", "isUrgent": true/false, "sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", "mentionedAgentName": "<nome ou null>", "isRequest": true/false, "requestSubject": "<resumo curto em até 8 palavras ou omitir>", "neighborhood": "<bairro mencionado ou omitir>"}.
 "topicKey": a chave do tema da lista se a mensagem for uma pergunta/comentário sobre esse tema, senão null.
 "isUrgent": true se a mensagem tiver tom agressivo, ameaça, xingamento, ou relatar situação sensível/grave que exige atenção humana imediata.
-"sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).${agentInstructions}
+"sentiment": tom geral da mensagem do eleitor — POSITIVE (elogio, apoio, agradecimento), NEGATIVE (reclamação, crítica, insatisfação) ou NEUTRAL (pergunta neutra, informativa).
+"isRequest": true se a mensagem for um PEDIDO ou RECLAMAÇÃO que deve virar solicitação formal para a equipe (ex: pedido de melhoria em um bairro, reclamação sobre serviço público, denúncia, pedido de ajuda). NÃO classifique como solicitação: perguntas sobre propostas, perguntas sobre agenda/eventos, cumprimentos, conversas gerais.
+"neighborhood": se a mensagem mencionar um bairro/região/localidade específica, extraia esse nome (ex: "Centro", "Jardim das Flores") — senão omita.${agentInstructions}
 Nenhum texto adicional.`,
       messages: [{ role: 'user', content: message }],
-      maxTokens: 100,
+      maxTokens: 150,
     })
     const parsed = JSON.parse(res.content.trim().replace(/```json|```/g, ''))
     const topicKey = typeof parsed.topicKey === 'string' && PLATFORM_TOPICS.some(t => t.key === parsed.topicKey) ? parsed.topicKey : null
     const isContentGap = !!topicKey && !topicsWithContent.has(topicKey)
     const sentiment = ['POSITIVE', 'NEUTRAL', 'NEGATIVE'].includes(parsed.sentiment) ? parsed.sentiment : 'NEUTRAL'
     const mentionedAgentName = typeof parsed.mentionedAgentName === 'string' && fieldAgentNames.includes(parsed.mentionedAgentName) ? parsed.mentionedAgentName : null
-    return { topicKey, isContentGap, isUrgent: !!parsed.isUrgent, sentiment, mentionedAgentName }
+    return {
+      topicKey,
+      isContentGap,
+      isUrgent: !!parsed.isUrgent,
+      sentiment,
+      mentionedAgentName,
+      isRequest: !!parsed.isRequest,
+      requestSubject: parsed.requestSubject,
+      neighborhood: parsed.neighborhood || undefined,
+    }
   } catch (err: any) {
-    logger.warn('[AI] classifyMessageForAlerts falhou', { error: err?.message })
-    return { topicKey: null, isContentGap: false, isUrgent: false, sentiment: 'NEUTRAL', mentionedAgentName: null }
+    logger.warn('[AI] classifyMessage falhou', { error: err?.message })
+    return fallback
   }
 }
 
@@ -257,12 +295,18 @@ export async function processAgentResponse(opts: {
     getOrRefreshSiteContent(config).catch(() => null),
   ])
 
-  const systemPrompt = buildSystemPrompt(candidate, config, topics, portal as any, siteContent)
+  const { stable, dynamic } = buildSystemPromptBlocks(candidate, config, topics, portal as any, siteContent)
   const messages = [...conversationHistory, { role: 'user' as const, content: userMessage }]
 
   const res = await callLLM({
     model: DEFAULT_MODEL,
-    system: systemPrompt,
+    // Bloco estável marcado com cache: idêntico entre mensagens do mesmo candidato
+    // (só muda quando a campanha edita propostas/história) — a Anthropic reaproveita
+    // esse prefixo em vez de cobrar tokens de input cheios a cada mensagem de eleitor.
+    system: [
+      { text: stable, cache: true },
+      { text: dynamic },
+    ],
     messages,
     maxTokens: 2048,
   })
