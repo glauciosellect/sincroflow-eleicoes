@@ -278,17 +278,17 @@ export function startMessageWorker() {
         return
       }
 
-      // ── Preferência de resposta em áudio (espelha o formato do eleitor) ──────
+      // ── Preferência de resposta em áudio (espelha o formato da ÚLTIMA mensagem
+      // do eleitor) — texto responde em texto, áudio responde em áudio, sempre
+      // atualizando a cada mensagem em vez de "grudar" na primeira preferência
+      // detectada. O eleitor pode fixar manualmente com #texto / #audio (abaixo).
       let audioPreference: 'audio' | 'text' | undefined = contact.audioPreference as 'audio' | 'text' | undefined
 
       const isAudioMessage = channelType === 'WHATSAPP' && incomingMediaType === 'audio'
-      if (isAudioMessage) {
-        if (audioPreference !== 'audio') {
-          audioPreference = 'audio'
-          await prisma.contact.update({ where: { id: contact.id }, data: { audioPreference: 'audio' } })
-        }
-      } else if (!audioPreference) {
-        audioPreference = 'text'
+      const inferredPreference = isAudioMessage ? 'audio' : 'text'
+      if (audioPreference !== inferredPreference) {
+        audioPreference = inferredPreference
+        await prisma.contact.update({ where: { id: contact.id }, data: { audioPreference: inferredPreference } })
       }
 
       const lowerText = text.trim().toLowerCase()
