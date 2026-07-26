@@ -601,9 +601,9 @@ function ChannelsTab() {
             {whatsappEmbeddedSignupMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Plus className="w-3 h-3 mr-1" />}
             WhatsApp (número próprio){whatsappAtLimit ? ' — limite atingido' : ''}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowVirtualNumberDialog(true)} className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50" disabled={whatsappAtLimit} title={whatsappAtLimit ? 'Limite do plano atingido — faça upgrade para conectar mais números' : undefined}>
+          <Button variant="outline" size="sm" onClick={() => setShowVirtualNumberDialog(true)} className="border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50" disabled={whatsappAtLimit || !billing?.campaignActivated} title={!billing?.campaignActivated ? 'Disponível após o pagamento da licença — use WhatsApp (número próprio) durante o período gratuito' : whatsappAtLimit ? 'Limite do plano atingido — faça upgrade para conectar mais números' : undefined}>
             <Plus className="w-3 h-3 mr-1" />
-            WhatsApp (número novo){whatsappAtLimit ? ' — limite atingido' : ''}
+            WhatsApp (número novo){!billing?.campaignActivated ? ' — após pagamento' : whatsappAtLimit ? ' — limite atingido' : ''}
           </Button>
           <Button variant="outline" size="sm" onClick={() => connectMeta('instagram')} className="border-pink-200 text-pink-700 hover:bg-pink-50">
             <Plus className="w-3 h-3 mr-1" />Instagram

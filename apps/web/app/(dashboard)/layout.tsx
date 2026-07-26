@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { Sidebar } from '@/components/shared/sidebar'
 import { Topbar } from '@/components/shared/topbar'
 import { MascoteHelper } from '@/components/shared/mascote-helper'
+import { TutorialPanel } from '@/components/shared/tutorial-panel'
 import { useSocketConnect } from '@/hooks/use-socket'
 import api from '@/lib/api'
 import { AlertTriangle, Clock } from 'lucide-react'
@@ -101,6 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {role !== 'AGENTE_CAMPO' && <MascoteHelper />}
+        {role !== 'AGENTE_CAMPO' && <TutorialPanel />}
         <main className="flex-1 overflow-auto p-4 md:p-6">
           {isSuspended && !isBillingPage ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4">

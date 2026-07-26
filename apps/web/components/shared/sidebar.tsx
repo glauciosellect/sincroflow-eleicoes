@@ -2,9 +2,10 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart, ExternalLink, Lock } from 'lucide-react'
+import { LayoutDashboard, FileText, Users, MessageSquare, Contact, Settings, CalendarDays, X, Menu, BarChart3, FileWarning, Image as ImageIcon, Plug, Award, ShieldCheck, Map, Globe, Sparkles, Radar, Wallet, Building2, UserCheck, Scale, ClipboardList, Network, Trophy, Heart, ExternalLink, Lock, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
+import { useTutorialStore } from '@/store/tutorial.store'
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 
@@ -26,6 +27,7 @@ const ROLE_MODULES: Record<TeamRole, string[]> = {
 
 const navItems = [
   { section: 'VISÃO GERAL', items: [
+    { href: '/tutorial', label: 'Tutorial', icon: GraduationCap, module: null },
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, module: null },
   ] },
 
@@ -79,6 +81,7 @@ export function Sidebar() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const { candidate, role } = useAuthStore()
+  const openTutorial = useTutorialStore((s) => s.open)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [portalUrl, setPortalUrl] = useState<string | null>(null)
 
@@ -160,6 +163,22 @@ export function Sidebar() {
               </div>
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
+                  // Item especial: Tutorial abre o card flutuante (sem navegar/trocar
+                  // de rota), para o candidato poder ir configurando o sistema por
+                  // trás enquanto acompanha o passo a passo.
+                  if (item.href === '/tutorial') {
+                    return (
+                      <button
+                        key={item.href}
+                        onClick={() => { openTutorial(); setMobileOpen(false) }}
+                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-[hsl(var(--sidebar-fg))] hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-[hsl(var(--sidebar-active-fg))]"
+                      >
+                        <item.icon className="w-4 h-4 shrink-0 opacity-60" />
+                        {item.label}
+                      </button>
+                    )
+                  }
+
                   // Item especial: Portal do Eleitor para agente de campo — abre URL externa
                   if (item.href === '/portal_campo_externo') {
                     // Usa <a> com target="_blank" para funcionar em PWA/app instalado

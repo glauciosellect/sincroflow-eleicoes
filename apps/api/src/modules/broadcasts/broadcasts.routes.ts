@@ -51,10 +51,15 @@ async function getActiveChannel(candidateId: string, channelType: BroadcastChann
 // Canais elegíveis para distribuir um disparo: WhatsApp pode ter várias linhas
 // (round-robin, excluindo YELLOW/RED); e-mail e Telegram têm sempre no máximo 1
 // canal por candidato, então a lista cai naturalmente para 0 ou 1 elemento.
-async function getEligibleChannelsForBroadcast(candidateId: string, channelType: BroadcastChannelType) {
-  if (channelType === 'WHATSAPP') return getEligibleWhatsAppChannels(candidateId)
-  const channel = await getActiveChannel(candidateId, channelType)
-  return channel ? [channel] : []
+// Se o candidato escolher uma linha específica (channelId), o disparo usa só ela —
+// sem round-robin — desde que ela esteja entre as elegíveis.
+async function getEligibleChannelsForBroadcast(candidateId: string, channelType: BroadcastChannelType, channelId?: string) {
+  const eligible = channelType === 'WHATSAPP'
+    ? await getEligibleWhatsAppChannels(candidateId)
+    : await getActiveChannel(candidateId, channelType).then((c) => (c ? [c] : []))
+
+  if (!channelId) return eligible
+  return eligible.filter((c) => c.id === channelId)
 }
 
 export async function broadcastRoutes(app: FastifyInstance) {
@@ -72,16 +77,30 @@ export async function broadcastRoutes(app: FastifyInstance) {
     return reply.send(broadcasts)
   })
 
+  // Lista as linhas WhatsApp ativas do candidato — usado pela UI para o seletor de
+  // linha específica no disparo de criativos (opcional; sem escolha, distribui
+  // automaticamente em round-robin entre todas).
+  app.get('/broadcasts/whatsapp-channels', { onRequest: [requireModule('story')] }, async (req, reply) => {
+    const { sub, wid } = req.user as { sub: string; wid?: string }
+    const candidateId = await getWorkspaceId(sub, wid)
+    const channels = await getEligibleWhatsAppChannels(candidateId)
+    return reply.send(channels.map((c) => ({
+      id: c.id,
+      name: c.name,
+      displayPhoneNumber: (c.config as any)?.displayPhoneNumber ?? c.name,
+    })))
+  })
+
   app.get('/broadcasts/preview', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { creativeId, contactType, channelType: rawChannelType } = req.query as { creativeId: string; contactType?: string; channelType?: string }
+    const { creativeId, contactType, channelType: rawChannelType, channelId } = req.query as { creativeId: string; contactType?: string; channelType?: string; channelId?: string }
     const channelType: BroadcastChannelType = rawChannelType === 'EMAIL' ? 'EMAIL' : rawChannelType === 'TELEGRAM' ? 'TELEGRAM' : 'WHATSAPP'
 
     const creative = await prisma.creative.findFirst({ where: { id: creativeId, candidateId } })
     if (!creative) return reply.status(404).send({ error: 'Criativo não encontrado' })
 
-    const eligibleChannels = await getEligibleChannelsForBroadcast(candidateId, channelType)
+    const eligibleChannels = await getEligibleChannelsForBroadcast(candidateId, channelType, channelId)
     if (eligibleChannels.length === 0) return reply.status(400).send({ error: noChannelErrorFor(channelType) })
 
     const targets = await resolveTargets(candidateId, channelType, contactType)
@@ -124,10 +143,11 @@ export async function broadcastRoutes(app: FastifyInstance) {
   app.post('/broadcasts', { onRequest: [requireModule('story')] }, async (req, reply) => {
     const { sub, wid } = req.user as { sub: string; wid?: string }
     const candidateId = await getWorkspaceId(sub, wid)
-    const { creativeId, contactType, channelType } = z.object({
+    const { creativeId, contactType, channelType, channelId } = z.object({
       creativeId: z.string(),
       contactType: z.enum(['VOTER', 'FAMILY_FRIEND', 'STAFF', 'CONTRACTOR', 'OTHER']).optional(),
       channelType: z.enum(['WHATSAPP', 'EMAIL', 'TELEGRAM']).default('WHATSAPP'),
+      channelId: z.string().optional(),
     }).parse(req.body)
 
     const agentConfig = await prisma.agentConfig.findUnique({ where: { candidateId } })
@@ -136,7 +156,7 @@ export async function broadcastRoutes(app: FastifyInstance) {
     const creative = await prisma.creative.findFirst({ where: { id: creativeId, candidateId } })
     if (!creative) return reply.status(404).send({ error: 'Criativo não encontrado' })
 
-    const eligibleChannels = await getEligibleChannelsForBroadcast(candidateId, channelType)
+    const eligibleChannels = await getEligibleChannelsForBroadcast(candidateId, channelType, channelId)
     if (eligibleChannels.length === 0) return reply.status(400).send({ error: noChannelErrorFor(channelType) })
 
     const targets = await resolveTargets(candidateId, channelType, contactType)

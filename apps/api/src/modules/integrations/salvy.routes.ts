@@ -201,6 +201,15 @@ export async function salvyRoutes(app: FastifyInstance) {
     const candidateId = await getWorkspaceId(sub, wid)
     const { areaCode } = z.object({ areaCode: z.number().int() }).parse(req.body)
 
+    // Linha nova (Salvy) só pode ser contratada após o pagamento da licença —
+    // durante o período gratuito, só WhatsApp com número próprio fica disponível.
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { campaignActivated: true } })
+    if (!candidate?.campaignActivated) {
+      return reply.status(400).send({
+        error: 'Contratar uma linha de WhatsApp nova exige pagamento da licença confirmado. Durante o período gratuito, use um número de WhatsApp próprio em Configurações → Canais, ou finalize o pagamento em Configurações → Financeiro para liberar linhas novas.',
+      })
+    }
+
     // Verifica limite de linhas do plano antes de provisionar
     try {
       await assertWhatsAppLimit(candidateId)

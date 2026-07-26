@@ -381,6 +381,7 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null)
   const [broadcastContactType, setBroadcastContactType] = useState('VOTER')
   const [broadcastChannelType, setBroadcastChannelType] = useState<'WHATSAPP' | 'EMAIL' | 'TELEGRAM'>('WHATSAPP')
+  const [broadcastChannelId, setBroadcastChannelId] = useState<string>('')
 
   const { data: channels } = useQuery<{ id: string; type: string; isActive: boolean }[]>({
     queryKey: ['channels'],
@@ -389,9 +390,18 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
   const hasEmailChannel = !!channels?.some(c => c.type === 'EMAIL' && c.isActive)
   const hasTelegramChannel = !!channels?.some(c => c.type === 'TELEGRAM' && c.isActive)
 
+  // Lista de linhas WhatsApp ativas — só é útil (e só exibimos o seletor) quando
+  // o candidato tem mais de uma linha; com 1 só, o round-robin já concentra tudo nela.
+  const { data: whatsappChannels } = useQuery<{ id: string; name: string; displayPhoneNumber: string }[]>({
+    queryKey: ['broadcast-whatsapp-channels'],
+    queryFn: () => api.get('/broadcasts/whatsapp-channels').then(r => r.data),
+    enabled: broadcastChannelType === 'WHATSAPP',
+  })
+  const showLineSelector = broadcastChannelType === 'WHATSAPP' && (whatsappChannels?.length ?? 0) > 1
+
   const { data: preview, isLoading: loadingPreview } = useQuery({
-    queryKey: ['broadcast-preview', selectedCreative?.id, broadcastContactType, broadcastChannelType],
-    queryFn: () => api.get('/broadcasts/preview', { params: { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType } }).then(r => r.data),
+    queryKey: ['broadcast-preview', selectedCreative?.id, broadcastContactType, broadcastChannelType, broadcastChannelId],
+    queryFn: () => api.get('/broadcasts/preview', { params: { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType, channelId: broadcastChannelId || undefined } }).then(r => r.data),
     enabled: !!selectedCreative,
   })
 
@@ -401,7 +411,7 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
   })
 
   const broadcastMutation = useMutation({
-    mutationFn: () => api.post('/broadcasts', { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType }),
+    mutationFn: () => api.post('/broadcasts', { creativeId: selectedCreative!.id, contactType: broadcastContactType, channelType: broadcastChannelType, channelId: broadcastChannelId || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['broadcasts'] })
       setSelectedCreative(null)
@@ -553,11 +563,28 @@ function CreativesTab({ topics }: { topics?: PlatformTopic[] }) {
                         id="broadcast-channel"
                         className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                         value={broadcastChannelType}
-                        onChange={(e) => setBroadcastChannelType(e.target.value as 'WHATSAPP' | 'EMAIL' | 'TELEGRAM')}
+                        onChange={(e) => { setBroadcastChannelType(e.target.value as 'WHATSAPP' | 'EMAIL' | 'TELEGRAM'); setBroadcastChannelId('') }}
                       >
                         <option value="WHATSAPP">WhatsApp</option>
                         {hasEmailChannel && <option value="EMAIL">E-mail</option>}
                         {hasTelegramChannel && <option value="TELEGRAM">Telegram</option>}
+                      </select>
+                    </div>
+                  )}
+
+                  {showLineSelector && (
+                    <div>
+                      <Label htmlFor="broadcast-line">Qual linha do WhatsApp</Label>
+                      <select
+                        id="broadcast-line"
+                        className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                        value={broadcastChannelId}
+                        onChange={(e) => setBroadcastChannelId(e.target.value)}
+                      >
+                        <option value="">Distribuir automaticamente entre as linhas</option>
+                        {whatsappChannels!.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name || c.displayPhoneNumber}</option>
+                        ))}
                       </select>
                     </div>
                   )}
