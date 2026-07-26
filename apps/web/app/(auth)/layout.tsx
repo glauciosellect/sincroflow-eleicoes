@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div
         className="auth-left"
         style={{
-          backgroundColor: '#002776',
+          backgroundColor: '#FFFFFF',
           backgroundImage: 'url(/capa-entrada.png)',
           backgroundSize: 'contain',
           backgroundRepeat: 'no-repeat',
