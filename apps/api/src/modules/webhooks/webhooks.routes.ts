@@ -1,9 +1,41 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import crypto from 'crypto'
+import axios from 'axios'
 import { prisma } from '../../lib/prisma'
 import { messageQueue } from '../../lib/queue'
 import { emitNewMessage } from '../../lib/socket'
 import { logger } from '../../lib/logger'
+
+// O app Meta é compartilhado entre este projeto (Eleições) e o SyncroFlow
+// padrão (produto "cliente comum"). A Callback URL do app só pode apontar
+// para um servidor por vez — está configurada aqui, no Eleições, que já
+// está em produção real. Números conectados pelo SyncroFlow padrão também
+// chegam nesta URL; quando o phone_number_id não é de um canal deste
+// projeto, repassamos a requisição bruta (mesmo corpo, mesma assinatura
+// HMAC) para a API do SyncroFlow padrão validar e processar.
+const SYNCROFLOW_PADRAO_WEBHOOK_URL = process.env.SYNCROFLOW_PADRAO_WEBHOOK_URL
+
+async function repassarParaSyncroflowPadrao(req: FastifyRequest, reply: any) {
+  if (!SYNCROFLOW_PADRAO_WEBHOOK_URL) {
+    logger.warn('[WEBHOOK-PROXY] SYNCROFLOW_PADRAO_WEBHOOK_URL não configurado — não é possível repassar')
+    return reply.status(404).send()
+  }
+  try {
+    const rawBody: Buffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body ?? {}))
+    const signature = req.headers['x-hub-signature-256'] as string | undefined
+    const res = await axios.post(SYNCROFLOW_PADRAO_WEBHOOK_URL, rawBody, {
+      headers: {
+        'content-type': 'application/json',
+        ...(signature ? { 'x-hub-signature-256': signature } : {}),
+      },
+      validateStatus: () => true,
+    })
+    return reply.status(res.status).send(res.data)
+  } catch (err: any) {
+    logger.error('[WEBHOOK-PROXY] Erro ao repassar webhook para SyncroFlow padrão', { error: err?.message })
+    return reply.status(502).send()
+  }
+}
 
 function safeEqual(a: string, b: string): boolean {
   try {
@@ -69,7 +101,10 @@ export async function webhookRoutes(app: FastifyInstance) {
       ? await prisma.channel.findUnique({ where: { type_externalId: { type: 'WHATSAPP', externalId: phoneNumberId } } })
       : await prisma.channel.findUnique({ where: { id: urlChannelId } })
 
-    if (!channel) return reply.status(404).send()
+    if (!channel) {
+      if (phoneNumberId) return repassarParaSyncroflowPadrao(req, reply)
+      return reply.status(404).send()
+    }
 
     await messageQueue.add('process', { channelId: channel.id, channelType: 'WHATSAPP', payload: body }, {
       attempts: 3,
