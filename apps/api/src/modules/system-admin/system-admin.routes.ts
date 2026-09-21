@@ -111,4 +111,31 @@ export async function systemAdminRoutes(app: FastifyInstance) {
     })
     return reply.send(updated)
   })
+
+  // Reverte SUSPENDED (vencimento de Pix/boleto não renovado) sem passar pelo
+  // fluxo normal de checkout — reativa o agente e estende o prazo pago. Usado
+  // pelo dono do sistema quando um candidato fica sem atendimento por engano
+  // (ex.: lembrete de renovação perdido) e precisa de acesso imediato.
+  app.post('/system/candidates/:id/reactivate', async (req, reply) => {
+    if (!requireSystemAdminKey(req, reply)) return
+    const { id } = req.params as { id: string }
+    const { extendDays } = z.object({ extendDays: z.number().int().min(1).max(3650).default(30) }).parse(req.body ?? {})
+
+    const candidate = await prisma.candidate.findUnique({ where: { id } })
+    if (!candidate) return reply.status(404).send({ error: 'Candidato não encontrado' })
+
+    const paidUntil = new Date(Date.now() + extendDays * 24 * 60 * 60 * 1000)
+
+    const [updated] = await prisma.$transaction([
+      prisma.candidate.update({
+        where: { id },
+        data: { status: 'ACTIVE', campaignPaidUntil: paidUntil },
+      }),
+      prisma.agentConfig.updateMany({
+        where: { candidateId: id },
+        data: { isActive: true, deactivatedAt: null, deactivationReason: null },
+      }),
+    ])
+    return reply.send(updated)
+  })
 }

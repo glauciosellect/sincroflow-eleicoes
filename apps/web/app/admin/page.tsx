@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Check, X, Search, Smartphone, MessageSquare, AlertTriangle, Signal } from 'lucide-react'
+import { Loader2, Check, X, Search, Smartphone, MessageSquare, AlertTriangle, Signal, RefreshCcw } from 'lucide-react'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -68,6 +68,12 @@ export default function AdminPage() {
   const addMsgsMutation = useMutation({
     mutationFn: ({ id, quantity }: { id: string; quantity: number }) =>
       api.post(`/system/candidates/${id}/add-active-msgs`, { quantity }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-candidates-search'] }),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: ({ id, extendDays }: { id: string; extendDays: number }) =>
+      api.post(`/system/candidates/${id}/reactivate`, { extendDays }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-candidates-search'] }),
   })
 
@@ -205,6 +211,18 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-4">
+                  {c.status !== 'ACTIVE' && (
+                    <div className="flex items-center gap-2">
+                      <RefreshCcw className="w-4 h-4 text-gray-400" />
+                      <button
+                        onClick={() => reactivateMutation.mutate({ id: c.id, extendDays: 30 })}
+                        disabled={reactivateMutation.isPending}
+                        className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg"
+                      >
+                        Reativar (30 dias)
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Smartphone className="w-4 h-4 text-gray-400" />
                     <input
