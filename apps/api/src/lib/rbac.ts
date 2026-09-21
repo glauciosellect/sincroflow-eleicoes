@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
 import { prisma } from './prisma'
 import { getWorkspaceId } from './workspace'
 import { shouldBlockForNonActivation } from './campaign-activation'
+import { isOwnerAccount } from './owner-accounts'
 
 // Módulos do produto, conforme docs/spec-eleicoes/04-modulos/4.10-equipe.md
 export type Module =
@@ -70,8 +71,13 @@ export function requireModule(module: Module) {
       return reply.status(403).send({ error: 'Sem permissão para acessar este módulo' })
     }
 
-    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { campaignActivated: true } })
-    if (!candidate || !hasCampaignAccess(module, candidate.campaignActivated)) {
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId }, select: { campaignActivated: true, email: true } })
+    if (!candidate) {
+      return reply.status(403).send({ error: 'Sem permissão para acessar este módulo' })
+    }
+    if (isOwnerAccount(candidate.email)) return
+
+    if (!hasCampaignAccess(module, candidate.campaignActivated)) {
       return reply.status(403).send({ error: 'Ative a campanha em Configurações → Financeiro para continuar usando este módulo', code: 'CAMPAIGN_NOT_ACTIVATED' })
     }
   }

@@ -1,9 +1,5 @@
 import { prisma } from '../../lib/prisma'
-
-// Contas do dono do sistema — nunca suspender por vencimento de Pix/boleto.
-// São usadas para testes e atendimento real da NuClick; ficar sem IA por causa
-// de um lembrete de renovação perdido não é aceitável para essas contas.
-const OWNER_EMAILS = ['nuclick10@gmail.com', 'glaucio.sellect@gmail.com', 'glaucio@syncroflow.com', 'glaucio2@syncroflow.com']
+import { OWNER_EMAILS } from '../../lib/owner-accounts'
 
 // Roda periodicamente (ver campaign-payment.worker.ts): suspende quem pagou por
 // Pix/boleto avulso (campaignPaidUntil) e não renovou a tempo. Sem tolerância —
